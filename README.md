@@ -65,6 +65,20 @@ npm run dev
 
 Open `http://localhost:3000` in your browser.
 
+## Environment Variables
+
+Next.js loads `.env*` files automatically for server-side code. Model provider settings are now defined and validated through [lib/config/env.ts](/Users/owa/code/mindmap/lib/config/env.ts).
+
+Use [.env.example](/Users/owa/code/mindmap/.env.example) as the template for local configuration.
+
+Required variables:
+
+- `MODEL_PROVIDER` — one of `openai`, `azure-openai`, or `openrouter`
+- `MODEL_API_KEY` — secret key for the chosen provider
+- `MODEL_BASE_URL` — optional override for provider-compatible endpoints
+- `MODEL_COMPLETION_MODEL` — model used for low-latency inline completions
+- `MODEL_GENERATION_MODEL` — model used for on-demand mindmap generation
+
 ## Available Scripts
 
 - `npm run dev` starts the local development server.
