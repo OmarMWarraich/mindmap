@@ -1,36 +1,104 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Mindmap
+
+Mindmap is a learning-first study app for turning course content into structured mindmaps while the user types. The main idea is that writing notes should also teach: the editor should suggest relevant next concepts, missing subtopics, clarifying facts, and useful follow-up ideas that stay tightly aligned with the current topic.
+
+## Product Goal
+
+The core workflow is:
+
+1. The user types topic content from a course book into a structured outline.
+2. The app offers inline suggestions that help them learn the next relevant thing, not just finish a phrase.
+3. The outline is parsed into a deterministic structure.
+4. The structure is turned into a visual mindmap that can later be refined and exported.
+
+This project is being built MVP-first. Deterministic structure, readability, and relevance come before broader AI features.
+
+## Current Status
+
+The repository is currently bootstrapped with Next.js, React, and TypeScript.
+
+Implemented now:
+
+- Next.js App Router project scaffold
+- React 19 + TypeScript setup
+- ESLint configuration
+- Initial project planning in [TODO.md](/Users/owa/code/mindmap/TODO.md)
+
+Planned next:
+
+- Study editor with Monaco
+- Deterministic DSL parser and validation
+- Inline learning-focused completions
+- Mindmap generation, layout, and SVG rendering
+- PNG export and local draft persistence
+
+## Tech Stack
+
+- Next.js 16
+- React 19
+- TypeScript 5
+- ESLint 9
+- Tailwind CSS 4
+
+Expected additions during implementation:
+
+- Monaco Editor for the structured study editor
+- ELK / elkjs for layout computation
+- Schema validation for AI responses
+- PNG export utilities
+- Local-first draft persistence
 
 ## Getting Started
 
-First, run the development server:
+Install dependencies if needed:
+
+```bash
+npm install
+```
+
+Run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000` in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Available Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `npm run dev` starts the local development server.
+- `npm run build` creates the production build.
+- `npm run start` runs the production server.
+- `npm run lint` runs ESLint.
 
-## Learn More
+## Project Structure
 
-To learn more about Next.js, take a look at the following resources:
+- [app](/Users/owa/code/mindmap/app) contains the Next.js App Router entrypoints.
+- [public](/Users/owa/code/mindmap/public) contains static assets.
+- [TODO.md](/Users/owa/code/mindmap/TODO.md) tracks the phased implementation plan.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Development Direction
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+This app is intentionally not a generic note editor. The completion system is meant to behave like a study assistant:
 
-## Deploy on Vercel
+- stay inside the current topic and branch
+- prefer educationally useful additions over generic completions
+- suggest the next relevant idea a student should know
+- avoid duplication and unsupported tangents
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The parser will remain the source of truth for structure. AI should enrich the writing experience, not invent the hierarchy.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Roadmap
+
+The execution plan is tracked in [TODO.md](/Users/owa/code/mindmap/TODO.md). The current build order is:
+
+1. Foundation and app shell
+2. DSL and shared data contracts
+3. Deterministic parsing and validation
+4. Editor workflow
+5. Deterministic mindmap generation
+6. Layout and rendering
+7. Inline completion service
+8. AI-assisted mindmap generation
+9. Export and persistence
+10. Hardening and release readiness
