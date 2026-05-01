@@ -85,6 +85,8 @@ Required variables:
 - `npm run build` creates the production build.
 - `npm run start` runs the production server.
 - `npm run lint` runs ESLint.
+- `npm run test` runs the Node.js test runner and will execute discovered test files as they are added.
+- `npm run typecheck` runs TypeScript type checking without emitting build output.
 
 ## Project Structure
 
