@@ -1,8 +1,8 @@
 import MonacoSmokeTest from "../components/MonacoSmokeTest";
-import { getModelProviderEnvStatus } from "../lib/config/env";
+import { getModelProviderEnv } from "../lib/config/env";
 
 export default function Home() {
-  const modelProviderStatus = getModelProviderEnvStatus();
+  const modelProviderEnv = getModelProviderEnv();
 
   return (
     <main className="min-h-screen bg-zinc-50 px-6 py-12 text-zinc-950 sm:px-10 lg:px-12">
@@ -12,16 +12,8 @@ export default function Home() {
             <span className="text-sm font-medium uppercase tracking-[0.2em] text-zinc-500">
               Mindmap MVP
             </span>
-            <span
-              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
-                modelProviderStatus.isValid
-                  ? "bg-emerald-100 text-emerald-700"
-                  : "bg-amber-100 text-amber-800"
-              }`}
-            >
-              {modelProviderStatus.isValid
-                ? `Model provider ready: ${modelProviderStatus.env.MODEL_PROVIDER}`
-                : "Model provider config incomplete"}
+            <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
+              {`Model provider ready: ${modelProviderEnv.MODEL_PROVIDER}`}
             </span>
           </div>
           <div className="grid gap-3">
@@ -33,12 +25,10 @@ export default function Home() {
               actions, a structured editor for writing, and a preview pane for the
               generated mindmap.
             </p>
-            {!modelProviderStatus.isValid ? (
-              <p className="max-w-3xl text-sm leading-6 text-amber-700">
-                AI features will stay unavailable until the model provider variables are
-                configured. See `.env.example` for the required keys.
-              </p>
-            ) : null}
+            <p className="max-w-3xl text-sm leading-6 text-zinc-500">
+              Environment variables are validated on the server during render so model
+              misconfiguration fails fast before AI features are wired in.
+            </p>
           </div>
         </section>
 
