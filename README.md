@@ -22,6 +22,8 @@ Implemented now:
 - Next.js App Router project scaffold
 - React 19 + TypeScript setup
 - ESLint configuration
+- Monaco dependency setup and smoke-test mount
+- Core runtime dependencies for layout, schema validation, export, and persistence
 - Initial project planning in [TODO.md](/Users/owa/code/mindmap/TODO.md)
 
 Planned next:
@@ -39,14 +41,13 @@ Planned next:
 - TypeScript 5
 - ESLint 9
 - Tailwind CSS 4
+- Monaco Editor via `@monaco-editor/react`
+- ELK via `elkjs`
+- Runtime schema validation via `zod`
+- PNG export via `html-to-image`
+- IndexedDB persistence via `idb`
 
-Expected additions during implementation:
-
-- Monaco Editor for the structured study editor
-- ELK / elkjs for layout computation
-- Schema validation for AI responses
-- PNG export utilities
-- Local-first draft persistence
+These dependencies are installed, but most of their feature-specific integration work is still ahead.
 
 ## Getting Started
 
