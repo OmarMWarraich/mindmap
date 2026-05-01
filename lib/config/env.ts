@@ -1,3 +1,5 @@
+import "server-only";
+
 import { z } from "zod";
 
 const requiredValue = (name: string) =>
@@ -21,6 +23,10 @@ const modelProviderEnvSchema = z.object({
 });
 
 export type ModelProviderEnv = z.infer<typeof modelProviderEnvSchema>;
+
+export type ModelProviderEnvStatus =
+  | { isValid: true; env: ModelProviderEnv }
+  | { isValid: false; error: string };
 
 let cachedModelProviderEnv: ModelProviderEnv | null = null;
 
@@ -60,4 +66,23 @@ export function getModelProviderEnv(): ModelProviderEnv {
 
   cachedModelProviderEnv = Object.freeze(validateModelProviderEnv());
   return cachedModelProviderEnv;
+}
+
+export function getModelProviderEnvStatus(
+  env: NodeJS.ProcessEnv = process.env,
+): ModelProviderEnvStatus {
+  try {
+    return {
+      isValid: true,
+      env: validateModelProviderEnv(env),
+    };
+  } catch (error) {
+    return {
+      isValid: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unknown model provider configuration error",
+    };
+  }
 }

@@ -24,7 +24,7 @@ Implemented now:
 - ESLint configuration
 - Monaco dependency setup and smoke-test mount
 - Core runtime dependencies for layout, schema validation, export, and persistence
-- Initial project planning in [TODO.md](/Users/owa/code/mindmap/TODO.md)
+- Initial project planning in [TODO.md](TODO.md)
 
 Planned next:
 
@@ -67,9 +67,9 @@ Open `http://localhost:3000` in your browser.
 
 ## Environment Variables
 
-Next.js loads `.env*` files automatically for server-side code. Model provider settings are now defined and validated through [lib/config/env.ts](/Users/owa/code/mindmap/lib/config/env.ts).
+Next.js loads `.env*` files automatically for server-side code. Model provider settings are now defined and validated through [lib/config/env.ts](lib/config/env.ts).
 
-Use [.env.example](/Users/owa/code/mindmap/.env.example) as the template for local configuration.
+Use [.env.example](.env.example) as the template for local configuration.
 
 Required variables:
 
@@ -90,9 +90,9 @@ Required variables:
 
 ## Project Structure
 
-- [app](/Users/owa/code/mindmap/app) contains the Next.js App Router entrypoints.
-- [public](/Users/owa/code/mindmap/public) contains static assets.
-- [TODO.md](/Users/owa/code/mindmap/TODO.md) tracks the phased implementation plan.
+- [app](app) contains the Next.js App Router entrypoints.
+- [public](public) contains static assets.
+- [TODO.md](TODO.md) tracks the phased implementation plan.
 
 ## Development Direction
 
@@ -107,7 +107,7 @@ The parser will remain the source of truth for structure. AI should enrich the w
 
 ## Roadmap
 
-The execution plan is tracked in [TODO.md](/Users/owa/code/mindmap/TODO.md). The current build order is:
+The execution plan is tracked in [TODO.md](TODO.md). The current build order is:
 
 1. Foundation and app shell
 2. DSL and shared data contracts

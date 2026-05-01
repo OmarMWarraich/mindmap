@@ -1,13 +1,29 @@
 import MonacoSmokeTest from "../components/MonacoSmokeTest";
+import { getModelProviderEnvStatus } from "../lib/config/env";
 
 export default function Home() {
+  const modelProviderStatus = getModelProviderEnvStatus();
+
   return (
     <main className="min-h-screen bg-zinc-50 px-6 py-12 text-zinc-950 sm:px-10 lg:px-12">
       <div className="mx-auto grid max-w-7xl gap-8">
         <section className="grid gap-4 rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">
-          <span className="text-sm font-medium uppercase tracking-[0.2em] text-zinc-500">
-            Mindmap MVP
-          </span>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm font-medium uppercase tracking-[0.2em] text-zinc-500">
+              Mindmap MVP
+            </span>
+            <span
+              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
+                modelProviderStatus.isValid
+                  ? "bg-emerald-100 text-emerald-700"
+                  : "bg-amber-100 text-amber-800"
+              }`}
+            >
+              {modelProviderStatus.isValid
+                ? `Model provider ready: ${modelProviderStatus.env.MODEL_PROVIDER}`
+                : "Model provider config incomplete"}
+            </span>
+          </div>
           <div className="grid gap-3">
             <h1 className="max-w-3xl text-4xl font-semibold tracking-tight text-zinc-950">
               Learning-first mindmap workspace
@@ -17,6 +33,12 @@ export default function Home() {
               actions, a structured editor for writing, and a preview pane for the
               generated mindmap.
             </p>
+            {!modelProviderStatus.isValid ? (
+              <p className="max-w-3xl text-sm leading-6 text-amber-700">
+                AI features will stay unavailable until the model provider variables are
+                configured. See `.env.example` for the required keys.
+              </p>
+            ) : null}
           </div>
         </section>
 

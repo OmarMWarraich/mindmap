@@ -36,7 +36,7 @@ export default function MonacoSmokeTest() {
         </p>
       </div>
 
-      <div className="h-full min-h-[460px] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+      <div className="h-[460px] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
         <Editor
           defaultLanguage="markdown"
           defaultValue={smokeTestOutline}
