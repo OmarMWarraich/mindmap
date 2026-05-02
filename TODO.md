@@ -108,7 +108,7 @@ Purpose: Protects the core transformation logic from regressions as heuristics a
 - [x] Translate mindmap JSON into ELK graph input
 Purpose: Connects the app's internal graph model to a layout engine that can compute readable positions.
 
-- [ ] Run ELK layout in a Web Worker
+- [x] Run ELK layout in a Web Worker
 Purpose: Keeps layout computation off the main thread so typing and UI interactions stay responsive.
 
 - [ ] Configure radial layout spacing rules for level distance, sibling gap, and canvas padding

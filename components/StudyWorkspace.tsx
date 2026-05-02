@@ -11,6 +11,11 @@ import {
   getStubInlineSuggestionSet,
   pickPreferredStubSuggestion,
 } from '../lib/dsl/inline-completion';
+import { generateMindmapFromAst } from '../lib/mindmap/from-ast';
+import type {
+  MindmapLayoutResult,
+  MindmapLayoutWorkerResponse,
+} from '../lib/mindmap/layout';
 import { parseMindmapDsl } from '../lib/dsl/parse';
 import { mindmapDslStarterOutline } from '../lib/dsl/mvp';
 import type { MindmapValidationIssue } from '../lib/dsl/validation';
@@ -31,6 +36,7 @@ const editorLoadingFallback = (
 export default function StudyWorkspace() {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const editorDisposablesRef = useRef<Array<{ dispose(): void }>>([]);
+  const layoutWorkerRef = useRef<Worker | null>(null);
   const ghostTextDecorationIdsRef = useRef<string[]>([]);
   const ghostTextStateRef = useRef<{
     position: { lineNumber: number; column: number };
@@ -39,6 +45,7 @@ export default function StudyWorkspace() {
   const [outline, setOutline] = useState(mindmapDslStarterOutline);
   const [debouncedOutline, setDebouncedOutline] = useState(mindmapDslStarterOutline);
   const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
+  const [layoutResult, setLayoutResult] = useState<MindmapLayoutResult | null>(null);
   const [inlineSuggestionPreference, setInlineSuggestionPreference] =
     useState<InlineSuggestionPreference>('auto');
 
@@ -68,6 +75,16 @@ export default function StudyWorkspace() {
     [inlineSuggestionPreference, stubSuggestionSet],
   );
   const isParsing = outline !== debouncedOutline;
+  const generatedMindmap = useMemo(() => {
+    if (!parseResult.ast) {
+      return null;
+    }
+
+    return generateMindmapFromAst(parseResult.ast, {
+      warnings: parseResult.warnings,
+      errors: parseResult.errors,
+    });
+  }, [parseResult.ast, parseResult.errors, parseResult.warnings]);
   const branchCount = parseResult.ast?.root.branches.length ?? 0;
   const nodeCount = (parseResult.ast?.root.branches ?? []).reduce((count, branch) => {
     const countChildren = (children: typeof branch.children): number => {
@@ -124,6 +141,41 @@ export default function StudyWorkspace() {
       ],
     );
   }, [cursorPosition, preferredStubSuggestion]);
+
+  useEffect(() => {
+    if (!window.Worker) {
+      return;
+    }
+
+    const worker = new Worker(new URL('../workers/mindmap-layout.worker.ts', import.meta.url), {
+      type: 'module',
+    });
+
+    worker.onmessage = (event: MessageEvent<MindmapLayoutWorkerResponse>) => {
+      if (event.data.type === 'layout-success') {
+        setLayoutResult(event.data.result);
+      }
+    };
+
+    layoutWorkerRef.current = worker;
+
+    return () => {
+      worker.terminate();
+      layoutWorkerRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!generatedMindmap || !layoutWorkerRef.current) {
+      setLayoutResult(null);
+      return;
+    }
+
+    layoutWorkerRef.current.postMessage({
+      type: 'layout',
+      mindmap: generatedMindmap,
+    });
+  }, [generatedMindmap]);
 
   useEffect(() => {
     return () => {
@@ -315,6 +367,9 @@ export default function StudyWorkspace() {
               </span>
               <span className="rounded-full bg-zinc-100 px-3 py-1 font-medium text-zinc-700">
                 {branchCount} branches
+              </span>
+              <span className="rounded-full bg-zinc-100 px-3 py-1 font-medium text-zinc-700">
+                {layoutResult ? 'Worker layout ready' : 'Worker idle'}
               </span>
             </div>
             <p className="leading-6 text-zinc-600">
