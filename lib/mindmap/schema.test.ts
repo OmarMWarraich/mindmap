@@ -90,6 +90,68 @@ test("generateMindmapFromAst assigns deterministic graph ids even when AST ids c
   assert.equal(generated.edges.every((edge) => edge.id.includes("->")), true);
 });
 
+test("generateMindmapFromAst keeps duplicate sibling labels distinct by position", () => {
+  const generated = generateMindmapFromAst({
+    root: {
+      id: "root-duplicate-labels",
+      kind: "root",
+      label: "Duplicate labels",
+      source: {
+        line: 1,
+        column: 1,
+        indentLevel: 0,
+        raw: "@root: Duplicate labels",
+      },
+      branches: [
+        {
+          id: "branch-repeated",
+          kind: "branch",
+          label: "Overview",
+          source: {
+            line: 2,
+            column: 1,
+            indentLevel: 0,
+            raw: "- @branch: Overview",
+          },
+          children: [
+            {
+              id: "leaf-a",
+              kind: "leaf",
+              label: "Repeated label",
+              source: {
+                line: 3,
+                column: 3,
+                indentLevel: 1,
+                raw: "  - Repeated label",
+              },
+              children: [],
+            },
+            {
+              id: "leaf-b",
+              kind: "leaf",
+              label: "Repeated label",
+              source: {
+                line: 4,
+                column: 3,
+                indentLevel: 1,
+                raw: "  - Repeated label",
+              },
+              children: [],
+            },
+          ],
+        },
+      ],
+    },
+  });
+
+  const branchNode = generated.nodes.find((node) => node.id === "branch-1-overview");
+
+  assert.deepEqual(branchNode?.childIds, [
+    "node-1-1-repeated-label",
+    "node-1-2-repeated-label",
+  ]);
+});
+
 test("generateMindmapFromAst cleans labels and groups overloaded branches", () => {
   const generated = generateMindmapFromAst({
     root: {
