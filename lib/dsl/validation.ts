@@ -4,6 +4,7 @@ import type {
   MindmapAstNode,
   MindmapAstNodeKind,
   MindmapAstSource,
+  MindmapDocumentAst,
 } from "./ast.ts";
 
 export type MindmapValidationSeverity = "warning" | "error";
@@ -85,7 +86,7 @@ export interface MindmapValidationError extends MindmapValidationIssue {
 }
 
 export interface MindmapValidationResult {
-  ast: MindmapAstNode | null;
+  ast: MindmapDocumentAst | null;
   warnings: MindmapValidationWarning[];
   errors: MindmapValidationError[];
 }
