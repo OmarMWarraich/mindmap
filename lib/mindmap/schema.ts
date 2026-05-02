@@ -53,7 +53,62 @@ export const generatedMindmapSchema = z.object({
   edges: z.array(mindmapEdgeSchema),
   warnings: z.array(mindmapValidationWarningSchema),
   errors: z.array(mindmapValidationErrorSchema),
-}).strict();
+}).strict().superRefine((mindmap, ctx) => {
+   const nodeIds = new Set<string>();
+   const duplicateNodeIds = new Set<string>();
+   mindmap.nodes.forEach((node) => {
+     if (nodeIds.has(node.id)) {
+       duplicateNodeIds.add(node.id);
+       return;
+     }
+     nodeIds.add(node.id);
+   });
+   mindmap.nodes.forEach((node, nodeIndex) => {
+     if (!duplicateNodeIds.has(node.id)) {
+       return;
+     }
+     ctx.addIssue({
+       code: z.ZodIssueCode.custom,
+       path: ["nodes", nodeIndex, "id"],
+       message: `Duplicate node id "${node.id}"`,
+     });
+   });
+   if (!nodeIds.has(mindmap.metadata.rootId)) {
+     ctx.addIssue({
+       code: z.ZodIssueCode.custom,
+       path: ["metadata", "rootId"],
+       message: `Root node "${mindmap.metadata.rootId}" does not exist in nodes`,
+     });
+   }
+   mindmap.edges.forEach((edge, edgeIndex) => {
+     if (!nodeIds.has(edge.from)) {
+       ctx.addIssue({
+         code: z.ZodIssueCode.custom,
+         path: ["edges", edgeIndex, "from"],
+         message: `Edge source "${edge.from}" does not exist in nodes`,
+       });
+     }
+     if (!nodeIds.has(edge.to)) {
+       ctx.addIssue({
+         code: z.ZodIssueCode.custom,
+         path: ["edges", edgeIndex, "to"],
+         message: `Edge target "${edge.to}" does not exist in nodes`,
+       });
+     }
+   });
+   mindmap.nodes.forEach((node, nodeIndex) => {
+     node.childIds.forEach((childId, childIndex) => {
+       if (nodeIds.has(childId)) {
+         return;
+       }
+       ctx.addIssue({
+         code: z.ZodIssueCode.custom,
+         path: ["nodes", nodeIndex, "childIds", childIndex],
+         message: `Child node "${childId}" does not exist in nodes`,
+       });
+     });
+   });
+ });
 
 export type MindmapNodeKind = z.infer<typeof mindmapNodeKindSchema>;
 export type MindmapEdge = z.infer<typeof mindmapEdgeSchema>;

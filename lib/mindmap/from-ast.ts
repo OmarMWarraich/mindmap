@@ -10,9 +10,9 @@ import type {
 import {
   getMindmapBranchColorToken,
   getMindmapTintTone,
-} from "./palette";
+} from "./palette.ts";
 import type { GeneratedMindmap, MindmapEdge, MindmapNode } from "./schema.ts";
-import { validateGeneratedMindmap } from "./schema";
+import { validateGeneratedMindmap } from "./schema.ts";
 
 export interface GenerateMindmapFromAstOptions {
   warnings?: MindmapValidationWarning[];

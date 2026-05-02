@@ -79,7 +79,7 @@ Each document has exactly one root line, followed by one or more top-level branc
 
 ### Leaf Nodes
 
-- Any non-empty line that is not `@root` or `@branch` is a leaf node.
+- A leaf node is any non-empty non-`@branch` line written as `- <label>`.
 - Leaf nodes must be written as `- <label>`.
 - Leaf nodes require a label after the marker.
 - A leaf node may appear directly under a branch or under another leaf node.

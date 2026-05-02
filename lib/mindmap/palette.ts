@@ -29,7 +29,11 @@ export const mindmapTintRules: readonly MindmapTintRule[] = [
 export function getMindmapBranchColorToken(
   branchIndex: number,
 ): MindmapBranchColorToken {
-  return mindmapBranchColorTokens[branchIndex % mindmapBranchColorTokens.length];
+  const normalizedIndex =
+     ((branchIndex % mindmapBranchColorTokens.length) +
+       mindmapBranchColorTokens.length) %
+     mindmapBranchColorTokens.length;
+   return mindmapBranchColorTokens[normalizedIndex];
 }
 
 export function getMindmapTintTone(level: number): MindmapTintTone {
