@@ -3,7 +3,11 @@ import { z } from "zod";
 import {
   mindmapValidationErrorSchema,
   mindmapValidationWarningSchema,
-} from "../dsl/validation";
+} from "../dsl/validation.ts";
+import {
+  mindmapBranchColorTokens,
+  mindmapTintTones,
+} from "./palette.ts";
 
 export const mindmapNodeKindSchema = z.enum(["root", "branch", "leaf"]);
 
@@ -16,7 +20,8 @@ export const mindmapEdgeSchema = z.object({
 export const mindmapNodeStyleSchema = z.object({
   branchKey: z.string().min(1).optional(),
   branchIndex: z.number().int().nonnegative().optional(),
-  colorToken: z.string().min(1).optional(),
+  colorToken: z.enum(mindmapBranchColorTokens).optional(),
+  tintTone: z.enum(mindmapTintTones).optional(),
 }).strict();
 
 export const mindmapNodeSchema = z.object({

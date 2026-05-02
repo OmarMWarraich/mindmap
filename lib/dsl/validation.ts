@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import type { MindmapAstNode, MindmapAstNodeKind, MindmapAstSource } from "./ast";
+import type {
+  MindmapAstNode,
+  MindmapAstNodeKind,
+  MindmapAstSource,
+} from "./ast.ts";
 
 export type MindmapValidationSeverity = "warning" | "error";
 
