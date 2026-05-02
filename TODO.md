@@ -120,7 +120,7 @@ Purpose: Produces a crisp, scalable preview that is also easy to export as an im
 - [x] Add pan and zoom interactions to the preview canvas
 Purpose: Makes larger study maps navigable without shrinking everything to unreadable sizes.
 
-- [ ] Add loading and failure states around layout computation
+- [x] Add loading and failure states around layout computation
 Purpose: Prevents the preview from feeling broken when layout work is still running or fails.
 
 ### Phase 7 - Inline Completion Service

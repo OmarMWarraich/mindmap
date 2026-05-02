@@ -13,6 +13,7 @@ self.onmessage = async (event: MessageEvent<MindmapLayoutWorkerRequest>) => {
     const result = await layoutMindmapWithElk(event.data.mindmap);
     const response: MindmapLayoutWorkerResponse = {
       type: 'layout-success',
+      requestId: event.data.requestId,
       result,
     };
 
@@ -20,6 +21,7 @@ self.onmessage = async (event: MessageEvent<MindmapLayoutWorkerRequest>) => {
   } catch (error) {
     const response: MindmapLayoutWorkerResponse = {
       type: 'layout-error',
+      requestId: event.data.requestId,
       message: error instanceof Error ? error.message : 'Unknown ELK layout failure.',
     };
 

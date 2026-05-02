@@ -38,6 +38,7 @@ export default function StudyWorkspace() {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const editorDisposablesRef = useRef<Array<{ dispose(): void }>>([]);
   const layoutWorkerRef = useRef<Worker | null>(null);
+  const layoutRequestIdRef = useRef(0);
   const ghostTextDecorationIdsRef = useRef<string[]>([]);
   const ghostTextStateRef = useRef<{
     position: { lineNumber: number; column: number };
@@ -47,6 +48,8 @@ export default function StudyWorkspace() {
   const [debouncedOutline, setDebouncedOutline] = useState(mindmapDslStarterOutline);
   const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
   const [layoutResult, setLayoutResult] = useState<MindmapLayoutResult | null>(null);
+  const [layoutStatus, setLayoutStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [layoutError, setLayoutError] = useState<string | null>(null);
   const [inlineSuggestionPreference, setInlineSuggestionPreference] =
     useState<InlineSuggestionPreference>('auto');
 
@@ -145,6 +148,8 @@ export default function StudyWorkspace() {
 
   useEffect(() => {
     if (!window.Worker) {
+      setLayoutStatus('error');
+      setLayoutError('This browser does not support Web Workers for ELK layout.');
       return;
     }
 
@@ -153,9 +158,23 @@ export default function StudyWorkspace() {
     });
 
     worker.onmessage = (event: MessageEvent<MindmapLayoutWorkerResponse>) => {
+      if (event.data.requestId !== layoutRequestIdRef.current) {
+        return;
+      }
+
       if (event.data.type === 'layout-success') {
         setLayoutResult(event.data.result);
+        setLayoutStatus('ready');
+        setLayoutError(null);
+        return;
       }
+
+      setLayoutStatus('error');
+      setLayoutError(event.data.message);
+    };
+    worker.onerror = () => {
+      setLayoutStatus('error');
+      setLayoutError('The layout worker crashed while computing the radial preview.');
     };
 
     layoutWorkerRef.current = worker;
@@ -169,11 +188,19 @@ export default function StudyWorkspace() {
   useEffect(() => {
     if (!generatedMindmap || !layoutWorkerRef.current) {
       setLayoutResult(null);
+      setLayoutStatus('idle');
+      setLayoutError(null);
       return;
     }
 
+    const requestId = layoutRequestIdRef.current + 1;
+    layoutRequestIdRef.current = requestId;
+    setLayoutStatus('loading');
+    setLayoutError(null);
+
     layoutWorkerRef.current.postMessage({
       type: 'layout',
+      requestId,
       mindmap: generatedMindmap,
     });
   }, [generatedMindmap]);
@@ -370,7 +397,13 @@ export default function StudyWorkspace() {
                 {branchCount} branches
               </span>
               <span className="rounded-full bg-zinc-100 px-3 py-1 font-medium text-zinc-700">
-                {layoutResult ? 'Worker layout ready' : 'Worker idle'}
+                {layoutStatus === 'ready'
+                  ? 'Worker layout ready'
+                  : layoutStatus === 'loading'
+                    ? 'Worker computing'
+                    : layoutStatus === 'error'
+                      ? 'Worker failed'
+                      : 'Worker idle'}
               </span>
             </div>
             <p className="leading-6 text-zinc-600">
@@ -470,7 +503,12 @@ export default function StudyWorkspace() {
             </div>
           </div>
 
-          <MindmapSvgPreview layoutResult={layoutResult} mindmap={generatedMindmap} />
+          <MindmapSvgPreview
+            layoutError={layoutError}
+            layoutResult={layoutResult}
+            layoutStatus={layoutStatus}
+            mindmap={generatedMindmap}
+          />
         </aside>
       </div>
     </section>

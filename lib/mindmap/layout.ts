@@ -26,16 +26,19 @@ export interface MindmapLayoutResult {
 
 export interface MindmapLayoutWorkerRequest {
   type: 'layout';
+  requestId: number;
   mindmap: GeneratedMindmap;
 }
 
 export interface MindmapLayoutWorkerSuccess {
   type: 'layout-success';
+  requestId: number;
   result: MindmapLayoutResult;
 }
 
 export interface MindmapLayoutWorkerFailure {
   type: 'layout-error';
+  requestId: number;
   message: string;
 }
 
