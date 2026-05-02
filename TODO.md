@@ -77,7 +77,7 @@ Purpose: Supplies the completion system with local structural context such as cu
 - [x] Stub the inline completion integration before connecting the API
 Purpose: Lets the editor architecture support ghost text early without blocking on backend AI work.
 
-- [ ] Add a study guidance panel or lightweight hint surface next to the editor
+- [x] Add a study guidance panel or lightweight hint surface next to the editor
 Purpose: Gives the user a clear place to see why a suggestion is relevant, what subtopic it expands, or what adjacent concept it helps them learn.
 
 - [ ] Distinguish between continuation completions and enrichment completions in the editor UX

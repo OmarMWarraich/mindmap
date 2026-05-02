@@ -50,6 +50,14 @@ export default function StudyWorkspace() {
     () => getMindmapSectionContext(outline, cursorPosition),
     [cursorPosition, outline],
   );
+  const stubSuggestionSet = useMemo(
+    () => getStubInlineSuggestionSet(sectionContext),
+    [sectionContext],
+  );
+  const preferredStubSuggestion = useMemo(
+    () => pickPreferredStubSuggestion(stubSuggestionSet),
+    [stubSuggestionSet],
+  );
   const branchCount = parseResult.ast?.root.branches.length ?? 0;
   const nodeCount = (parseResult.ast?.root.branches ?? []).reduce((count, branch) => {
     const countChildren = (children: typeof branch.children): number => {
@@ -208,6 +216,43 @@ export default function StudyWorkspace() {
                 ? `Sub-branch trail: ${sectionContext.subBranchTrail.join(' / ')}`
                 : 'No nested sub-branch is active at the current cursor position.'}
             </p>
+          </div>
+
+          <div className="grid gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 text-sm text-emerald-950">
+            <div className="grid gap-1">
+              <h3 className="text-base font-semibold text-emerald-950">Study guidance</h3>
+              <p className="leading-6 text-emerald-900/80">
+                This hint surface explains what the stub assistant is trying to add in
+                the current section before the API-backed model is connected.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-emerald-200 bg-white p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                Current focus
+              </p>
+              <p className="mt-2 leading-6 text-emerald-950">
+                {sectionContext.branchLabel
+                  ? `${sectionContext.branchLabel}${
+                      sectionContext.subBranchTrail.length > 0
+                        ? ` -> ${sectionContext.subBranchTrail.join(' -> ')}`
+                        : ''
+                    }`
+                  : sectionContext.rootLabel ?? 'Start with a root topic'}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-emerald-200 bg-white p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                Ghost text preview
+              </p>
+              <p className="mt-2 rounded-xl bg-emerald-950 px-3 py-2 font-mono text-sm text-emerald-50">
+                {preferredStubSuggestion?.insertText || 'No inline hint for this cursor position.'}
+              </p>
+              <p className="mt-3 leading-6 text-emerald-900/80">
+                {preferredStubSuggestion?.explanation || 'Move the cursor into a partial label or a blank study slot to preview a hint.'}
+              </p>
+            </div>
           </div>
 
           <div className="grid min-h-[460px] place-items-center rounded-2xl border border-dashed border-zinc-300 bg-white p-6 text-center">
