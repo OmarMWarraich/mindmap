@@ -3,7 +3,7 @@
 import Editor from '@monaco-editor/react';
 import { startTransition, useEffect, useMemo, useRef, useState } from 'react';
 import type { Monaco } from '@monaco-editor/react';
-import type { editor, languages } from 'monaco-editor';
+import type { CancellationToken, editor, languages } from 'monaco-editor';
 
 import MindmapSvgPreview from './MindmapSvgPreview';
 import { requestInlineCompletionFromApi } from '../lib/completion/client';
@@ -324,6 +324,10 @@ export default function StudyWorkspace() {
                 );
                 editorDisposablesRef.current.push(
                   editor.onKeyDown((event) => {
+                    if (enableMonacoInlineCompletions) {
+                      return;
+                    }
+
                     if (event.browserEvent.key !== 'Tab') {
                       return;
                     }
@@ -614,6 +618,27 @@ function getGhostTextPreview(insertText: string): string {
     .trim();
 }
 
+function linkAbortControllerToCancellationToken(token: CancellationToken): {
+  abortController: AbortController;
+  dispose(): void;
+} {
+  const abortController = new AbortController();
+  const listener = token.onCancellationRequested(() => {
+    abortController.abort();
+  });
+
+  return {
+    abortController,
+    dispose() {
+      listener.dispose();
+    },
+  };
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError';
+}
+
 function configureMindmapDslMonaco(monaco: Monaco): void {
   if (
     !monaco.languages
@@ -636,36 +661,56 @@ function configureMindmapDslMonaco(monaco: Monaco): void {
       model: editor.ITextModel,
       position: { lineNumber: number; column: number },
       _context: languages.InlineCompletionContext,
-      token: { isCancellationRequested: boolean },
+      token: CancellationToken,
     ) {
       if (token.isCancellationRequested || model.isDisposed()) {
         return { items: [] };
       }
 
-      if (token.isCancellationRequested) {
-        return { items: [] };
-      }
+      const requestVersionId = model.getVersionId();
+      const { abortController, dispose } = linkAbortControllerToCancellationToken(token);
 
-      const response = await requestInlineCompletionFromApi({
-        outline: model.getValue(),
-        cursor: {
-          lineNumber: position.lineNumber,
-          column: position.column,
-        },
-      }).catch(() => null);
-
-      if (token.isCancellationRequested || !response || response.completionText.length === 0) {
-        return { items: [] };
-      }
-
-      return {
-        items: [
+      try {
+        const response = await requestInlineCompletionFromApi(
           {
-            insertText: response.completionText,
-            range: createInlineSuggestionRange(position),
+            outline: model.getValue(),
+            cursor: {
+              lineNumber: position.lineNumber,
+              column: position.column,
+            },
           },
-        ],
-      };
+          {
+            signal: abortController.signal,
+          },
+        );
+
+        if (
+          token.isCancellationRequested
+          || model.isDisposed()
+          || model.getVersionId() !== requestVersionId
+          || !response
+          || response.completionText.length === 0
+        ) {
+          return { items: [] };
+        }
+
+        return {
+          items: [
+            {
+              insertText: response.completionText,
+              range: createInlineSuggestionRange(position),
+            },
+          ],
+        };
+      } catch (error) {
+        if (isAbortError(error)) {
+          return { items: [] };
+        }
+
+        return { items: [] };
+      } finally {
+        dispose();
+      }
     },
     disposeInlineCompletions() {},
     displayName: 'Mindmap study assistant',

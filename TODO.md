@@ -211,7 +211,7 @@ Purpose: Keeps the per-keystroke assistance fast and prevents avoidable duplicat
 - [x] Wire Monaco `InlineCompletionsProvider` to the completion endpoint
 Purpose: Delivers the study-assistant UX directly inside the editor where learning and note entry happen together.
 
-- [ ] Support ghost-text acceptance with Tab and cancellation on rapid edits
+- [x] Support ghost-text acceptance with Tab and cancellation on rapid edits
 Purpose: Makes completions feel natural and unobtrusive rather than disruptive to note-taking flow.
 
 - [ ] Add instrumentation to track which suggestions are accepted, ignored, or dismissed
