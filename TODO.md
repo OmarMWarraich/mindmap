@@ -125,7 +125,7 @@ Purpose: Prevents the preview from feeling broken when layout work is still runn
 
 ### Phase 7 - Inline Completion Service
 
-- [ ] Implement the strict inline completion prompt template
+- [x] Implement the strict inline completion prompt template
 Purpose: Constrains the model to short, insertable text that matches the DSL while prioritizing relevant study enrichment over generic wording help.
 
 Reference prompt for implementation:
