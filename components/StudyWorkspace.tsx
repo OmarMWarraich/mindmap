@@ -2,11 +2,21 @@
 
 import Editor from '@monaco-editor/react';
 import { startTransition, useEffect, useMemo, useState } from 'react';
+import type { Monaco } from '@monaco-editor/react';
+import type { editor, languages } from 'monaco-editor';
 
 import { getMindmapSectionContext } from '../lib/dsl/editor-context';
+import {
+  createInlineSuggestionRange,
+  getStubInlineSuggestionSet,
+  pickPreferredStubSuggestion,
+} from '../lib/dsl/inline-completion';
 import { parseMindmapDsl } from '../lib/dsl/parse';
 import { mindmapDslStarterOutline } from '../lib/dsl/mvp';
 import type { MindmapValidationIssue } from '../lib/dsl/validation';
+
+let mindmapDslInlineCompletionRegistered = false;
+const mindmapDslLanguageId = 'mindmap-dsl';
 
 const editorLoadingFallback = (
   <div className="flex h-[460px] items-center justify-center rounded-2xl border border-zinc-200 bg-zinc-100 text-sm text-zinc-500">
@@ -107,7 +117,8 @@ export default function StudyWorkspace() {
 
           <div className="h-[460px] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
             <Editor
-              defaultLanguage="markdown"
+              beforeMount={configureMindmapDslMonaco}
+              defaultLanguage={mindmapDslLanguageId}
               height="100%"
               loading={editorLoadingFallback}
               onChange={(value) => {
@@ -127,6 +138,7 @@ export default function StudyWorkspace() {
               options={{
                 automaticLayout: true,
                 glyphMargin: false,
+                inlineSuggest: { enabled: true },
                 minimap: { enabled: false },
                 padding: { top: 16, bottom: 16 },
                 scrollBeyondLastLine: false,
@@ -283,4 +295,48 @@ function formatIssueLocation(issue: MindmapValidationIssue): string {
   }
 
   return column == null ? `line ${line}` : `line ${line}, col ${column}`;
+}
+
+function configureMindmapDslMonaco(monaco: Monaco): void {
+  if (
+    !monaco.languages
+      .getLanguages()
+      .some((language: languages.ILanguageExtensionPoint) => language.id === mindmapDslLanguageId)
+  ) {
+    monaco.languages.register({ id: mindmapDslLanguageId });
+  }
+
+  if (mindmapDslInlineCompletionRegistered) {
+    return;
+  }
+
+  monaco.languages.registerInlineCompletionsProvider(mindmapDslLanguageId, {
+    provideInlineCompletions(
+      model: editor.ITextModel,
+      position: { lineNumber: number; column: number },
+    ) {
+      const sectionContext = getMindmapSectionContext(model.getValue(), {
+        lineNumber: position.lineNumber,
+        column: position.column,
+      });
+      const suggestion = pickPreferredStubSuggestion(getStubInlineSuggestionSet(sectionContext));
+
+      if (!suggestion || suggestion.insertText.length === 0) {
+        return { items: [] };
+      }
+
+      return {
+        items: [
+          {
+            insertText: suggestion.insertText,
+            range: createInlineSuggestionRange(position),
+          },
+        ],
+      };
+    },
+    disposeInlineCompletions() {},
+    displayName: 'Mindmap study stub',
+  });
+
+  mindmapDslInlineCompletionRegistered = true;
 }

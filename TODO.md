@@ -74,7 +74,7 @@ Purpose: Helps users repair broken markup before generating a mindmap.
 - [x] Add section-awareness helpers based on cursor location
 Purpose: Supplies the completion system with local structural context such as current branch or sub-branch.
 
-- [ ] Stub the inline completion integration before connecting the API
+- [x] Stub the inline completion integration before connecting the API
 Purpose: Lets the editor architecture support ghost text early without blocking on backend AI work.
 
 - [ ] Add a study guidance panel or lightweight hint surface next to the editor
