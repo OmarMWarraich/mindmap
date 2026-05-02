@@ -187,7 +187,7 @@ CURRENT LINE WITH CURSOR MARKER:
 {{CURRENT_LINE_WITH_CURSOR}}
 ```
 
-- [ ] Build context extraction for recent text, line prefix, cursor position, and structural section
+- [x] Build context extraction for recent text, line prefix, cursor position, and structural section
 Purpose: Gives the completion model only the local context it needs to stay relevant and low-latency.
 
 - [ ] Add prompt rules that prefer adjacent concepts, missing subtopics, definitions, inputs/outputs, steps, and examples
