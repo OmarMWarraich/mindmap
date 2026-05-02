@@ -88,7 +88,7 @@ Purpose: Keeps simple typing assistance separate from knowledge-expanding sugges
 - [x] Convert AST data into the app's mindmap JSON format
 Purpose: Creates a working generation pipeline that does not depend on model output to build the graph.
 
-- [ ] Assign branch IDs, node IDs, levels, and edges deterministically
+- [x] Assign branch IDs, node IDs, levels, and edges deterministically
 Purpose: Guarantees the rendered graph has stable structure and traceable relationships.
 
 - [x] Apply top-level branch colors from the shared palette

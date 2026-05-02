@@ -44,3 +44,11 @@ test('stub inline completions can prefer enrichment over continuation when reque
   assert.equal(preferred?.kind, 'enrichment');
   assert.equal(preferred?.insertText, '\n  - Key detail');
 });
+
+test('stub inline completions do not emit multiline enrichment while typing inside the root label', () => {
+  const suggestions = getStubInlineSuggestionSet(
+    getMindmapSectionContext('@root: Photosynthesis', { lineNumber: 1, column: 12 }),
+  );
+
+  assert.equal(suggestions.enrichment, null);
+});

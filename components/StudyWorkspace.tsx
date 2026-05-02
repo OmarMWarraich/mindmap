@@ -1,7 +1,7 @@
 'use client';
 
 import Editor from '@monaco-editor/react';
-import { startTransition, useEffect, useMemo, useState } from 'react';
+import { startTransition, useEffect, useMemo, useRef, useState } from 'react';
 import type { Monaco } from '@monaco-editor/react';
 import type { editor, languages } from 'monaco-editor';
 
@@ -17,6 +17,7 @@ import type { MindmapValidationIssue } from '../lib/dsl/validation';
 
 let mindmapDslInlineCompletionRegistered = false;
 const mindmapDslLanguageId = 'mindmap-dsl';
+const enableMonacoInlineCompletions = false;
 let mindmapDslInlineSuggestionPreference: InlineSuggestionPreference = 'auto';
 
 type InlineSuggestionPreference = 'auto' | 'continuation' | 'enrichment';
@@ -28,6 +29,13 @@ const editorLoadingFallback = (
 );
 
 export default function StudyWorkspace() {
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const editorDisposablesRef = useRef<Array<{ dispose(): void }>>([]);
+  const ghostTextDecorationIdsRef = useRef<string[]>([]);
+  const ghostTextStateRef = useRef<{
+    position: { lineNumber: number; column: number };
+    suggestionText: string;
+  } | null>(null);
   const [outline, setOutline] = useState(mindmapDslStarterOutline);
   const [debouncedOutline, setDebouncedOutline] = useState(mindmapDslStarterOutline);
   const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
@@ -72,6 +80,59 @@ export default function StudyWorkspace() {
   useEffect(() => {
     mindmapDslInlineSuggestionPreference = inlineSuggestionPreference;
   }, [inlineSuggestionPreference]);
+
+  useEffect(() => {
+    const editor = editorRef.current;
+
+    if (!editor) {
+      return;
+    }
+
+    const ghostTextPreview = getGhostTextPreview(preferredStubSuggestion?.insertText ?? '');
+
+    if (!ghostTextPreview) {
+      ghostTextStateRef.current = null;
+      ghostTextDecorationIdsRef.current = editor.deltaDecorations(ghostTextDecorationIdsRef.current, []);
+      return;
+    }
+
+    const position = editor.getPosition() ?? cursorPosition;
+    ghostTextStateRef.current = {
+      position: {
+        lineNumber: position.lineNumber,
+        column: position.column,
+      },
+      suggestionText: preferredStubSuggestion?.insertText ?? '',
+    };
+
+    ghostTextDecorationIdsRef.current = editor.deltaDecorations(
+      ghostTextDecorationIdsRef.current,
+      [
+        {
+          range: createInlineSuggestionRange(position),
+          options: {
+            after: {
+              content: ghostTextPreview,
+              cursorStops: monacoInjectedTextCursorStops.none,
+              inlineClassName: 'mindmap-editor-ghost-text',
+              inlineClassNameAffectsLetterSpacing: true,
+            },
+            showIfCollapsed: true,
+            stickiness: 1,
+          },
+        },
+      ],
+    );
+  }, [cursorPosition, preferredStubSuggestion]);
+
+  useEffect(() => {
+    return () => {
+      editorDisposablesRef.current.forEach((disposable) => {
+        disposable.dispose();
+      });
+      editorDisposablesRef.current = [];
+    };
+  }, []);
 
   return (
     <section className="grid gap-4 rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
@@ -121,6 +182,7 @@ export default function StudyWorkspace() {
             <button
               className="rounded-full border border-emerald-300 bg-white px-4 py-2 text-sm font-medium text-emerald-900 transition hover:bg-emerald-100"
               onClick={() => {
+                editorRef.current?.setValue(mindmapDslStarterOutline);
                 setOutline(mindmapDslStarterOutline);
               }}
               type="button"
@@ -132,27 +194,87 @@ export default function StudyWorkspace() {
           <div className="h-[460px] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
             <Editor
               beforeMount={configureMindmapDslMonaco}
+              defaultValue={mindmapDslStarterOutline}
               defaultLanguage={mindmapDslLanguageId}
               height="100%"
               loading={editorLoadingFallback}
               onChange={(value) => {
                 setOutline(value ?? '');
               }}
-              onMount={(editor) => {
+              onMount={(editor, monaco) => {
+                editorDisposablesRef.current.forEach((disposable) => {
+                  disposable.dispose();
+                });
+                editorDisposablesRef.current = [];
+                editorRef.current = editor;
                 const position = editor.getPosition();
 
                 if (position) {
                   setCursorPosition(position);
                 }
 
-                editor.onDidChangeCursorPosition((event) => {
-                  setCursorPosition(event.position);
-                });
+                editorDisposablesRef.current.push(
+                  editor.onDidChangeCursorPosition((event) => {
+                    setCursorPosition(event.position);
+                  }),
+                );
+                editorDisposablesRef.current.push(
+                  editor.onDidChangeModelContent(() => {
+                    const nextPosition = editor.getPosition();
+
+                    if (nextPosition) {
+                      setCursorPosition(nextPosition);
+                    }
+                  }),
+                );
+                editorDisposablesRef.current.push(
+                  editor.onKeyDown((event) => {
+                    if (event.browserEvent.key !== 'Tab') {
+                      return;
+                    }
+
+                    const ghostTextState = ghostTextStateRef.current;
+                    const currentPosition = editor.getPosition();
+                    const selection = editor.getSelection();
+
+                    if (!ghostTextState || !currentPosition || !selection || !selection.isEmpty()) {
+                      return;
+                    }
+
+                    if (
+                      currentPosition.lineNumber !== ghostTextState.position.lineNumber ||
+                      currentPosition.column !== ghostTextState.position.column
+                    ) {
+                      return;
+                    }
+
+                    event.preventDefault();
+                    event.stopPropagation();
+                    editor.executeEdits('mindmap-ghost-text', [
+                      {
+                        range: createInlineSuggestionRange(ghostTextState.position),
+                        text: ghostTextState.suggestionText,
+                        forceMoveMarkers: true,
+                      },
+                    ]);
+                    editor.pushUndoStop();
+                    ghostTextStateRef.current = null;
+                    ghostTextDecorationIdsRef.current = editor.deltaDecorations(
+                      ghostTextDecorationIdsRef.current,
+                      [],
+                    );
+                    const nextPosition = editor.getPosition();
+                    if (nextPosition) {
+                      setCursorPosition(nextPosition);
+                    }
+                  }),
+                );
+                monaco.editor.remeasureFonts();
               }}
               options={{
                 automaticLayout: true,
                 glyphMargin: false,
-                inlineSuggest: { enabled: true },
+                inlineSuggest: { enabled: enableMonacoInlineCompletions },
                 minimap: { enabled: false },
                 padding: { top: 16, bottom: 16 },
                 scrollBeyondLastLine: false,
@@ -160,7 +282,6 @@ export default function StudyWorkspace() {
               }}
               path="mindmap://study-outline.dsl"
               theme="light"
-              value={outline}
             />
           </div>
 
@@ -380,6 +501,21 @@ function formatIssueLocation(issue: MindmapValidationIssue): string {
   return column == null ? `line ${line}` : `line ${line}, col ${column}`;
 }
 
+const monacoInjectedTextCursorStops = {
+  none: 3,
+} as const;
+
+function getGhostTextPreview(insertText: string): string {
+  if (!insertText) {
+    return '';
+  }
+
+  return insertText
+    .replace(/\r?\n/g, '  ↵  ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function configureMindmapDslMonaco(monaco: Monaco): void {
   if (
     !monaco.languages
@@ -393,15 +529,30 @@ function configureMindmapDslMonaco(monaco: Monaco): void {
     return;
   }
 
+  if (!enableMonacoInlineCompletions) {
+    return;
+  }
+
   monaco.languages.registerInlineCompletionsProvider(mindmapDslLanguageId, {
     provideInlineCompletions(
       model: editor.ITextModel,
       position: { lineNumber: number; column: number },
+      _context: languages.InlineCompletionContext,
+      token: { isCancellationRequested: boolean },
     ) {
+      if (token.isCancellationRequested || model.isDisposed()) {
+        return { items: [] };
+      }
+
       const sectionContext = getMindmapSectionContext(model.getValue(), {
         lineNumber: position.lineNumber,
         column: position.column,
       });
+
+      if (token.isCancellationRequested) {
+        return { items: [] };
+      }
+
       const suggestion = pickPreferredStubSuggestion(
         getStubInlineSuggestionSet(sectionContext),
         mindmapDslInlineSuggestionPreference,

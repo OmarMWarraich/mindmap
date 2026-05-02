@@ -108,6 +108,7 @@ function getEnrichmentSuggestion(
   context: MindmapSectionContext,
 ): StubInlineSuggestion | null {
   const trimmedPrefix = context.currentLinePrefix.trim();
+  const isAtLineEnd = context.currentLinePrefix.length === context.currentLine.length;
 
   if (trimmedPrefix.length === 0) {
     if (context.rootLabel == null) {
@@ -130,6 +131,10 @@ function getEnrichmentSuggestion(
   }
 
   if (context.currentLineKind === 'root') {
+    if (!isAtLineEnd) {
+      return null;
+    }
+
     return {
       kind: 'enrichment',
       insertText: '\n- @branch: Key idea',
@@ -138,6 +143,10 @@ function getEnrichmentSuggestion(
   }
 
   if (context.currentLineKind === 'branch') {
+    if (!isAtLineEnd) {
+      return null;
+    }
+
     return {
       kind: 'enrichment',
       insertText: `\n${MINDMAP_DSL_INDENT}- Key detail`,
@@ -146,6 +155,10 @@ function getEnrichmentSuggestion(
   }
 
   if (context.currentLineKind === 'leaf') {
+    if (!isAtLineEnd) {
+      return null;
+    }
+
     return {
       kind: 'enrichment',
       insertText: `\n${MINDMAP_DSL_INDENT.repeat(context.indentLevel + 1)}- Supporting fact`,

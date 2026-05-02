@@ -26,27 +26,31 @@ export function generateMindmapFromAst(
 ): GeneratedMindmap {
   const nodes: MindmapNode[] = [];
   const edges: MindmapEdge[] = [];
-  const branchOrder = ast.root.branches.map((branch) => branch.id);
+  const rootLabel = normalizeMindmapLabel(ast.root.label);
+  const rootId = createRootId(rootLabel);
+  const branchOrder = ast.root.branches.map((branch, branchIndex) =>
+    createBranchId(branchIndex, normalizeMindmapLabel(branch.label)),
+  );
 
   nodes.push({
-    id: ast.root.id,
+    id: rootId,
     kind: "root",
-    label: ast.root.label,
+    label: rootLabel,
     level: 0,
     parentId: null,
-    branchId: ast.root.id,
+    branchId: rootId,
     childIds: branchOrder,
   });
 
   ast.root.branches.forEach((branch, branchIndex) => {
-    appendBranch(branch, ast.root.id, branchIndex, nodes, edges);
+    appendBranch(branch, rootId, branchIndex, nodes, edges);
   });
 
   return validateGeneratedMindmap({
     version: "1.0",
     metadata: {
       title: ast.root.label,
-      rootId: ast.root.id,
+      rootId,
       branchOrder,
       ...(options.generatedAt ? { generatedAt: options.generatedAt } : {}),
       source: {
@@ -68,18 +72,22 @@ function appendBranch(
   nodes: MindmapNode[],
   edges: MindmapEdge[],
 ): void {
+  const branchLabel = normalizeMindmapLabel(branch.label);
+  const branchId = createBranchId(branchIndex, branchLabel);
   const colorToken = getMindmapBranchColorToken(branchIndex);
 
   nodes.push({
-    id: branch.id,
+    id: branchId,
     kind: "branch",
-    label: branch.label,
+    label: branchLabel,
     level: 1,
     parentId: rootId,
-    branchId: branch.id,
-    childIds: branch.children.map((child) => child.id),
+    branchId: branchId,
+    childIds: branch.children.map((child, childIndex) =>
+      createNodeId([branchIndex + 1, childIndex + 1], normalizeMindmapLabel(child.label)),
+    ),
     style: {
-      branchKey: branch.id,
+      branchKey: branchId,
       branchIndex,
       colorToken,
       tintTone: getMindmapTintTone(1),
@@ -87,13 +95,22 @@ function appendBranch(
   });
 
   edges.push({
-    id: createEdgeId(rootId, branch.id),
+    id: createEdgeId(rootId, branchId),
     from: rootId,
-    to: branch.id,
+    to: branchId,
   });
 
-  branch.children.forEach((child) => {
-    appendLeaf(child, branch.id, branch.id, branchIndex, 2, nodes, edges);
+  branch.children.forEach((child, childIndex) => {
+    appendLeaf(
+      child,
+      branchId,
+      branchId,
+      branchIndex,
+      2,
+      nodes,
+      edges,
+      [branchIndex + 1, childIndex + 1],
+    );
   });
 }
 
@@ -105,15 +122,21 @@ function appendLeaf(
   level: number,
   nodes: MindmapNode[],
   edges: MindmapEdge[],
+  path: number[],
 ): void {
+  const label = normalizeMindmapLabel(leaf.label);
+  const nodeId = createNodeId(path, label);
+
   nodes.push({
-    id: leaf.id,
+    id: nodeId,
     kind: "leaf",
-    label: leaf.label,
+    label,
     level,
     parentId,
     branchId,
-    childIds: leaf.children.map((child) => child.id),
+    childIds: leaf.children.map((child, childIndex) =>
+      createNodeId([...path, childIndex + 1], normalizeMindmapLabel(child.label)),
+    ),
     style: {
       branchKey: branchId,
       branchIndex,
@@ -123,16 +146,50 @@ function appendLeaf(
   });
 
   edges.push({
-    id: createEdgeId(parentId, leaf.id),
+    id: createEdgeId(parentId, nodeId),
     from: parentId,
-    to: leaf.id,
+    to: nodeId,
   });
 
-  leaf.children.forEach((child) => {
-    appendLeaf(child, leaf.id, branchId, branchIndex, level + 1, nodes, edges);
+  leaf.children.forEach((child, childIndex) => {
+    appendLeaf(
+      child,
+      nodeId,
+      branchId,
+      branchIndex,
+      level + 1,
+      nodes,
+      edges,
+      [...path, childIndex + 1],
+    );
   });
+}
+
+function createRootId(label: string): string {
+  return `root-${createStableSlug(label) || "topic"}`;
+}
+
+function createBranchId(branchIndex: number, label: string): string {
+  return `branch-${branchIndex + 1}-${createStableSlug(label) || "section"}`;
+}
+
+function createNodeId(path: number[], label: string): string {
+  return `node-${path.join("-")}-${createStableSlug(label) || "item"}`;
 }
 
 function createEdgeId(from: string, to: string): string {
   return `${from}->${to}`;
+}
+
+function normalizeMindmapLabel(label: string): string {
+  return label.replace(/\s+/g, " ").trim();
+}
+
+function createStableSlug(label: string): string {
+  return label
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
