@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   createInlineCompletionPrompt,
+  inlineCompletionPreferenceRules,
   inlineCompletionSystemPrompt,
   inlineCompletionUserPromptTemplate,
 } from './prompt.ts';
@@ -33,4 +34,20 @@ test('inline completion user template preserves the study-enrichment decision ru
   assert.match(inlineCompletionUserPromptTemplate, /a missing definition/);
   assert.match(inlineCompletionUserPromptTemplate, /Do not duplicate nearby sibling nodes or recently written ideas\./);
   assert.match(inlineCompletionUserPromptTemplate, /If that answer is clear and insertable, output it\./);
+});
+
+test('inline completion preference rules prioritize adjacent study enrichment', () => {
+  assert.match(inlineCompletionPreferenceRules, /Prefer the nearest adjacent concept/);
+  assert.match(inlineCompletionPreferenceRules, /Prefer missing subtopics over rewording text the user already wrote\./);
+  assert.match(inlineCompletionPreferenceRules, /definitions, inputs and outputs, process steps, causes and effects, functions, and concrete examples/);
+});
+
+test('inline completion prompt appends the preference rules after the base template', () => {
+  const prompt = createInlineCompletionPrompt({
+    lastTokens: 'ATP synthase uses proton gradient',
+    currentBranchAndSubbranch: 'Branch: Light reactions\nSub-branch: Chemiosmosis',
+    currentLineWithCursor: '  - proton gradi<CURSOR>',
+  });
+
+  assert.ok(prompt.user.includes(inlineCompletionPreferenceRules));
 });

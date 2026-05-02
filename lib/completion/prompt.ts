@@ -9,6 +9,13 @@ export interface InlineCompletionPrompt {
   user: string;
 }
 
+export const inlineCompletionPreferenceRules = `Additional priority rules:
+- Prefer the nearest adjacent concept that logically follows the active branch or sub-branch.
+- Prefer missing subtopics over rewording text the user already wrote.
+- Prefer definitions, inputs and outputs, process steps, causes and effects, functions, and concrete examples.
+- If multiple candidates are valid, choose the one that best deepens the current study path without widening scope.
+- Favor insertions that can fit as the next sibling or continuation before inventing deeper structure.`;
+
 export const inlineCompletionSystemPrompt = `You are an inline study assistant for a structured mindmap editor.
 Your job is to help the user learn while they type.
 You must suggest the next most relevant piece of study content, not just the next few words.
@@ -68,6 +75,7 @@ export function createInlineCompletionPrompt(
   return {
     system: inlineCompletionSystemPrompt,
     user: inlineCompletionUserPromptTemplate
+      .concat(`\n\n${inlineCompletionPreferenceRules}`)
       .replace('{{LAST_N_TOKENS}}', input.lastTokens)
       .replace('{{CURRENT_BRANCH_AND_SUBBRANCH}}', input.currentBranchAndSubbranch)
       .replace('{{CURRENT_LINE_WITH_CURSOR}}', input.currentLineWithCursor),

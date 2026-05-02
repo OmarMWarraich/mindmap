@@ -190,7 +190,7 @@ CURRENT LINE WITH CURSOR MARKER:
 - [x] Build context extraction for recent text, line prefix, cursor position, and structural section
 Purpose: Gives the completion model only the local context it needs to stay relevant and low-latency.
 
-- [ ] Add prompt rules that prefer adjacent concepts, missing subtopics, definitions, inputs/outputs, steps, and examples
+- [x] Add prompt rules that prefer adjacent concepts, missing subtopics, definitions, inputs/outputs, steps, and examples
 Purpose: Guides completions toward the kinds of additions that actually help the user learn more than what is already in the textbook.
 
 - [ ] Add the completion API route
