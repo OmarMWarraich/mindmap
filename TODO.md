@@ -193,7 +193,7 @@ Purpose: Gives the completion model only the local context it needs to stay rele
 - [x] Add prompt rules that prefer adjacent concepts, missing subtopics, definitions, inputs/outputs, steps, and examples
 Purpose: Guides completions toward the kinds of additions that actually help the user learn more than what is already in the textbook.
 
-- [ ] Add the completion API route
+- [x] Add the completion API route
 Purpose: Centralizes prompt construction, provider access, output filtering, and future operational controls.
 
 - [ ] Add response normalization and insertion-only filtering
