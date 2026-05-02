@@ -2,13 +2,47 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  edgeCaseMindmapDslFixtures,
   invalidHierarchyMindmapDslFixture,
   invalidIndentationMindmapDslFixture,
   malformedMarkerMindmapDslFixture,
   malformedMindmapDslFixture,
+  malformedMindmapDslFixtures,
   validMindmapDslFixture,
+  validMindmapDslFixtures,
 } from "./__fixtures__/parser.ts";
 import { parseMindmapDsl } from "./parse.ts";
+
+test("parser fixtures cover valid outlines without fatal parse failures", () => {
+  for (const fixture of validMindmapDslFixtures) {
+    const result = parseMindmapDsl(fixture.outline);
+
+    assert.ok(result.ast, fixture.name);
+    assert.equal(result.errors.length, 0, fixture.name);
+  }
+});
+
+test("parser fixtures cover malformed outlines with validation feedback", () => {
+  for (const fixture of malformedMindmapDslFixtures) {
+    const result = parseMindmapDsl(fixture.outline);
+
+    assert.ok(
+      result.errors.length > 0 || result.warnings.length > 0,
+      fixture.name,
+    );
+  }
+});
+
+test("parser fixtures cover edge cases with stable parser output", () => {
+  for (const fixture of edgeCaseMindmapDslFixtures) {
+    const result = parseMindmapDsl(fixture.outline);
+
+    assert.ok(
+      result.ast !== null || result.errors.length > 0,
+      fixture.name,
+    );
+  }
+});
 
 test("parseMindmapDsl converts valid DSL into a document AST", () => {
   const result = parseMindmapDsl(validMindmapDslFixture);
