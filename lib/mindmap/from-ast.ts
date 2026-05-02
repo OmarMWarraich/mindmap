@@ -33,6 +33,15 @@ const antiCramLayoutDefaults: MindmapLayoutDefaults = {
   leafHeightHint: 60,
 };
 
+const maxMindmapLabelLength = 56;
+const maxDirectBranchChildrenBeforeGrouping = 6;
+const overflowGroupChunkSize = 4;
+
+interface GeneratedLeafInput {
+  label: string;
+  children: GeneratedLeafInput[];
+}
+
 export interface GenerateMindmapFromAstOptions {
   warnings?: MindmapValidationWarning[];
   errors?: MindmapValidationError[];
@@ -95,6 +104,7 @@ function appendBranch(
 ): void {
   const branchLabel = normalizeMindmapLabel(branch.label);
   const branchId = createBranchId(branchIndex, branchLabel);
+  const branchChildren = getBranchChildrenForGeneration(branch);
   const colorToken = getMindmapBranchColorToken(branchIndex);
 
   nodes.push({
@@ -104,10 +114,10 @@ function appendBranch(
     level: 1,
     parentId: rootId,
     branchId: branchId,
-    childIds: branch.children.map((child, childIndex) =>
-      createNodeId([branchIndex + 1, childIndex + 1], normalizeMindmapLabel(child.label)),
+    childIds: branchChildren.map((child, childIndex) =>
+      createNodeId([branchIndex + 1, childIndex + 1], child.label),
     ),
-    layout: createNodeLayout("branch", branchLabel, branch.children.length, 1),
+    layout: createNodeLayout("branch", branchLabel, branchChildren.length, 1),
     style: {
       branchKey: branchId,
       branchIndex,
@@ -122,7 +132,7 @@ function appendBranch(
     to: branchId,
   });
 
-  branch.children.forEach((child, childIndex) => {
+  branchChildren.forEach((child, childIndex) => {
     appendLeaf(
       child,
       branchId,
@@ -137,7 +147,7 @@ function appendBranch(
 }
 
 function appendLeaf(
-  leaf: MindmapLeafAstNode,
+  leaf: GeneratedLeafInput,
   parentId: string,
   branchId: string,
   branchIndex: number,
@@ -146,20 +156,19 @@ function appendLeaf(
   edges: MindmapEdge[],
   path: number[],
 ): void {
-  const label = normalizeMindmapLabel(leaf.label);
-  const nodeId = createNodeId(path, label);
+  const nodeId = createNodeId(path, leaf.label);
 
   nodes.push({
     id: nodeId,
     kind: "leaf",
-    label,
+    label: leaf.label,
     level,
     parentId,
     branchId,
     childIds: leaf.children.map((child, childIndex) =>
-      createNodeId([...path, childIndex + 1], normalizeMindmapLabel(child.label)),
+      createNodeId([...path, childIndex + 1], child.label),
     ),
-    layout: createNodeLayout("leaf", label, leaf.children.length, level),
+    layout: createNodeLayout("leaf", leaf.label, leaf.children.length, level),
     style: {
       branchKey: branchId,
       branchIndex,
@@ -205,7 +214,22 @@ function createEdgeId(from: string, to: string): string {
 }
 
 function normalizeMindmapLabel(label: string): string {
-  return label.replace(/\s+/g, " ").trim();
+  const compactLabel = label
+    .normalize("NFKC")
+    .replace(/\s+/g, " ")
+    .replace(/\s*([,:;])\s*/g, "$1 ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (compactLabel.length <= maxMindmapLabelLength) {
+    return compactLabel;
+  }
+
+  const truncatedLabel = compactLabel.slice(0, maxMindmapLabelLength - 3).trimEnd();
+  const wordBoundary = truncatedLabel.lastIndexOf(" ");
+  const safeTruncation = wordBoundary >= 24 ? truncatedLabel.slice(0, wordBoundary) : truncatedLabel;
+
+  return `${safeTruncation}...`;
 }
 
 function createStableSlug(label: string): string {
@@ -246,4 +270,44 @@ function createNodeLayout(
     paddingY: antiCramLayoutDefaults.nodePaddingY,
     siblingGap: antiCramLayoutDefaults.siblingGap + Math.min(childCount, 4) * 4 + levelTaper,
   };
+}
+
+function getBranchChildrenForGeneration(
+  branch: MindmapBranchAstNode,
+): GeneratedLeafInput[] {
+  const directChildren = branch.children.map((child) => createGeneratedLeafInput(child));
+
+  if (directChildren.length <= maxDirectBranchChildrenBeforeGrouping) {
+    return directChildren;
+  }
+
+  const groupedChildren: GeneratedLeafInput[] = [];
+
+  for (let index = 0; index < directChildren.length; index += overflowGroupChunkSize) {
+    const chunk = directChildren.slice(index, index + overflowGroupChunkSize);
+    groupedChildren.push({
+      label: createOverflowGroupLabel(chunk),
+      children: chunk,
+    });
+  }
+
+  return groupedChildren;
+}
+
+function createGeneratedLeafInput(leaf: MindmapLeafAstNode): GeneratedLeafInput {
+  return {
+    label: normalizeMindmapLabel(leaf.label),
+    children: leaf.children.map((child) => createGeneratedLeafInput(child)),
+  };
+}
+
+function createOverflowGroupLabel(children: GeneratedLeafInput[]): string {
+  const firstLabel = children[0]?.label ?? "extra topics";
+  const lastLabel = children.at(-1)?.label ?? firstLabel;
+
+  if (firstLabel === lastLabel) {
+    return normalizeMindmapLabel(`More: ${firstLabel}`);
+  }
+
+  return normalizeMindmapLabel(`More: ${firstLabel} - ${lastLabel}`);
 }

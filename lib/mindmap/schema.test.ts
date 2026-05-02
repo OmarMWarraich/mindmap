@@ -89,3 +89,69 @@ test("generateMindmapFromAst assigns deterministic graph ids even when AST ids c
   assert.equal(new Set(generated.nodes.map((node) => node.id)).size, generated.nodes.length);
   assert.equal(generated.edges.every((edge) => edge.id.includes("->")), true);
 });
+
+test("generateMindmapFromAst cleans labels and groups overloaded branches", () => {
+  const generated = generateMindmapFromAst({
+    root: {
+      id: "root-messy",
+      kind: "root",
+      label: "  Cellular   respiration  ",
+      source: {
+        line: 1,
+        column: 1,
+        indentLevel: 0,
+        raw: "@root: Cellular respiration",
+      },
+      branches: [
+        {
+          id: "branch-messy",
+          kind: "branch",
+          label: "  Electron   transport   chain  ",
+          source: {
+            line: 2,
+            column: 1,
+            indentLevel: 0,
+            raw: "- @branch: Electron transport chain",
+          },
+          children: [
+            "  NADH   oxidation  ",
+            " Proton   pumping across inner membrane ",
+            " ATP synthase rotor coupling ",
+            " Chemiosmosis link to ATP output ",
+            " Oxygen as terminal electron acceptor ",
+            " Reactive oxygen species control ",
+            " Extremely verbose label describing regulation of mitochondrial electron transport efficiency under stress conditions ",
+          ].map((label, index) => ({
+            id: `leaf-${index + 1}`,
+            kind: "leaf" as const,
+            label,
+            source: {
+              line: index + 3,
+              column: 3,
+              indentLevel: 1,
+              raw: `  - ${label.trim()}`,
+            },
+            children: [],
+          })),
+        },
+      ],
+    },
+  });
+
+  const branchNode = generated.nodes.find((node) => node.id === "branch-1-electron-transport-chain");
+
+  assert.equal(generated.metadata.title, "Cellular   respiration");
+  assert.equal(generated.metadata.rootId, "root-cellular-respiration");
+  assert.equal(branchNode?.childIds.length, 2);
+
+  const groupedChildren = generated.nodes.filter(
+    (node) => node.parentId === "branch-1-electron-transport-chain",
+  );
+
+  assert.equal(groupedChildren.length, 2);
+  assert.equal(groupedChildren.every((node) => node.label.startsWith("More:")), true);
+  assert.equal(
+    generated.nodes.some((node) => node.label.endsWith("...")),
+    true,
+  );
+});

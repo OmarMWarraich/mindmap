@@ -97,7 +97,7 @@ Purpose: Makes the visual map easier to scan by preserving color consistency per
 - [x] Add anti-cram defaults for spacing, padding, and branch sizing hints
 Purpose: Encodes readability constraints before layout runs so dense maps remain usable.
 
-- [ ] Add label cleanup and optional grouping rules for overloaded branches
+- [x] Add label cleanup and optional grouping rules for overloaded branches
 Purpose: Prevents overly long labels or oversized sibling lists from degrading readability.
 
 - [ ] Add snapshot tests for AST-to-mindmap generation
