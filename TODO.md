@@ -65,7 +65,7 @@ Purpose: Provides a robust text-editing surface with the APIs needed for a study
 - [x] Seed the editor with helpful starter DSL content
 Purpose: Reduces blank-page friction and teaches the expected structure through an example.
 
-- [ ] Add debounced parsing on editor changes
+- [x] Add debounced parsing on editor changes
 Purpose: Keeps validation and preview updates responsive without reprocessing the outline on every keystroke.
 
 - [ ] Display structured validation warnings and errors beside the editor

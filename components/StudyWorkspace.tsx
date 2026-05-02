@@ -1,8 +1,9 @@
 'use client';
 
 import Editor from '@monaco-editor/react';
-import { useState } from 'react';
+import { startTransition, useEffect, useMemo, useState } from 'react';
 
+import { parseMindmapDsl } from '../lib/dsl/parse';
 import { mindmapDslStarterOutline } from '../lib/dsl/mvp';
 
 const editorLoadingFallback = (
@@ -13,6 +14,33 @@ const editorLoadingFallback = (
 
 export default function StudyWorkspace() {
   const [outline, setOutline] = useState(mindmapDslStarterOutline);
+  const [debouncedOutline, setDebouncedOutline] = useState(mindmapDslStarterOutline);
+  const [isParsing, setIsParsing] = useState(false);
+
+  useEffect(() => {
+    setIsParsing(true);
+
+    const timeoutId = window.setTimeout(() => {
+      startTransition(() => {
+        setDebouncedOutline(outline);
+        setIsParsing(false);
+      });
+    }, 180);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [outline]);
+
+  const parseResult = useMemo(() => parseMindmapDsl(debouncedOutline), [debouncedOutline]);
+  const branchCount = parseResult.ast?.root.branches.length ?? 0;
+  const nodeCount = (parseResult.ast?.root.branches ?? []).reduce((count, branch) => {
+    const countChildren = (children: typeof branch.children): number => {
+      return children.reduce((total, child) => total + 1 + countChildren(child.children), 0);
+    };
+
+    return count + 1 + countChildren(branch.children);
+  }, 1);
 
   return (
     <section className="grid gap-4 rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
@@ -25,6 +53,9 @@ export default function StudyWorkspace() {
         </div>
 
         <div className="flex flex-wrap gap-3">
+          <span className="inline-flex items-center rounded-full bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700">
+            {isParsing ? 'Parsing…' : `Parsed ${nodeCount} nodes`}
+          </span>
           <button className="rounded-full bg-zinc-950 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800">
             Generate mindmap
           </button>
@@ -96,6 +127,22 @@ export default function StudyWorkspace() {
             <p className="text-sm leading-6 text-zinc-600">
               Layout output, branch colours, and export bounds will render in this
               panel once the deterministic generation pipeline is connected.
+            </p>
+          </div>
+
+          <div className="grid gap-3 rounded-2xl border border-zinc-200 bg-white p-4 text-sm text-zinc-700">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-zinc-100 px-3 py-1 font-medium text-zinc-700">
+                {parseResult.ast ? 'AST ready' : 'Awaiting valid root'}
+              </span>
+              <span className="rounded-full bg-zinc-100 px-3 py-1 font-medium text-zinc-700">
+                {branchCount} branches
+              </span>
+            </div>
+            <p className="leading-6 text-zinc-600">
+              {parseResult.ast
+                ? `Current topic: ${parseResult.ast.root.label}`
+                : 'The parser will resume once the outline contains a valid root declaration.'}
             </p>
           </div>
 
