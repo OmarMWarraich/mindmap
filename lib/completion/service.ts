@@ -5,6 +5,7 @@ import { extractInlineCompletionContextWindow } from './context.ts';
 import { normalizeInlineCompletionOutput } from './normalize.ts';
 import { createInlineCompletionPrompt } from './prompt.ts';
 import { requestModelProviderChatCompletion } from './provider.ts';
+import { evaluateInlineCompletionRelevance } from './relevance.ts';
 
 export const inlineCompletionRequestSchema = z.object({
   outline: z.string(),
@@ -51,9 +52,10 @@ export async function generateInlineCompletion(
   const normalizedCompletionText = normalizeInlineCompletionOutput(completionText, {
     currentLinePrefix: context.linePrefix,
   });
+  const relevance = evaluateInlineCompletionRelevance(normalizedCompletionText, context);
 
   return inlineCompletionResponseSchema.parse({
-    completionText: normalizedCompletionText,
+    completionText: relevance.accepted ? normalizedCompletionText : '',
     source: 'model',
   });
 }

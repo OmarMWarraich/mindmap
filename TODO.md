@@ -199,7 +199,7 @@ Purpose: Centralizes prompt construction, provider access, output filtering, and
 - [x] Add response normalization and insertion-only filtering
 Purpose: Ensures completions can be shown as ghost text without corrupting the user's outline.
 
-- [ ] Add relevance checks that reject off-topic, repetitive, or overly broad completions
+- [x] Add relevance checks that reject off-topic, repetitive, or overly broad completions
 Purpose: Prevents the assistant from polluting study notes with low-value suggestions that do not deepen the current topic.
 
 - [ ] Add enrichment-vs-duplication checks against nearby sibling nodes
