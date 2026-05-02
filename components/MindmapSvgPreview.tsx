@@ -25,6 +25,7 @@ export default function MindmapSvgPreview({
 }) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const [transform, setTransform] = useState(createDefaultSvgPreviewTransform);
 
   if (!mindmap || (!layoutResult && layoutStatus !== 'error' && layoutStatus !== 'loading')) {
@@ -120,13 +121,15 @@ export default function MindmapSvgPreview({
       </div>
       <svg
         aria-label="Rendered mindmap preview"
-        className={`h-[460px] w-full touch-none ${dragStartRef.current ? 'cursor-grabbing' : 'cursor-grab'}`}
+        className={`h-[460px] w-full touch-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
         onPointerDown={(event) => {
           dragStartRef.current = { x: event.clientX, y: event.clientY };
+          setIsDragging(true);
           svgRef.current?.setPointerCapture(event.pointerId);
         }}
         onPointerLeave={() => {
           dragStartRef.current = null;
+          setIsDragging(false);
         }}
         onPointerMove={(event) => {
           const dragStart = dragStartRef.current;
@@ -152,6 +155,7 @@ export default function MindmapSvgPreview({
         }}
         onPointerUp={(event) => {
           dragStartRef.current = null;
+          setIsDragging(false);
           svgRef.current?.releasePointerCapture(event.pointerId);
         }}
         onWheel={(event) => {

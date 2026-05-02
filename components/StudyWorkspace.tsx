@@ -89,6 +89,11 @@ export default function StudyWorkspace() {
       errors: parseResult.errors,
     });
   }, [parseResult.ast, parseResult.errors, parseResult.warnings]);
+  const hasWorkerSupport = typeof window === 'undefined' ? true : typeof window.Worker !== 'undefined';
+  const effectiveLayoutStatus = hasWorkerSupport ? layoutStatus : 'error';
+  const effectiveLayoutError = hasWorkerSupport
+    ? layoutError
+    : 'This browser does not support Web Workers for ELK layout.';
   const branchCount = parseResult.ast?.root.branches.length ?? 0;
   const nodeCount = (parseResult.ast?.root.branches ?? []).reduce((count, branch) => {
     const countChildren = (children: typeof branch.children): number => {
@@ -148,8 +153,6 @@ export default function StudyWorkspace() {
 
   useEffect(() => {
     if (!window.Worker) {
-      setLayoutStatus('error');
-      setLayoutError('This browser does not support Web Workers for ELK layout.');
       return;
     }
 
@@ -397,11 +400,11 @@ export default function StudyWorkspace() {
                 {branchCount} branches
               </span>
               <span className="rounded-full bg-zinc-100 px-3 py-1 font-medium text-zinc-700">
-                {layoutStatus === 'ready'
+                {effectiveLayoutStatus === 'ready'
                   ? 'Worker layout ready'
-                  : layoutStatus === 'loading'
+                  : effectiveLayoutStatus === 'loading'
                     ? 'Worker computing'
-                    : layoutStatus === 'error'
+                    : effectiveLayoutStatus === 'error'
                       ? 'Worker failed'
                       : 'Worker idle'}
               </span>
@@ -504,9 +507,9 @@ export default function StudyWorkspace() {
           </div>
 
           <MindmapSvgPreview
-            layoutError={layoutError}
+            layoutError={effectiveLayoutError}
             layoutResult={layoutResult}
-            layoutStatus={layoutStatus}
+            layoutStatus={effectiveLayoutStatus}
             mindmap={generatedMindmap}
           />
         </aside>
