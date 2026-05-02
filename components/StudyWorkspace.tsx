@@ -3,6 +3,7 @@
 import Editor from '@monaco-editor/react';
 import { startTransition, useEffect, useMemo, useState } from 'react';
 
+import { getMindmapSectionContext } from '../lib/dsl/editor-context';
 import { parseMindmapDsl } from '../lib/dsl/parse';
 import { mindmapDslStarterOutline } from '../lib/dsl/mvp';
 import type { MindmapValidationIssue } from '../lib/dsl/validation';
@@ -17,6 +18,7 @@ export default function StudyWorkspace() {
   const [outline, setOutline] = useState(mindmapDslStarterOutline);
   const [debouncedOutline, setDebouncedOutline] = useState(mindmapDslStarterOutline);
   const [isParsing, setIsParsing] = useState(false);
+  const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
 
   useEffect(() => {
     setIsParsing(true);
@@ -34,6 +36,10 @@ export default function StudyWorkspace() {
   }, [outline]);
 
   const parseResult = useMemo(() => parseMindmapDsl(debouncedOutline), [debouncedOutline]);
+  const sectionContext = useMemo(
+    () => getMindmapSectionContext(outline, cursorPosition),
+    [cursorPosition, outline],
+  );
   const branchCount = parseResult.ast?.root.branches.length ?? 0;
   const nodeCount = (parseResult.ast?.root.branches ?? []).reduce((count, branch) => {
     const countChildren = (children: typeof branch.children): number => {
@@ -107,6 +113,17 @@ export default function StudyWorkspace() {
               onChange={(value) => {
                 setOutline(value ?? '');
               }}
+              onMount={(editor) => {
+                const position = editor.getPosition();
+
+                if (position) {
+                  setCursorPosition(position);
+                }
+
+                editor.onDidChangeCursorPosition((event) => {
+                  setCursorPosition(event.position);
+                });
+              }}
               options={{
                 automaticLayout: true,
                 glyphMargin: false,
@@ -157,6 +174,27 @@ export default function StudyWorkspace() {
               {parseResult.ast
                 ? `Current topic: ${parseResult.ast.root.label}`
                 : 'The parser will resume once the outline contains a valid root declaration.'}
+            </p>
+          </div>
+
+          <div className="grid gap-3 rounded-2xl border border-sky-200 bg-sky-50/70 p-4 text-sm text-sky-950">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-white px-3 py-1 font-medium text-sky-900">
+                Cursor line {sectionContext.cursor.lineNumber}
+              </span>
+              <span className="rounded-full bg-white px-3 py-1 font-medium text-sky-900">
+                {sectionContext.currentLineKind}
+              </span>
+            </div>
+            <p className="leading-6 text-sky-900/80">
+              {sectionContext.branchLabel
+                ? `Active branch: ${sectionContext.branchLabel}`
+                : 'Move into a branch to get section-aware study help.'}
+            </p>
+            <p className="leading-6 text-sky-900/80">
+              {sectionContext.subBranchTrail.length > 0
+                ? `Sub-branch trail: ${sectionContext.subBranchTrail.join(' / ')}`
+                : 'No nested sub-branch is active at the current cursor position.'}
             </p>
           </div>
 

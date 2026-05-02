@@ -71,7 +71,7 @@ Purpose: Keeps validation and preview updates responsive without reprocessing th
 - [x] Display structured validation warnings and errors beside the editor
 Purpose: Helps users repair broken markup before generating a mindmap.
 
-- [ ] Add section-awareness helpers based on cursor location
+- [x] Add section-awareness helpers based on cursor location
 Purpose: Supplies the completion system with local structural context such as current branch or sub-branch.
 
 - [ ] Stub the inline completion integration before connecting the API
