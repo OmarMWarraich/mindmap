@@ -68,7 +68,7 @@ Purpose: Reduces blank-page friction and teaches the expected structure through 
 - [x] Add debounced parsing on editor changes
 Purpose: Keeps validation and preview updates responsive without reprocessing the outline on every keystroke.
 
-- [ ] Display structured validation warnings and errors beside the editor
+- [x] Display structured validation warnings and errors beside the editor
 Purpose: Helps users repair broken markup before generating a mindmap.
 
 - [ ] Add section-awareness helpers based on cursor location

@@ -5,6 +5,7 @@ import { startTransition, useEffect, useMemo, useState } from 'react';
 
 import { parseMindmapDsl } from '../lib/dsl/parse';
 import { mindmapDslStarterOutline } from '../lib/dsl/mvp';
+import type { MindmapValidationIssue } from '../lib/dsl/validation';
 
 const editorLoadingFallback = (
   <div className="flex h-[460px] items-center justify-center rounded-2xl border border-zinc-200 bg-zinc-100 text-sm text-zinc-500">
@@ -119,6 +120,19 @@ export default function StudyWorkspace() {
               value={outline}
             />
           </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <ValidationPanel
+              issues={parseResult.errors}
+              tone="error"
+              title={`Errors (${parseResult.errors.length})`}
+            />
+            <ValidationPanel
+              issues={parseResult.warnings}
+              tone="warning"
+              title={`Warnings (${parseResult.warnings.length})`}
+            />
+          </div>
         </section>
 
         <aside className="grid gap-4 rounded-3xl border border-zinc-200 bg-zinc-50 p-5">
@@ -162,4 +176,73 @@ export default function StudyWorkspace() {
       </div>
     </section>
   );
+}
+
+function ValidationPanel({
+  issues,
+  title,
+  tone,
+}: {
+  issues: MindmapValidationIssue[];
+  title: string;
+  tone: 'error' | 'warning';
+}) {
+  const palette = tone === 'error'
+    ? {
+        badge: 'bg-rose-100 text-rose-700',
+        border: 'border-rose-200',
+        subtle: 'text-rose-900',
+      }
+    : {
+        badge: 'bg-amber-100 text-amber-700',
+        border: 'border-amber-200',
+        subtle: 'text-amber-900',
+      };
+
+  return (
+    <section className={`grid gap-3 rounded-2xl border bg-white p-4 ${palette.border}`}>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-zinc-950">{title}</h3>
+        <span className={`rounded-full px-3 py-1 text-xs font-medium ${palette.badge}`}>
+          {issues.length === 0 ? 'clear' : 'active'}
+        </span>
+      </div>
+
+      {issues.length === 0 ? (
+        <p className="text-sm leading-6 text-zinc-500">
+          {tone === 'error'
+            ? 'No blocking parser errors in the current outline.'
+            : 'No parser warnings in the current outline.'}
+        </p>
+      ) : (
+        <ul className="grid gap-2">
+          {issues.map((issue, index) => (
+            <li
+              className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3"
+              key={`${issue.code}-${issue.target.source?.line ?? 'unknown'}-${index}`}
+            >
+              <div className="flex flex-wrap items-center gap-2 text-xs font-medium uppercase tracking-[0.12em] text-zinc-500">
+                <span>{issue.code}</span>
+                <span className={palette.subtle}>
+                  {formatIssueLocation(issue)}
+                </span>
+              </div>
+              <p className="mt-2 text-sm leading-6 text-zinc-700">{issue.message}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function formatIssueLocation(issue: MindmapValidationIssue): string {
+  const line = issue.target.source?.line;
+  const column = issue.target.source?.column;
+
+  if (line == null) {
+    return 'document-level';
+  }
+
+  return column == null ? `line ${line}` : `line ${line}, col ${column}`;
 }
