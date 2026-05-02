@@ -80,7 +80,7 @@ Purpose: Lets the editor architecture support ghost text early without blocking 
 - [x] Add a study guidance panel or lightweight hint surface next to the editor
 Purpose: Gives the user a clear place to see why a suggestion is relevant, what subtopic it expands, or what adjacent concept it helps them learn.
 
-- [ ] Distinguish between continuation completions and enrichment completions in the editor UX
+- [x] Distinguish between continuation completions and enrichment completions in the editor UX
 Purpose: Keeps simple typing assistance separate from knowledge-expanding suggestions so the learning value stays visible.
 
 ### Phase 5 - Deterministic Mindmap Generation

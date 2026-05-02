@@ -17,6 +17,9 @@ import type { MindmapValidationIssue } from '../lib/dsl/validation';
 
 let mindmapDslInlineCompletionRegistered = false;
 const mindmapDslLanguageId = 'mindmap-dsl';
+let mindmapDslInlineSuggestionPreference: InlineSuggestionPreference = 'auto';
+
+type InlineSuggestionPreference = 'auto' | 'continuation' | 'enrichment';
 
 const editorLoadingFallback = (
   <div className="flex h-[460px] items-center justify-center rounded-2xl border border-zinc-200 bg-zinc-100 text-sm text-zinc-500">
@@ -29,6 +32,8 @@ export default function StudyWorkspace() {
   const [debouncedOutline, setDebouncedOutline] = useState(mindmapDslStarterOutline);
   const [isParsing, setIsParsing] = useState(false);
   const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
+  const [inlineSuggestionPreference, setInlineSuggestionPreference] =
+    useState<InlineSuggestionPreference>('auto');
 
   useEffect(() => {
     setIsParsing(true);
@@ -55,8 +60,8 @@ export default function StudyWorkspace() {
     [sectionContext],
   );
   const preferredStubSuggestion = useMemo(
-    () => pickPreferredStubSuggestion(stubSuggestionSet),
-    [stubSuggestionSet],
+    () => pickPreferredStubSuggestion(stubSuggestionSet, inlineSuggestionPreference),
+    [inlineSuggestionPreference, stubSuggestionSet],
   );
   const branchCount = parseResult.ast?.root.branches.length ?? 0;
   const nodeCount = (parseResult.ast?.root.branches ?? []).reduce((count, branch) => {
@@ -66,6 +71,10 @@ export default function StudyWorkspace() {
 
     return count + 1 + countChildren(branch.children);
   }, 1);
+
+  useEffect(() => {
+    mindmapDslInlineSuggestionPreference = inlineSuggestionPreference;
+  }, [inlineSuggestionPreference]);
 
   return (
     <section className="grid gap-4 rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
@@ -227,6 +236,25 @@ export default function StudyWorkspace() {
               </p>
             </div>
 
+            <div className="flex flex-wrap gap-2">
+              {(['auto', 'continuation', 'enrichment'] as InlineSuggestionPreference[]).map((mode) => (
+                <button
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                    inlineSuggestionPreference === mode
+                      ? 'bg-emerald-950 text-emerald-50'
+                      : 'border border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-100'
+                  }`}
+                  key={mode}
+                  onClick={() => {
+                    setInlineSuggestionPreference(mode);
+                  }}
+                  type="button"
+                >
+                  {mode === 'auto' ? 'Auto' : mode}
+                </button>
+              ))}
+            </div>
+
             <div className="rounded-2xl border border-emerald-200 bg-white p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
                 Current focus
@@ -242,9 +270,22 @@ export default function StudyWorkspace() {
               </p>
             </div>
 
+            <div className="grid gap-3 lg:grid-cols-2">
+              <SuggestionCard
+                active={inlineSuggestionPreference === 'continuation'}
+                label="Continuation"
+                suggestion={stubSuggestionSet.continuation}
+              />
+              <SuggestionCard
+                active={inlineSuggestionPreference === 'enrichment'}
+                label="Enrichment"
+                suggestion={stubSuggestionSet.enrichment}
+              />
+            </div>
+
             <div className="rounded-2xl border border-emerald-200 bg-white p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
-                Ghost text preview
+                Active ghost text
               </p>
               <p className="mt-2 rounded-xl bg-emerald-950 px-3 py-2 font-mono text-sm text-emerald-50">
                 {preferredStubSuggestion?.insertText || 'No inline hint for this cursor position.'}
@@ -364,8 +405,10 @@ function configureMindmapDslMonaco(monaco: Monaco): void {
         lineNumber: position.lineNumber,
         column: position.column,
       });
-      const suggestion = pickPreferredStubSuggestion(getStubInlineSuggestionSet(sectionContext));
-
+      const suggestion = pickPreferredStubSuggestion(
+        getStubInlineSuggestionSet(sectionContext),
+        mindmapDslInlineSuggestionPreference,
+      );
       if (!suggestion || suggestion.insertText.length === 0) {
         return { items: [] };
       }
@@ -384,4 +427,37 @@ function configureMindmapDslMonaco(monaco: Monaco): void {
   });
 
   mindmapDslInlineCompletionRegistered = true;
+}
+
+function SuggestionCard({
+  active,
+  label,
+  suggestion,
+}: {
+  active: boolean;
+  label: string;
+  suggestion: ReturnType<typeof getStubInlineSuggestionSet>['continuation'];
+}) {
+  return (
+    <div
+      className={`rounded-2xl border bg-white p-4 ${
+        active ? 'border-emerald-500 shadow-[0_0_0_1px_rgba(16,185,129,0.2)]' : 'border-emerald-200'
+      }`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
+          {label}
+        </p>
+        <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800">
+          {active ? 'active' : 'available'}
+        </span>
+      </div>
+      <p className="mt-2 rounded-xl bg-emerald-950 px-3 py-2 font-mono text-sm text-emerald-50">
+        {suggestion?.insertText || 'No suggestion'}
+      </p>
+      <p className="mt-3 leading-6 text-emerald-900/80">
+        {suggestion?.explanation || 'This mode has nothing useful to add at the current cursor position.'}
+      </p>
+    </div>
+  );
 }

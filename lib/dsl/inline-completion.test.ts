@@ -33,3 +33,14 @@ test('stub inline completions offer the next detail after a branch line', () => 
   assert.equal(preferred?.kind, 'continuation');
   assert.equal(suggestions.enrichment?.insertText, '\n  - Key detail');
 });
+
+test('stub inline completions can prefer enrichment over continuation when requested', () => {
+  const suggestions = getStubInlineSuggestionSet(
+    getMindmapSectionContext('@root: Topic\n- @branch: Overview', { lineNumber: 2, column: 20 }),
+  );
+
+  const preferred = pickPreferredStubSuggestion(suggestions, 'enrichment');
+
+  assert.equal(preferred?.kind, 'enrichment');
+  assert.equal(preferred?.insertText, '\n  - Key detail');
+});
