@@ -7,11 +7,15 @@ import {
 import { generateMindmapFromAst } from "./from-ast.ts";
 
 const snapshotDirectory = join(import.meta.dirname, "__snapshots__");
+type SnapshotAssert = {
+  fileSnapshot(value: string, path: string): void;
+};
 
 test("generateMindmapFromAst matches the base AST snapshot", (t) => {
   const generated = generateMindmapFromAst(mindmapAstFixture);
+  const snapshotAssert = t.assert as typeof t.assert & SnapshotAssert;
 
-  t.assert.fileSnapshot(
+  snapshotAssert.fileSnapshot(
     JSON.stringify(generated, null, 2),
     join(snapshotDirectory, "from-ast.base.snapshot.json"),
   );
@@ -64,8 +68,9 @@ test("generateMindmapFromAst matches the grouped-branch snapshot", (t) => {
       ],
     },
   });
+  const snapshotAssert = t.assert as typeof t.assert & SnapshotAssert;
 
-  t.assert.fileSnapshot(
+  snapshotAssert.fileSnapshot(
     JSON.stringify(generated, null, 2),
     join(snapshotDirectory, "from-ast.grouped.snapshot.json"),
   );
