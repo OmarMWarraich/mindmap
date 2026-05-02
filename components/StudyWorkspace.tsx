@@ -3,6 +3,8 @@
 import Editor from '@monaco-editor/react';
 import { useState } from 'react';
 
+import { mindmapDslStarterOutline } from '../lib/dsl/mvp';
+
 const editorLoadingFallback = (
   <div className="flex h-[460px] items-center justify-center rounded-2xl border border-zinc-200 bg-zinc-100 text-sm text-zinc-500">
     Loading Monaco editor...
@@ -10,7 +12,7 @@ const editorLoadingFallback = (
 );
 
 export default function StudyWorkspace() {
-  const [outline, setOutline] = useState('');
+  const [outline, setOutline] = useState(mindmapDslStarterOutline);
 
   return (
     <section className="grid gap-4 rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
@@ -43,6 +45,26 @@ export default function StudyWorkspace() {
               Monaco now hosts the study outline directly in the app shell so later
               parsing, completions, and preview updates can build on the real editor.
             </p>
+          </div>
+
+          <div className="flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="grid gap-1">
+              <p className="text-sm font-medium text-emerald-900">Starter outline loaded</p>
+              <p className="text-sm leading-6 text-emerald-800/80">
+                The editor opens with a working DSL example so users can learn the
+                format from a concrete root, branch, and nested leaf structure.
+              </p>
+            </div>
+
+            <button
+              className="rounded-full border border-emerald-300 bg-white px-4 py-2 text-sm font-medium text-emerald-900 transition hover:bg-emerald-100"
+              onClick={() => {
+                setOutline(mindmapDslStarterOutline);
+              }}
+              type="button"
+            >
+              Reset starter outline
+            </button>
           </div>
 
           <div className="h-[460px] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">

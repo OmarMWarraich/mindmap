@@ -62,7 +62,7 @@ Purpose: Locks down expected parser behavior so the DSL remains stable as the ap
 - [x] Integrate Monaco Editor for the study outline input
 Purpose: Provides a robust text-editing surface with the APIs needed for a study-first inline completion experience.
 
-- [ ] Seed the editor with helpful starter DSL content
+- [x] Seed the editor with helpful starter DSL content
 Purpose: Reduces blank-page friction and teaches the expected structure through an example.
 
 - [ ] Add debounced parsing on editor changes
