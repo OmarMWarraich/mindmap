@@ -51,9 +51,7 @@ export async function layoutMindmapWithElk(
   const elkGraph = translateMindmapToElkGraph(mindmap);
   const laidOutGraph = await elk.layout({
     ...elkGraph,
-    layoutOptions: {
-      'elk.algorithm': 'radial',
-    },
+    layoutOptions: createMindmapRadialLayoutOptions(mindmap),
   });
 
   return {
@@ -81,4 +79,24 @@ function collectEdgePoints(edge: NonNullable<ElkNode['edges']>[number]): ElkPoin
   }
 
   return [section.startPoint, ...(section.bendPoints ?? []), section.endPoint];
+}
+
+export function createMindmapRadialLayoutOptions(
+  mindmap: GeneratedMindmap,
+): Record<string, string> {
+  const layout = mindmap.metadata.layout;
+
+  return {
+    'elk.algorithm': 'radial',
+    'org.eclipse.elk.radial.centerOnRoot': 'true',
+    'org.eclipse.elk.radial.compactor': 'NONE',
+    'org.eclipse.elk.radial.wedgeCriteria': 'NODE_SIZE',
+    'org.eclipse.elk.radial.radius': String(layout.levelGap),
+    'org.eclipse.elk.spacing.nodeNode': String(layout.siblingGap),
+    'org.eclipse.elk.padding': formatElkPadding(layout.canvasPadding),
+  };
+}
+
+function formatElkPadding(padding: number): string {
+  return `[top=${padding},left=${padding},bottom=${padding},right=${padding}]`;
 }
