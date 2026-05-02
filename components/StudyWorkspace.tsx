@@ -6,7 +6,10 @@ import type { Monaco } from '@monaco-editor/react';
 import type { CancellationToken, editor, languages } from 'monaco-editor';
 
 import MindmapSvgPreview from './MindmapSvgPreview';
-import { requestInlineCompletionFromApi } from '../lib/completion/client';
+import {
+  requestInlineCompletionFromApi,
+  trackInlineCompletionEvent,
+} from '../lib/completion/client';
 import { getMindmapSectionContext } from '../lib/dsl/editor-context';
 import {
   createInlineSuggestionRange,
@@ -639,6 +642,29 @@ function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === 'AbortError';
 }
 
+function createInlineCompletionCorrelationId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  return `completion-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function mapInlineCompletionOutcome(
+  monaco: Monaco,
+  reasonKind: languages.InlineCompletionEndOfLifeReasonKind,
+): 'accepted' | 'dismissed' | 'ignored' {
+  if (reasonKind === monaco.languages.InlineCompletionEndOfLifeReasonKind.Accepted) {
+    return 'accepted';
+  }
+
+  if (reasonKind === monaco.languages.InlineCompletionEndOfLifeReasonKind.Rejected) {
+    return 'dismissed';
+  }
+
+  return 'ignored';
+}
+
 function configureMindmapDslMonaco(monaco: Monaco): void {
   if (
     !monaco.languages
@@ -671,6 +697,7 @@ function configureMindmapDslMonaco(monaco: Monaco): void {
       const { abortController, dispose } = linkAbortControllerToCancellationToken(token);
 
       try {
+        const correlationId = createInlineCompletionCorrelationId();
         const response = await requestInlineCompletionFromApi(
           {
             outline: model.getValue(),
@@ -697,6 +724,7 @@ function configureMindmapDslMonaco(monaco: Monaco): void {
         return {
           items: [
             {
+              correlationId,
               insertText: response.completionText,
               range: createInlineSuggestionRange(position),
             },
@@ -711,6 +739,26 @@ function configureMindmapDslMonaco(monaco: Monaco): void {
       } finally {
         dispose();
       }
+    },
+    handleEndOfLifetime(
+      _completions: languages.InlineCompletions,
+      item: languages.InlineCompletion,
+      reason: languages.InlineCompletionEndOfLifeReason,
+      lifetimeSummary: languages.LifetimeSummary,
+    ) {
+      if (!item.correlationId || typeof item.insertText !== 'string') {
+        return;
+      }
+
+      void trackInlineCompletionEvent({
+        correlationId: item.correlationId,
+        outcome: mapInlineCompletionOutcome(monaco, reason.kind),
+        outlineLength: lifetimeSummary.characterCountOriginal ?? 0,
+        requestReason: lifetimeSummary.requestReason,
+        shownDurationMs: lifetimeSummary.shownDuration,
+        source: 'model',
+        suggestionText: item.insertText,
+      }).catch(() => undefined);
     },
     disposeInlineCompletions() {},
     displayName: 'Mindmap study assistant',

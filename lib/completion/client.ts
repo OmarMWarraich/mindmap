@@ -5,6 +5,16 @@ interface InlineCompletionClientResponse {
   source: 'model';
 }
 
+export interface InlineCompletionEventRequest {
+  correlationId: string;
+  outcome: 'accepted' | 'dismissed' | 'ignored';
+  outlineLength: number;
+  requestReason: string;
+  shownDurationMs: number;
+  source: 'model';
+  suggestionText: string;
+}
+
 export async function requestInlineCompletionFromApi(
   request: InlineCompletionRequest,
   options: {
@@ -46,4 +56,22 @@ export function parseInlineCompletionClientResponse(
     completionText: candidate.completionText,
     source: candidate.source,
   };
+}
+
+export async function trackInlineCompletionEvent(
+  event: InlineCompletionEventRequest,
+  options: {
+    fetchImpl?: typeof fetch;
+  } = {},
+): Promise<void> {
+  const fetchImpl = options.fetchImpl ?? fetch;
+
+  await fetchImpl('/api/completion/events', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(event),
+    keepalive: true,
+  });
 }

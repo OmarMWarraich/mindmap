@@ -214,7 +214,7 @@ Purpose: Delivers the study-assistant UX directly inside the editor where learni
 - [x] Support ghost-text acceptance with Tab and cancellation on rapid edits
 Purpose: Makes completions feel natural and unobtrusive rather than disruptive to note-taking flow.
 
-- [ ] Add instrumentation to track which suggestions are accepted, ignored, or dismissed
+- [x] Add instrumentation to track which suggestions are accepted, ignored, or dismissed
 Purpose: Helps tune the system toward completions that genuinely teach and reduce typing instead of merely appearing plausible.
 
 ### Phase 8 - AI-Assisted Mindmap Generation

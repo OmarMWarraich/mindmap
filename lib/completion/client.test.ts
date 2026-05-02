@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   parseInlineCompletionClientResponse,
   requestInlineCompletionFromApi,
+  trackInlineCompletionEvent,
 } from './client.ts';
 
 test('parseInlineCompletionClientResponse accepts the expected route payload', () => {
@@ -51,5 +52,33 @@ test('requestInlineCompletionFromApi posts to the completion endpoint', async ()
     source: 'model',
   });
   assert.equal(requestUrl, '/api/completion');
+  assert.equal(requestInit?.method, 'POST');
+});
+
+test('trackInlineCompletionEvent posts lifecycle events to the instrumentation endpoint', async () => {
+  let requestUrl = '';
+  let requestInit: RequestInit | undefined;
+
+  await trackInlineCompletionEvent(
+    {
+      correlationId: 'completion-1',
+      outcome: 'ignored',
+      outlineLength: 42,
+      requestReason: 'automatic',
+      shownDurationMs: 90,
+      source: 'model',
+      suggestionText: 'ATP synthase',
+    },
+    {
+      fetchImpl: async (input, init) => {
+        requestUrl = String(input);
+        requestInit = init;
+
+        return new Response(null, { status: 202 });
+      },
+    },
+  );
+
+  assert.equal(requestUrl, '/api/completion/events');
   assert.equal(requestInit?.method, 'POST');
 });
