@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { getModelProviderEnv, type ModelProviderEnv } from '../config/env.ts';
 import { extractInlineCompletionContextWindow } from './context.ts';
+import { normalizeInlineCompletionOutput } from './normalize.ts';
 import { createInlineCompletionPrompt } from './prompt.ts';
 import { requestModelProviderChatCompletion } from './provider.ts';
 
@@ -47,9 +48,12 @@ export async function generateInlineCompletion(
       { role: 'user', content: prompt.user },
     ],
   });
+  const normalizedCompletionText = normalizeInlineCompletionOutput(completionText, {
+    currentLinePrefix: context.linePrefix,
+  });
 
   return inlineCompletionResponseSchema.parse({
-    completionText,
+    completionText: normalizedCompletionText,
     source: 'model',
   });
 }

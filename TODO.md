@@ -196,7 +196,7 @@ Purpose: Guides completions toward the kinds of additions that actually help the
 - [x] Add the completion API route
 Purpose: Centralizes prompt construction, provider access, output filtering, and future operational controls.
 
-- [ ] Add response normalization and insertion-only filtering
+- [x] Add response normalization and insertion-only filtering
 Purpose: Ensures completions can be shown as ghost text without corrupting the user's outline.
 
 - [ ] Add relevance checks that reject off-topic, repetitive, or overly broad completions

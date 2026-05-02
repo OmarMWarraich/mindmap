@@ -16,7 +16,7 @@ test('completion route returns model output for a valid request', async () => {
   delete process.env.MODEL_BASE_URL;
 
   globalThis.fetch = async () => new Response(JSON.stringify({
-    choices: [{ message: { content: '  - proton gradient' } }],
+    choices: [{ message: { content: '  - ATP synthase' } }],
   }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
@@ -34,7 +34,7 @@ test('completion route returns model output for a valid request', async () => {
 
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), {
-      completionText: '  - proton gradient',
+      completionText: 'ynthase',
       source: 'model',
     });
   } finally {
