@@ -208,7 +208,7 @@ Purpose: Pushes the assistant to contribute new useful information instead of re
 - [x] Add caching and rate-limiting hooks for completion requests
 Purpose: Keeps the per-keystroke assistance fast and prevents avoidable duplicate model calls.
 
-- [ ] Wire Monaco `InlineCompletionsProvider` to the completion endpoint
+- [x] Wire Monaco `InlineCompletionsProvider` to the completion endpoint
 Purpose: Delivers the study-assistant UX directly inside the editor where learning and note entry happen together.
 
 - [ ] Support ghost-text acceptance with Tab and cancellation on rapid edits

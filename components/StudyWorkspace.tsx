@@ -6,6 +6,7 @@ import type { Monaco } from '@monaco-editor/react';
 import type { editor, languages } from 'monaco-editor';
 
 import MindmapSvgPreview from './MindmapSvgPreview';
+import { requestInlineCompletionFromApi } from '../lib/completion/client';
 import { getMindmapSectionContext } from '../lib/dsl/editor-context';
 import {
   createInlineSuggestionRange,
@@ -23,7 +24,7 @@ import type { MindmapValidationIssue } from '../lib/dsl/validation';
 
 let mindmapDslInlineCompletionRegistered = false;
 const mindmapDslLanguageId = 'mindmap-dsl';
-const enableMonacoInlineCompletions = false;
+const enableMonacoInlineCompletions = true;
 let mindmapDslInlineSuggestionPreference: InlineSuggestionPreference = 'auto';
 
 type InlineSuggestionPreference = 'auto' | 'continuation' | 'enrichment';
@@ -108,6 +109,17 @@ export default function StudyWorkspace() {
   }, [inlineSuggestionPreference]);
 
   useEffect(() => {
+    if (enableMonacoInlineCompletions) {
+      const editor = editorRef.current;
+
+      if (editor) {
+        ghostTextDecorationIdsRef.current = editor.deltaDecorations(ghostTextDecorationIdsRef.current, []);
+      }
+
+      ghostTextStateRef.current = null;
+      return;
+    }
+
     const editor = editorRef.current;
 
     if (!editor) {
@@ -441,8 +453,8 @@ export default function StudyWorkspace() {
             <div className="grid gap-1">
               <h3 className="text-base font-semibold text-emerald-950">Study guidance</h3>
               <p className="leading-6 text-emerald-900/80">
-                This hint surface explains what the stub assistant is trying to add in
-                the current section before the API-backed model is connected.
+                This hint surface still shows the local study heuristics, while Monaco now
+                requests inline completions from the completion endpoint for live ghost text.
               </p>
             </div>
 
@@ -501,7 +513,7 @@ export default function StudyWorkspace() {
                 {preferredStubSuggestion?.insertText || 'No inline hint for this cursor position.'}
               </p>
               <p className="mt-3 leading-6 text-emerald-900/80">
-                {preferredStubSuggestion?.explanation || 'Move the cursor into a partial label or a blank study slot to preview a hint.'}
+                {preferredStubSuggestion?.explanation || 'Move the cursor into a partial label or a blank study slot to preview the local fallback hint.'}
               </p>
             </div>
           </div>
@@ -620,7 +632,7 @@ function configureMindmapDslMonaco(monaco: Monaco): void {
   }
 
   monaco.languages.registerInlineCompletionsProvider(mindmapDslLanguageId, {
-    provideInlineCompletions(
+    async provideInlineCompletions(
       model: editor.ITextModel,
       position: { lineNumber: number; column: number },
       _context: languages.InlineCompletionContext,
@@ -630,34 +642,33 @@ function configureMindmapDslMonaco(monaco: Monaco): void {
         return { items: [] };
       }
 
-      const sectionContext = getMindmapSectionContext(model.getValue(), {
-        lineNumber: position.lineNumber,
-        column: position.column,
-      });
-
       if (token.isCancellationRequested) {
         return { items: [] };
       }
 
-      const suggestion = pickPreferredStubSuggestion(
-        getStubInlineSuggestionSet(sectionContext),
-        mindmapDslInlineSuggestionPreference,
-      );
-      if (!suggestion || suggestion.insertText.length === 0) {
+      const response = await requestInlineCompletionFromApi({
+        outline: model.getValue(),
+        cursor: {
+          lineNumber: position.lineNumber,
+          column: position.column,
+        },
+      }).catch(() => null);
+
+      if (token.isCancellationRequested || !response || response.completionText.length === 0) {
         return { items: [] };
       }
 
       return {
         items: [
           {
-            insertText: suggestion.insertText,
+            insertText: response.completionText,
             range: createInlineSuggestionRange(position),
           },
         ],
       };
     },
     disposeInlineCompletions() {},
-    displayName: 'Mindmap study stub',
+    displayName: 'Mindmap study assistant',
   });
 
   mindmapDslInlineCompletionRegistered = true;
