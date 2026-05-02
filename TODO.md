@@ -114,7 +114,7 @@ Purpose: Keeps layout computation off the main thread so typing and UI interacti
 - [x] Configure radial layout spacing rules for level distance, sibling gap, and canvas padding
 Purpose: Enforces the non-cramped rendering goals that distinguish the product from a generic graph view.
 
-- [ ] Build an SVG renderer for nodes, edges, labels, and branch styling
+- [x] Build an SVG renderer for nodes, edges, labels, and branch styling
 Purpose: Produces a crisp, scalable preview that is also easy to export as an image.
 
 - [ ] Add pan and zoom interactions to the preview canvas

@@ -5,6 +5,7 @@ import { startTransition, useEffect, useMemo, useRef, useState } from 'react';
 import type { Monaco } from '@monaco-editor/react';
 import type { editor, languages } from 'monaco-editor';
 
+import MindmapSvgPreview from './MindmapSvgPreview';
 import { getMindmapSectionContext } from '../lib/dsl/editor-context';
 import {
   createInlineSuggestionRange,
@@ -355,8 +356,8 @@ export default function StudyWorkspace() {
           <div className="grid gap-1">
             <h2 className="text-xl font-semibold text-zinc-950">Mindmap preview</h2>
             <p className="text-sm leading-6 text-zinc-600">
-              Layout output, branch colours, and export bounds will render in this
-              panel once the deterministic generation pipeline is connected.
+              Layout output now renders as a radial SVG with branch-aware colour styling
+              so the preview reflects the generated graph instead of a placeholder.
             </p>
           </div>
 
@@ -469,18 +470,7 @@ export default function StudyWorkspace() {
             </div>
           </div>
 
-          <div className="grid min-h-[460px] place-items-center rounded-2xl border border-dashed border-zinc-300 bg-white p-6 text-center">
-            <div className="grid max-w-sm gap-3">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-500">
-                <span className="text-2xl">◎</span>
-              </div>
-              <h3 className="text-lg font-semibold text-zinc-950">Preview placeholder</h3>
-              <p className="text-sm leading-6 text-zinc-600">
-                The live editor now mounts on the left. The generated radial map will
-                appear here after the parser, layout engine, and SVG renderer are wired.
-              </p>
-            </div>
-          </div>
+          <MindmapSvgPreview layoutResult={layoutResult} mindmap={generatedMindmap} />
         </aside>
       </div>
     </section>
