@@ -105,7 +105,7 @@ Purpose: Protects the core transformation logic from regressions as heuristics a
 
 ### Phase 6 - Layout and SVG Rendering
 
-- [ ] Translate mindmap JSON into ELK graph input
+- [x] Translate mindmap JSON into ELK graph input
 Purpose: Connects the app's internal graph model to a layout engine that can compute readable positions.
 
 - [ ] Run ELK layout in a Web Worker
