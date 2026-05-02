@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  invalidHierarchyMindmapDslFixture,
+  invalidIndentationMindmapDslFixture,
   malformedMarkerMindmapDslFixture,
   malformedMindmapDslFixture,
   validMindmapDslFixture,
@@ -50,5 +52,25 @@ test("parseMindmapDsl validates malformed root and branch markers explicitly", (
       "invalid-branch-marker",
       "missing-root",
     ],
+  );
+});
+
+test("parseMindmapDsl rejects invalid indentation width and skipped indentation levels", () => {
+  const result = parseMindmapDsl(invalidIndentationMindmapDslFixture);
+
+  assert.ok(result.ast);
+  assert.deepEqual(
+    result.errors.map((error) => error.code),
+    ["invalid-indentation", "invalid-indentation"],
+  );
+});
+
+test("parseMindmapDsl rejects hierarchy without an exact parent level", () => {
+  const result = parseMindmapDsl(invalidHierarchyMindmapDslFixture);
+
+  assert.ok(result.ast);
+  assert.deepEqual(
+    result.errors.map((error) => error.code),
+    ["invalid-indentation"],
   );
 });

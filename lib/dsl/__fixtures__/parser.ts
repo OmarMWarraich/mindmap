@@ -16,3 +16,23 @@ export const malformedMarkerMindmapDslFixture = `- @root: Photosynthesis
 @root Photosynthesis
 - @branch Overview
 `;
+
+export const invalidIndentationMindmapDslFixture = `@root: Biology
+- @branch: Cells
+  - Organelles
+      - Mitochondria
+ - Misaligned spacing
+  - Recovery sibling
+`;
+
+export const invalidHierarchyMindmapDslFixture = `@root: Chemistry
+- @branch: Matter
+  - States
+    - Solid
+      - Crystal lattice
+    - Liquid
+      - Flow
+        - Viscosity
+    - Gas
+        - No exact parent level
+`;

@@ -307,14 +307,18 @@ function attachLeafNode(
     return;
   }
 
-  while (
-    leafStack.length > 0 &&
-    leafStack[leafStack.length - 1]?.indentLevel >= leaf.source.indentLevel
-  ) {
-    leafStack.pop();
-  }
+  const parentLeaf = resolveLeafParent(leaf.source.indentLevel, leafStack);
 
-  const parentLeaf = leafStack[leafStack.length - 1]?.node;
+  if (leaf.source.indentLevel > 1 && !parentLeaf) {
+    errors.push(
+      createError(
+        "invalid-indentation",
+        "Nested leaf nodes must have a parent exactly one indentation level above.",
+        leaf.source,
+      ),
+    );
+    return;
+  }
 
   if (parentLeaf) {
     parentLeaf.children.push(leaf);
@@ -383,6 +387,30 @@ function isValidLeafIndentation(indentLevel: number, leafStack: LeafStackEntry[]
 
   const currentLevel = leafStack[leafStack.length - 1]?.indentLevel ?? 0;
   return indentLevel <= currentLevel + 1;
+}
+
+function resolveLeafParent(
+  indentLevel: number,
+  leafStack: LeafStackEntry[],
+): MindmapLeafAstNode | null {
+  while (
+    leafStack.length > 0 &&
+    leafStack[leafStack.length - 1]?.indentLevel >= indentLevel
+  ) {
+    leafStack.pop();
+  }
+
+  const parentEntry = leafStack[leafStack.length - 1];
+
+  if (!parentEntry) {
+    return null;
+  }
+
+  if (parentEntry.indentLevel !== indentLevel - 1) {
+    return null;
+  }
+
+  return parentEntry.node;
 }
 
 function hasInvalidRootMarker(trimmed: string): boolean {
