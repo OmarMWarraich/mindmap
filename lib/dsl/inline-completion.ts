@@ -1,5 +1,3 @@
-import type { editor } from 'monaco-editor';
-
 import type { MindmapSectionContext } from './editor-context.ts';
 import { MINDMAP_DSL_INDENT } from './mvp.ts';
 
@@ -39,8 +37,13 @@ export function pickPreferredStubSuggestion(
 }
 
 export function createInlineSuggestionRange(
-  position: editor.IPosition,
-): editor.IRange {
+  position: { lineNumber: number; column: number },
+): {
+  startLineNumber: number;
+  endLineNumber: number;
+  startColumn: number;
+  endColumn: number;
+} {
   return {
     startLineNumber: position.lineNumber,
     endLineNumber: position.lineNumber,

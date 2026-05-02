@@ -30,18 +30,14 @@ const editorLoadingFallback = (
 export default function StudyWorkspace() {
   const [outline, setOutline] = useState(mindmapDslStarterOutline);
   const [debouncedOutline, setDebouncedOutline] = useState(mindmapDslStarterOutline);
-  const [isParsing, setIsParsing] = useState(false);
   const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
   const [inlineSuggestionPreference, setInlineSuggestionPreference] =
     useState<InlineSuggestionPreference>('auto');
 
   useEffect(() => {
-    setIsParsing(true);
-
     const timeoutId = window.setTimeout(() => {
       startTransition(() => {
         setDebouncedOutline(outline);
-        setIsParsing(false);
       });
     }, 180);
 
@@ -63,6 +59,7 @@ export default function StudyWorkspace() {
     () => pickPreferredStubSuggestion(stubSuggestionSet, inlineSuggestionPreference),
     [inlineSuggestionPreference, stubSuggestionSet],
   );
+  const isParsing = outline !== debouncedOutline;
   const branchCount = parseResult.ast?.root.branches.length ?? 0;
   const nodeCount = (parseResult.ast?.root.branches ?? []).reduce((count, branch) => {
     const countChildren = (children: typeof branch.children): number => {
