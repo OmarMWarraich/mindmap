@@ -2,7 +2,15 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { validGeneratedMindmapFixture } from './__fixtures__/generatedMindmap.ts';
-import { buildSvgPreviewModel, createEdgePath, wrapMindmapLabel } from './svg-preview.ts';
+import {
+  buildSvgPreviewModel,
+  clampSvgPreviewScale,
+  createDefaultSvgPreviewTransform,
+  createEdgePath,
+  panSvgPreviewTransform,
+  wrapMindmapLabel,
+  zoomSvgPreviewAroundPoint,
+} from './svg-preview.ts';
 
 test('wrapMindmapLabel splits long labels into multiple lines', () => {
   assert.deepEqual(wrapMindmapLabel('Cellular respiration drives ATP output', 18), [
@@ -53,4 +61,34 @@ test('buildSvgPreviewModel combines layout coordinates with node styling', () =>
   assert.equal(model.nodes[1]?.style.stroke, '#d97706');
   assert.equal(model.edges[0]?.color, '#fb923c');
   assert.ok(model.nodes[0]?.lines.length >= 1);
+});
+
+test('zoomSvgPreviewAroundPoint preserves the anchor position while scaling', () => {
+  const transform = zoomSvgPreviewAroundPoint(
+    createDefaultSvgPreviewTransform(),
+    1.5,
+    { x: 300, y: 240 },
+  );
+
+  assert.deepEqual(transform, {
+    scale: 1.5,
+    translateX: -150,
+    translateY: -120,
+  });
+});
+
+test('panSvgPreviewTransform offsets the current translation', () => {
+  assert.deepEqual(
+    panSvgPreviewTransform(
+      { scale: 1.2, translateX: 10, translateY: -20 },
+      { x: 18, y: 12 },
+    ),
+    { scale: 1.2, translateX: 28, translateY: -8 },
+  );
+});
+
+test('clampSvgPreviewScale constrains zoom extremes', () => {
+  assert.equal(clampSvgPreviewScale(0.2), 0.55);
+  assert.equal(clampSvgPreviewScale(1.4), 1.4);
+  assert.equal(clampSvgPreviewScale(4), 2.4);
 });

@@ -38,6 +38,12 @@ export interface SvgPreviewModel {
   edges: SvgPreviewEdge[];
 }
 
+export interface SvgPreviewTransform {
+  scale: number;
+  translateX: number;
+  translateY: number;
+}
+
 const rootNodeStyle: SvgPreviewNodeStyle = {
   fill: '#fff7ed',
   stroke: '#f97316',
@@ -194,4 +200,42 @@ function getNodeVisualStyle(node: MindmapNode | null): SvgPreviewNodeStyle {
   }
 
   return branchTokenStyles[node.style.colorToken][node.style.tintTone ?? 'base'];
+}
+
+export function createDefaultSvgPreviewTransform(): SvgPreviewTransform {
+  return {
+    scale: 1,
+    translateX: 0,
+    translateY: 0,
+  };
+}
+
+export function clampSvgPreviewScale(scale: number): number {
+  return Math.min(2.4, Math.max(0.55, scale));
+}
+
+export function panSvgPreviewTransform(
+  transform: SvgPreviewTransform,
+  delta: { x: number; y: number },
+): SvgPreviewTransform {
+  return {
+    ...transform,
+    translateX: transform.translateX + delta.x,
+    translateY: transform.translateY + delta.y,
+  };
+}
+
+export function zoomSvgPreviewAroundPoint(
+  transform: SvgPreviewTransform,
+  nextScale: number,
+  anchor: { x: number; y: number },
+): SvgPreviewTransform {
+  const clampedScale = clampSvgPreviewScale(nextScale);
+  const scaleRatio = clampedScale / transform.scale;
+
+  return {
+    scale: clampedScale,
+    translateX: anchor.x - scaleRatio * (anchor.x - transform.translateX),
+    translateY: anchor.y - scaleRatio * (anchor.y - transform.translateY),
+  };
 }

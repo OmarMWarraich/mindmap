@@ -117,7 +117,7 @@ Purpose: Enforces the non-cramped rendering goals that distinguish the product f
 - [x] Build an SVG renderer for nodes, edges, labels, and branch styling
 Purpose: Produces a crisp, scalable preview that is also easy to export as an image.
 
-- [ ] Add pan and zoom interactions to the preview canvas
+- [x] Add pan and zoom interactions to the preview canvas
 Purpose: Makes larger study maps navigable without shrinking everything to unreadable sizes.
 
 - [ ] Add loading and failure states around layout computation
