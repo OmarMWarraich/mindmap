@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { resetInlineCompletionRuntimeControlsForTests } from '../../../lib/completion/runtime-controls.ts';
 import { POST } from './route.ts';
 
 test('completion route returns model output for a valid request', async () => {
@@ -14,6 +15,8 @@ test('completion route returns model output for a valid request', async () => {
   process.env.MODEL_COMPLETION_MODEL = 'gpt-5-mini';
   process.env.MODEL_GENERATION_MODEL = 'gpt-5';
   delete process.env.MODEL_BASE_URL;
+
+  resetInlineCompletionRuntimeControlsForTests();
 
   globalThis.fetch = async () => new Response(JSON.stringify({
     choices: [{ message: { content: '  - ATP synthase' } }],
@@ -55,6 +58,8 @@ test('completion route drops off-topic model output after relevance filtering', 
   process.env.MODEL_GENERATION_MODEL = 'gpt-5';
   delete process.env.MODEL_BASE_URL;
 
+  resetInlineCompletionRuntimeControlsForTests();
+
   globalThis.fetch = async () => new Response(JSON.stringify({
     choices: [{ message: { content: 'French Revolution causes' } }],
   }), {
@@ -95,6 +100,8 @@ test('completion route drops duplicate nearby sibling suggestions', async () => 
   process.env.MODEL_GENERATION_MODEL = 'gpt-5';
   delete process.env.MODEL_BASE_URL;
 
+  resetInlineCompletionRuntimeControlsForTests();
+
   globalThis.fetch = async () => new Response(JSON.stringify({
     choices: [{ message: { content: 'NADPH output' } }],
   }), {
@@ -124,6 +131,8 @@ test('completion route drops duplicate nearby sibling suggestions', async () => 
 });
 
 test('completion route rejects invalid request payloads', async () => {
+  resetInlineCompletionRuntimeControlsForTests();
+
   const response = await POST(new Request('http://localhost/api/completion', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -132,4 +141,99 @@ test('completion route rejects invalid request payloads', async () => {
 
   assert.equal(response.status, 400);
   assert.match((await response.json()).error, /Invalid input|expected string/i);
+});
+
+test('completion route serves identical requests from cache before calling fetch again', async () => {
+  const originalEnv = {
+    ...process.env,
+  };
+  const originalFetch = globalThis.fetch;
+  let fetchCalls = 0;
+
+  process.env.MODEL_PROVIDER = 'openai';
+  process.env.MODEL_API_KEY = 'test-key';
+  process.env.MODEL_COMPLETION_MODEL = 'gpt-5-mini';
+  process.env.MODEL_GENERATION_MODEL = 'gpt-5';
+  delete process.env.MODEL_BASE_URL;
+  resetInlineCompletionRuntimeControlsForTests();
+
+  globalThis.fetch = async () => {
+    fetchCalls += 1;
+    return new Response(JSON.stringify({
+      choices: [{ message: { content: '  - ATP synthase' } }],
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+
+  const request = new Request('http://localhost/api/completion', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-forwarded-for': '203.0.113.8',
+    },
+    body: JSON.stringify({
+      outline: '@root: Photosynthesis\n- @branch: Light reactions\n  - ATP synth',
+      cursor: { lineNumber: 3, column: 10 },
+    }),
+  });
+
+  try {
+    const firstResponse = await POST(request.clone());
+    const secondResponse = await POST(request.clone());
+
+    assert.equal(firstResponse.status, 200);
+    assert.equal(secondResponse.status, 200);
+    assert.equal(fetchCalls, 1);
+  } finally {
+    process.env = originalEnv;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('completion route returns 429 after repeated burst requests from the same client', async () => {
+  const originalEnv = {
+    ...process.env,
+  };
+  const originalFetch = globalThis.fetch;
+
+  process.env.MODEL_PROVIDER = 'openai';
+  process.env.MODEL_API_KEY = 'test-key';
+  process.env.MODEL_COMPLETION_MODEL = 'gpt-5-mini';
+  process.env.MODEL_GENERATION_MODEL = 'gpt-5';
+  delete process.env.MODEL_BASE_URL;
+  resetInlineCompletionRuntimeControlsForTests();
+
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    choices: [{ message: { content: '  - ATP synthase' } }],
+  }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  try {
+    let lastResponse: Response | null = null;
+
+    for (let attempt = 0; attempt < 19; attempt += 1) {
+      lastResponse = await POST(new Request('http://localhost/api/completion', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-forwarded-for': '203.0.113.9',
+        },
+        body: JSON.stringify({
+          outline: `@root: Photosynthesis\n- @branch: Light reactions\n  - ATP synth ${attempt}`,
+          cursor: { lineNumber: 3, column: 10 },
+        }),
+      }));
+    }
+
+    assert.ok(lastResponse);
+    assert.equal(lastResponse.status, 429);
+    assert.equal(lastResponse.headers.get('Retry-After'), '30');
+  } finally {
+    process.env = originalEnv;
+    globalThis.fetch = originalFetch;
+  }
 });

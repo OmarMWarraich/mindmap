@@ -205,7 +205,7 @@ Purpose: Prevents the assistant from polluting study notes with low-value sugges
 - [x] Add enrichment-vs-duplication checks against nearby sibling nodes
 Purpose: Pushes the assistant to contribute new useful information instead of repeating what the user already typed.
 
-- [ ] Add caching and rate-limiting hooks for completion requests
+- [x] Add caching and rate-limiting hooks for completion requests
 Purpose: Keeps the per-keystroke assistance fast and prevents avoidable duplicate model calls.
 
 - [ ] Wire Monaco `InlineCompletionsProvider` to the completion endpoint
