@@ -94,7 +94,7 @@ Purpose: Guarantees the rendered graph has stable structure and traceable relati
 - [x] Apply top-level branch colors from the shared palette
 Purpose: Makes the visual map easier to scan by preserving color consistency per branch.
 
-- [ ] Add anti-cram defaults for spacing, padding, and branch sizing hints
+- [x] Add anti-cram defaults for spacing, padding, and branch sizing hints
 Purpose: Encodes readability constraints before layout runs so dense maps remain usable.
 
 - [ ] Add label cleanup and optional grouping rules for overloaded branches

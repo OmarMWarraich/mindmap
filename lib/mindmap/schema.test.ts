@@ -14,6 +14,7 @@ test("validateGeneratedMindmap accepts the valid fixture", () => {
 
   assert.equal(parsed.metadata.title, "Photosynthesis");
   assert.equal(parsed.nodes.length, 7);
+  assert.equal(parsed.metadata.layout.levelGap, 168);
 });
 
 test("generatedMindmapSchema rejects malformed fixture payloads", () => {
@@ -26,7 +27,11 @@ test("generatedMindmapSchema rejects malformed fixture payloads", () => {
   }
 
   assert(
-    result.error.issues.some((issue) => issue.path.join(".").includes("colorToken")),
+    result.error.issues.some(
+      (issue) =>
+        issue.path.join(".").includes("colorToken") ||
+        issue.path.join(".").includes("branchGap"),
+    ),
   );
 });
 
@@ -48,6 +53,11 @@ test("generateMindmapFromAst emits schema-valid nodes, edges, and palette styles
   assert.equal(
     generated.nodes.find((node) => node.id === "node-2-1-1-fixation")?.style?.tintTone,
     "soft",
+  );
+  assert.equal(generated.metadata.layout.canvasPadding, 96);
+  assert.equal(
+    generated.nodes.find((node) => node.id === "branch-1-overview")?.layout.minHeight,
+    104,
   );
 });
 

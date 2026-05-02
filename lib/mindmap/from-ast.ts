@@ -11,8 +11,27 @@ import {
   getMindmapBranchColorToken,
   getMindmapTintTone,
 } from "./palette.ts";
-import type { GeneratedMindmap, MindmapEdge, MindmapNode } from "./schema.ts";
+import type {
+  GeneratedMindmap,
+  MindmapEdge,
+  MindmapLayoutDefaults,
+  MindmapNode,
+  MindmapNodeKind,
+} from "./schema.ts";
 import { validateGeneratedMindmap } from "./schema.ts";
+
+const antiCramLayoutDefaults: MindmapLayoutDefaults = {
+  canvasPadding: 96,
+  levelGap: 168,
+  siblingGap: 44,
+  branchGap: 60,
+  nodePaddingX: 20,
+  nodePaddingY: 14,
+  branchWidthHint: 220,
+  branchHeightHint: 84,
+  leafWidthHint: 156,
+  leafHeightHint: 60,
+};
 
 export interface GenerateMindmapFromAstOptions {
   warnings?: MindmapValidationWarning[];
@@ -40,6 +59,7 @@ export function generateMindmapFromAst(
     parentId: null,
     branchId: rootId,
     childIds: branchOrder,
+    layout: createNodeLayout("root", rootLabel, branchOrder.length, 0),
   });
 
   ast.root.branches.forEach((branch, branchIndex) => {
@@ -52,6 +72,7 @@ export function generateMindmapFromAst(
       title: ast.root.label,
       rootId,
       branchOrder,
+      layout: antiCramLayoutDefaults,
       ...(options.generatedAt ? { generatedAt: options.generatedAt } : {}),
       source: {
         format: "mindmap-dsl",
@@ -86,6 +107,7 @@ function appendBranch(
     childIds: branch.children.map((child, childIndex) =>
       createNodeId([branchIndex + 1, childIndex + 1], normalizeMindmapLabel(child.label)),
     ),
+    layout: createNodeLayout("branch", branchLabel, branch.children.length, 1),
     style: {
       branchKey: branchId,
       branchIndex,
@@ -137,6 +159,7 @@ function appendLeaf(
     childIds: leaf.children.map((child, childIndex) =>
       createNodeId([...path, childIndex + 1], normalizeMindmapLabel(child.label)),
     ),
+    layout: createNodeLayout("leaf", label, leaf.children.length, level),
     style: {
       branchKey: branchId,
       branchIndex,
@@ -192,4 +215,35 @@ function createStableSlug(label: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function createNodeLayout(
+  kind: MindmapNodeKind,
+  label: string,
+  childCount: number,
+  level: number,
+): MindmapNode["layout"] {
+  const baseWidth =
+    kind === "branch"
+      ? antiCramLayoutDefaults.branchWidthHint
+      : kind === "leaf"
+        ? antiCramLayoutDefaults.leafWidthHint
+        : antiCramLayoutDefaults.branchWidthHint + 28;
+  const baseHeight =
+    kind === "branch"
+      ? antiCramLayoutDefaults.branchHeightHint
+      : kind === "leaf"
+        ? antiCramLayoutDefaults.leafHeightHint
+        : antiCramLayoutDefaults.branchHeightHint + 12;
+  const widthFromLabel = Math.max(0, Math.min(label.length, 40) - 12) * 5;
+  const heightFromChildren = Math.min(childCount, 5) * 10;
+  const levelTaper = Math.max(0, level - 2) * 4;
+
+  return {
+    minWidth: baseWidth + widthFromLabel,
+    minHeight: baseHeight + heightFromChildren,
+    paddingX: antiCramLayoutDefaults.nodePaddingX,
+    paddingY: antiCramLayoutDefaults.nodePaddingY,
+    siblingGap: antiCramLayoutDefaults.siblingGap + Math.min(childCount, 4) * 4 + levelTaper,
+  };
 }

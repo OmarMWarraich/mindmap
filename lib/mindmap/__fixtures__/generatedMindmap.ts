@@ -98,6 +98,18 @@ export const validGeneratedMindmapFixture: GeneratedMindmap = {
     title: "Photosynthesis",
     rootId: "root-photosynthesis",
     branchOrder: ["branch-1-overview", "branch-2-calvin-cycle"],
+    layout: {
+      canvasPadding: 96,
+      levelGap: 168,
+      siblingGap: 44,
+      branchGap: 60,
+      nodePaddingX: 20,
+      nodePaddingY: 14,
+      branchWidthHint: 220,
+      branchHeightHint: 84,
+      leafWidthHint: 156,
+      leafHeightHint: 60,
+    },
     source: {
       format: "mindmap-dsl",
       version: "mvp-v1",
@@ -112,6 +124,13 @@ export const validGeneratedMindmapFixture: GeneratedMindmap = {
       parentId: null,
       branchId: "root-photosynthesis",
       childIds: ["branch-1-overview", "branch-2-calvin-cycle"],
+      layout: {
+        minWidth: 248,
+        minHeight: 96,
+        paddingX: 20,
+        paddingY: 14,
+        siblingGap: 52,
+      },
     },
     {
       id: "branch-1-overview",
@@ -121,6 +140,13 @@ export const validGeneratedMindmapFixture: GeneratedMindmap = {
       parentId: "root-photosynthesis",
       branchId: "branch-1-overview",
       childIds: ["node-1-1-definition", "node-1-2-why-it-matters"],
+      layout: {
+        minWidth: 220,
+        minHeight: 104,
+        paddingX: 20,
+        paddingY: 14,
+        siblingGap: 52,
+      },
       style: {
         branchKey: "branch-1-overview",
         branchIndex: 0,
@@ -136,6 +162,13 @@ export const validGeneratedMindmapFixture: GeneratedMindmap = {
       parentId: "branch-1-overview",
       branchId: "branch-1-overview",
       childIds: [],
+      layout: {
+        minWidth: 156,
+        minHeight: 60,
+        paddingX: 20,
+        paddingY: 14,
+        siblingGap: 44,
+      },
       style: {
         branchKey: "branch-1-overview",
         branchIndex: 0,
@@ -151,6 +184,13 @@ export const validGeneratedMindmapFixture: GeneratedMindmap = {
       parentId: "branch-1-overview",
       branchId: "branch-1-overview",
       childIds: [],
+      layout: {
+        minWidth: 171,
+        minHeight: 60,
+        paddingX: 20,
+        paddingY: 14,
+        siblingGap: 44,
+      },
       style: {
         branchKey: "branch-1-overview",
         branchIndex: 0,
@@ -166,6 +206,13 @@ export const validGeneratedMindmapFixture: GeneratedMindmap = {
       parentId: "root-photosynthesis",
       branchId: "branch-2-calvin-cycle",
       childIds: ["node-2-1-steps"],
+      layout: {
+        minWidth: 220,
+        minHeight: 94,
+        paddingX: 20,
+        paddingY: 14,
+        siblingGap: 48,
+      },
       style: {
         branchKey: "branch-2-calvin-cycle",
         branchIndex: 1,
@@ -181,6 +228,13 @@ export const validGeneratedMindmapFixture: GeneratedMindmap = {
       parentId: "branch-2-calvin-cycle",
       branchId: "branch-2-calvin-cycle",
       childIds: ["node-2-1-1-fixation"],
+      layout: {
+        minWidth: 156,
+        minHeight: 70,
+        paddingX: 20,
+        paddingY: 14,
+        siblingGap: 48,
+      },
       style: {
         branchKey: "branch-2-calvin-cycle",
         branchIndex: 1,
@@ -196,6 +250,13 @@ export const validGeneratedMindmapFixture: GeneratedMindmap = {
       parentId: "node-2-1-steps",
       branchId: "branch-2-calvin-cycle",
       childIds: [],
+      layout: {
+        minWidth: 156,
+        minHeight: 60,
+        paddingX: 20,
+        paddingY: 14,
+        siblingGap: 48,
+      },
       style: {
         branchKey: "branch-2-calvin-cycle",
         branchIndex: 1,
@@ -242,6 +303,13 @@ export const validGeneratedMindmapFixture: GeneratedMindmap = {
 
 export const malformedGeneratedMindmapFixture: unknown = {
   ...validGeneratedMindmapFixture,
+  metadata: {
+    ...validGeneratedMindmapFixture.metadata,
+    layout: {
+      ...validGeneratedMindmapFixture.metadata.layout,
+      branchGap: 0,
+    },
+  },
   nodes: validGeneratedMindmapFixture.nodes.map((node) =>
     node.id === "branch-1-overview"
       ? {
