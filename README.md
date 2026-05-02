@@ -34,6 +34,68 @@ Planned next:
 - Mindmap generation, layout, and SVG rendering
 - PNG export and local draft persistence
 
+## MVP DSL Rules
+
+The editor input is a small outline DSL designed to stay easy to type and deterministic to parse.
+
+### Core Shape
+
+Each document has exactly one root line, followed by one or more top-level branches.
+
+```text
+@root: Photosynthesis
+- @branch: Overview
+  - Definition
+  - Why it matters
+- @branch: Light-dependent reactions
+  - Location: thylakoid membrane
+  - Inputs: light, H2O, ADP, NADP+
+  - Outputs: O2, ATP, NADPH
+```
+
+### `@root`
+
+- The first non-empty line must be `@root: <label>`.
+- `@root` appears exactly once.
+- The root line has no leading indentation and no list marker.
+- The root label is required and becomes the center topic of the mindmap.
+
+### `@branch`
+
+- A top-level branch line must be written as `- @branch: <label>`.
+- Every branch belongs directly under the root.
+- Branch lines must start at indentation level 0.
+- Branch labels are required.
+- The parser should treat every `@branch` as a new major section with its own subtree and color assignment later in generation.
+
+### Indentation
+
+- Indentation uses spaces only.
+- One nesting level equals two spaces.
+- Indentation must increase or decrease by one level at a time.
+- Tabs are invalid.
+- Only leaf nodes may be nested beneath a branch or another leaf node.
+- A line's parent is the nearest previous line whose indentation is exactly one level shallower.
+
+### Leaf Nodes
+
+- A leaf node is any non-empty non-`@branch` line written as `- <label>`.
+- Leaf nodes must be written as `- <label>`.
+- Leaf nodes require a label after the marker.
+- A leaf node may appear directly under a branch or under another leaf node.
+- Leaf nodes carry the study content shown in the preview, such as definitions, steps, examples, causes, effects, inputs, or outputs.
+
+### MVP Validation Rules
+
+- Ignore blank lines.
+- Reject content before the root line.
+- Reject multiple root lines.
+- Reject a branch before the root.
+- Reject leaf nodes before the first branch.
+- Reject indentation that skips a level.
+- Reject indented branch markers; `@branch` is only valid at the top level.
+- Preserve label text as authored except for trimming surrounding whitespace needed for parsing.
+
 ## Tech Stack
 
 - Next.js 16

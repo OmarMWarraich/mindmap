@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { mindmapDslStarterOutline } from '../lib/dsl/mvp';
 
 const Editor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -10,19 +11,6 @@ const Editor = dynamic(() => import('@monaco-editor/react'), {
     </div>
   ),
 });
-
-const smokeTestOutline = `@root: Photosynthesis
-- @branch: Overview
-  - Definition
-  - Why it matters
-- @branch: Light-dependent reactions
-  - Location: thylakoid membrane
-  - Inputs: light, H2O, ADP, NADP+
-  - Outputs: O2, ATP, NADPH
-- @branch: Calvin cycle
-  - Location: stroma
-  - Steps: fixation, reduction, regeneration
-`;
 
 export default function MonacoSmokeTest() {
   return (
@@ -39,7 +27,7 @@ export default function MonacoSmokeTest() {
       <div className="h-[460px] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
         <Editor
           defaultLanguage="markdown"
-          defaultValue={smokeTestOutline}
+          defaultValue={mindmapDslStarterOutline}
           height="100%"
           options={{
             automaticLayout: true,
