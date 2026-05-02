@@ -202,7 +202,7 @@ Purpose: Ensures completions can be shown as ghost text without corrupting the u
 - [x] Add relevance checks that reject off-topic, repetitive, or overly broad completions
 Purpose: Prevents the assistant from polluting study notes with low-value suggestions that do not deepen the current topic.
 
-- [ ] Add enrichment-vs-duplication checks against nearby sibling nodes
+- [x] Add enrichment-vs-duplication checks against nearby sibling nodes
 Purpose: Pushes the assistant to contribute new useful information instead of repeating what the user already typed.
 
 - [ ] Add caching and rate-limiting hooks for completion requests

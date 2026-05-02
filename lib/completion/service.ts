@@ -6,6 +6,7 @@ import { normalizeInlineCompletionOutput } from './normalize.ts';
 import { createInlineCompletionPrompt } from './prompt.ts';
 import { requestModelProviderChatCompletion } from './provider.ts';
 import { evaluateInlineCompletionRelevance } from './relevance.ts';
+import { rejectDuplicateSiblingCompletion } from './sibling-check.ts';
 
 export const inlineCompletionRequestSchema = z.object({
   outline: z.string(),
@@ -53,9 +54,15 @@ export async function generateInlineCompletion(
     currentLinePrefix: context.linePrefix,
   });
   const relevance = evaluateInlineCompletionRelevance(normalizedCompletionText, context);
+  const siblingDuplication = rejectDuplicateSiblingCompletion(
+    normalizedCompletionText,
+    request.outline,
+    request.cursor,
+  );
 
   return inlineCompletionResponseSchema.parse({
-    completionText: relevance.accepted ? normalizedCompletionText : '',
+    completionText:
+      relevance.accepted && siblingDuplication.accepted ? normalizedCompletionText : '',
     source: 'model',
   });
 }
