@@ -100,7 +100,7 @@ Purpose: Encodes readability constraints before layout runs so dense maps remain
 - [x] Add label cleanup and optional grouping rules for overloaded branches
 Purpose: Prevents overly long labels or oversized sibling lists from degrading readability.
 
-- [ ] Add snapshot tests for AST-to-mindmap generation
+- [x] Add snapshot tests for AST-to-mindmap generation
 Purpose: Protects the core transformation logic from regressions as heuristics are refined.
 
 ### Phase 6 - Layout and SVG Rendering
