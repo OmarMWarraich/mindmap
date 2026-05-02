@@ -12,7 +12,9 @@ export type MindmapValidationSeverity = "warning" | "error";
 export type MindmapValidationCode =
   | "missing-root"
   | "duplicate-root"
+  | "invalid-root-marker"
   | "branch-before-root"
+  | "invalid-branch-marker"
   | "leaf-before-branch"
   | "invalid-branch-indentation"
   | "invalid-indentation"
@@ -26,7 +28,9 @@ export const mindmapValidationSeveritySchema = z.enum(["warning", "error"]);
 export const mindmapValidationCodeSchema = z.enum([
   "missing-root",
   "duplicate-root",
+  "invalid-root-marker",
   "branch-before-root",
+  "invalid-branch-marker",
   "leaf-before-branch",
   "invalid-branch-indentation",
   "invalid-indentation",

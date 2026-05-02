@@ -10,3 +10,9 @@ Not a valid marker
   - Valid leaf
        - Too deep too fast
 `;
+
+export const malformedMarkerMindmapDslFixture = `- @root: Photosynthesis
+@branch: Overview
+@root Photosynthesis
+- @branch Overview
+`;

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  malformedMarkerMindmapDslFixture,
   malformedMindmapDslFixture,
   validMindmapDslFixture,
 } from "./__fixtures__/parser.ts";
@@ -32,6 +33,22 @@ test("parseMindmapDsl reports malformed structure with stable validation codes",
       "invalid-marker",
       "missing-label",
       "invalid-indentation",
+    ],
+  );
+});
+
+test("parseMindmapDsl validates malformed root and branch markers explicitly", () => {
+  const result = parseMindmapDsl(malformedMarkerMindmapDslFixture);
+
+  assert.equal(result.ast, null);
+  assert.deepEqual(
+    result.errors.map((error) => error.code),
+    [
+      "invalid-root-marker",
+      "invalid-branch-marker",
+      "invalid-root-marker",
+      "invalid-branch-marker",
+      "missing-root",
     ],
   );
 });

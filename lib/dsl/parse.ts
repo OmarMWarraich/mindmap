@@ -67,6 +67,28 @@ export function parseMindmapDsl(input: string): MindmapValidationResult {
       continue;
     }
 
+    if (hasInvalidRootMarker(trimmed)) {
+      errors.push(
+        createError(
+          "invalid-root-marker",
+          "Root lines must use the exact marker `@root: <label>` with no list prefix.",
+          source,
+        ),
+      );
+      continue;
+    }
+
+    if (hasInvalidBranchMarker(trimmed)) {
+      errors.push(
+        createError(
+          "invalid-branch-marker",
+          "Branch lines must use the exact marker `- @branch: <label>`.",
+          source,
+        ),
+      );
+      continue;
+    }
+
     if (trimmed.startsWith("@root:")) {
       const nextRoot = handleRootLine(raw, source, errors, root !== null);
 
@@ -361,6 +383,22 @@ function isValidLeafIndentation(indentLevel: number, leafStack: LeafStackEntry[]
 
   const currentLevel = leafStack[leafStack.length - 1]?.indentLevel ?? 0;
   return indentLevel <= currentLevel + 1;
+}
+
+function hasInvalidRootMarker(trimmed: string): boolean {
+  if (trimmed.startsWith("- @root")) {
+    return true;
+  }
+
+  return trimmed.startsWith("@root") && !trimmed.startsWith("@root:");
+}
+
+function hasInvalidBranchMarker(trimmed: string): boolean {
+  if (trimmed.startsWith("@branch")) {
+    return true;
+  }
+
+  return trimmed.startsWith("- @branch") && !trimmed.startsWith("- @branch:");
 }
 
 function createNodeId(kind: "root" | "branch" | "leaf", label: string, suffix?: number): string {
