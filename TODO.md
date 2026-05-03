@@ -234,7 +234,7 @@ Purpose: Preserves trustworthy hierarchy while still benefiting from AI readabil
 - [x] Let generation surface optional "suggested missing subtopics" alongside the main map output
 Purpose: Helps the user spot gaps in their understanding or in the textbook coverage without silently altering the core authored structure.
 
-- [ ] Add best-effort fallback to deterministic generation when AI output is invalid
+- [x] Add best-effort fallback to deterministic generation when AI output is invalid
 Purpose: Ensures Generate/Refresh still works even when the model fails or returns unusable JSON.
 
 - [ ] Return validation warnings and errors with the generation result

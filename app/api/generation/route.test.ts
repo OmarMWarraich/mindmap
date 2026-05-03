@@ -49,6 +49,7 @@ test('generation route returns a validated overlay for a valid request', async (
     assert.equal(response.status, 200);
     const payload = await response.json();
 
+    assert.equal(payload.fallbackUsed, false);
     assert.deepEqual(payload.overlay, {
       title: 'Photosynthesis',
       labelRewrites: [{
@@ -73,6 +74,52 @@ test('generation route returns a validated overlay for a valid request', async (
       payload.mindmap.nodes.find((node: { id: string; label: string }) => node.id === 'branch-1-overview')?.label,
       'Core overview',
     );
+  } finally {
+    process.env = originalEnv;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('generation route falls back to the deterministic mindmap when the model output is invalid', async () => {
+  const originalEnv = { ...process.env };
+  const originalFetch = globalThis.fetch;
+
+  process.env.MODEL_PROVIDER = 'openai';
+  process.env.MODEL_API_KEY = 'test-key';
+  process.env.MODEL_COMPLETION_MODEL = 'gpt-5-mini';
+  process.env.MODEL_GENERATION_MODEL = 'gpt-5';
+  delete process.env.MODEL_BASE_URL;
+
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    choices: [{ message: { content: 'not valid json' } }],
+  }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  try {
+    const response = await POST(new Request('http://localhost/api/generation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        rawDsl: '@root: Photosynthesis\n- @branch: Overview\n  - Definition',
+        ast: mindmapAstFixture,
+        warnings: [],
+        errors: [],
+      }),
+    }));
+
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.fallbackUsed, true);
+    assert.equal(payload.mindmap.metadata.title, 'Photosynthesis');
+    assert.deepEqual(payload.overlay, {
+      title: 'Photosynthesis',
+      labelRewrites: [],
+      groupingSuggestions: [],
+      suggestedMissingSubtopics: [],
+    });
   } finally {
     process.env = originalEnv;
     globalThis.fetch = originalFetch;

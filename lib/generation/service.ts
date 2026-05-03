@@ -60,6 +60,7 @@ export const generationRequestSchema = z.object({
 }).strict();
 
 export const generationOverlayResponseSchema = z.object({
+  fallbackUsed: z.boolean(),
   mindmap: generatedMindmapSchema,
   overlay: mindmapGenerationResponseSchema,
   suggestedMissingSubtopics: z.array(mindmapGenerationResponseSchema.shape.suggestedMissingSubtopics.element),
@@ -85,33 +86,45 @@ export async function generateMindmapOverlay(
     rawDsl: request.rawDsl,
     deterministicMindmap,
   });
-  const completionText = await requestModelProviderChatCompletion({
-    env,
-    fetchImpl: options.fetchImpl,
-    model: env.MODEL_GENERATION_MODEL,
-    maxCompletionTokens: 800,
-    temperature: 0.2,
-    responseFormat: {
-      type: 'json_schema',
-      json_schema: {
-        name: 'mindmap_generation_overlay',
-        strict: true,
-        schema: mindmapGenerationResponseJsonSchema,
+  try {
+    const completionText = await requestModelProviderChatCompletion({
+      env,
+      fetchImpl: options.fetchImpl,
+      model: env.MODEL_GENERATION_MODEL,
+      maxCompletionTokens: 800,
+      temperature: 0.2,
+      responseFormat: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'mindmap_generation_overlay',
+          strict: true,
+          schema: mindmapGenerationResponseJsonSchema,
+        },
       },
-    },
-    messages: [
-      { role: 'system', content: prompt.system },
-      { role: 'user', content: prompt.user },
-    ],
-  });
+      messages: [
+        { role: 'system', content: prompt.system },
+        { role: 'user', content: prompt.user },
+      ],
+    });
 
-  const overlay = parseMindmapGenerationOverlay(completionText);
+    const overlay = parseMindmapGenerationOverlay(completionText);
 
-  return generationOverlayResponseSchema.parse({
-    mindmap: mergeDeterministicMindmapWithOverlay(deterministicMindmap, overlay),
-    overlay,
-    suggestedMissingSubtopics: overlay.suggestedMissingSubtopics,
-  });
+    return generationOverlayResponseSchema.parse({
+      fallbackUsed: false,
+      mindmap: mergeDeterministicMindmapWithOverlay(deterministicMindmap, overlay),
+      overlay,
+      suggestedMissingSubtopics: overlay.suggestedMissingSubtopics,
+    });
+  } catch {
+    const fallbackOverlay = createFallbackOverlay(deterministicMindmap);
+
+    return generationOverlayResponseSchema.parse({
+      fallbackUsed: true,
+      mindmap: deterministicMindmap,
+      overlay: fallbackOverlay,
+      suggestedMissingSubtopics: fallbackOverlay.suggestedMissingSubtopics,
+    });
+  }
 }
 
 export function parseMindmapGenerationOverlay(value: string): MindmapGenerationResponse {
@@ -127,6 +140,15 @@ export function summarizeMindmapAst(ast: MindmapDocumentAst): string {
   });
 
   return lines.join('\n');
+}
+
+function createFallbackOverlay(deterministicMindmap: ReturnType<typeof generateMindmapFromAst>): MindmapGenerationResponse {
+  return {
+    title: deterministicMindmap.metadata.title,
+    labelRewrites: [],
+    groupingSuggestions: [],
+    suggestedMissingSubtopics: [],
+  };
 }
 
 function appendLeafSummary(lines: string[], leaves: MindmapLeafAstNode[], depth: number): void {
