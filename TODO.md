@@ -222,7 +222,7 @@ Purpose: Helps tune the system toward completions that genuinely teach and reduc
 - [x] Implement the strict JSON generation prompt template
 Purpose: Tells the model to improve wording and grouping while staying inside the app's exact data contract.
 
-- [ ] Add runtime schema validation for model responses
+- [x] Add runtime schema validation for model responses
 Purpose: Prevents malformed AI output from crashing generation or corrupting the rendered graph.
 
 - [ ] Add the generation API route that accepts AST plus raw DSL
