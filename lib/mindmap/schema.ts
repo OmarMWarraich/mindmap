@@ -24,6 +24,14 @@ export const mindmapNodeStyleSchema = z.object({
   tintTone: z.enum(mindmapTintTones).optional(),
 }).strict();
 
+export const mindmapNodeLayoutSchema = z.object({
+  minWidth: z.number().int().positive(),
+  minHeight: z.number().int().positive(),
+  paddingX: z.number().int().nonnegative(),
+  paddingY: z.number().int().nonnegative(),
+  siblingGap: z.number().int().positive(),
+}).strict();
+
 export const mindmapNodeSchema = z.object({
   id: z.string().min(1),
   kind: mindmapNodeKindSchema,
@@ -33,12 +41,27 @@ export const mindmapNodeSchema = z.object({
   branchId: z.string().min(1),
   childIds: z.array(z.string().min(1)),
   style: mindmapNodeStyleSchema.optional(),
+  layout: mindmapNodeLayoutSchema,
+}).strict();
+
+export const mindmapLayoutDefaultsSchema = z.object({
+  canvasPadding: z.number().int().positive(),
+  levelGap: z.number().int().positive(),
+  siblingGap: z.number().int().positive(),
+  branchGap: z.number().int().positive(),
+  nodePaddingX: z.number().int().nonnegative(),
+  nodePaddingY: z.number().int().nonnegative(),
+  branchWidthHint: z.number().int().positive(),
+  branchHeightHint: z.number().int().positive(),
+  leafWidthHint: z.number().int().positive(),
+  leafHeightHint: z.number().int().positive(),
 }).strict();
 
 export const mindmapMetadataSchema = z.object({
   title: z.string().trim().min(1),
   rootId: z.string().min(1),
   branchOrder: z.array(z.string().min(1)),
+  layout: mindmapLayoutDefaultsSchema,
   generatedAt: z.string().datetime().optional(),
   source: z.object({
     format: z.literal("mindmap-dsl"),
@@ -113,7 +136,9 @@ export const generatedMindmapSchema = z.object({
 export type MindmapNodeKind = z.infer<typeof mindmapNodeKindSchema>;
 export type MindmapEdge = z.infer<typeof mindmapEdgeSchema>;
 export type MindmapNodeStyle = z.infer<typeof mindmapNodeStyleSchema>;
+export type MindmapNodeLayout = z.infer<typeof mindmapNodeLayoutSchema>;
 export type MindmapNode = z.infer<typeof mindmapNodeSchema>;
+export type MindmapLayoutDefaults = z.infer<typeof mindmapLayoutDefaultsSchema>;
 export type MindmapMetadata = z.infer<typeof mindmapMetadataSchema>;
 export type GeneratedMindmap = z.infer<typeof generatedMindmapSchema>;
 

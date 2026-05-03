@@ -24,3 +24,9 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+.mindmap-editor-ghost-text {
+  color: color-mix(in srgb, var(--foreground) 38%, transparent);
+  font-style: italic;
+  opacity: 0.72;
+}
