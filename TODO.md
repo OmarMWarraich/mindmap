@@ -225,7 +225,7 @@ Purpose: Tells the model to improve wording and grouping while staying inside th
 - [x] Add runtime schema validation for model responses
 Purpose: Prevents malformed AI output from crashing generation or corrupting the rendered graph.
 
-- [ ] Add the generation API route that accepts AST plus raw DSL
+- [x] Add the generation API route that accepts AST plus raw DSL
 Purpose: Creates a controlled server boundary for prompt execution, validation, and future provider changes.
 
 - [ ] Merge deterministic structure with AI-cleaned labels and grouping suggestions

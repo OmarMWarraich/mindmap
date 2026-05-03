@@ -10,6 +10,17 @@ export interface RequestModelProviderChatCompletionOptions {
   fetchImpl?: typeof fetch;
   messages: ModelProviderChatMessage[];
   maxCompletionTokens?: number;
+  model?: string;
+  responseFormat?: {
+    type: 'json_object';
+  } | {
+    type: 'json_schema';
+    json_schema: {
+      name: string;
+      strict?: boolean;
+      schema: object;
+    };
+  };
   temperature?: number;
 }
 
@@ -45,6 +56,14 @@ export function buildModelProviderChatCompletionRequest(
   const { env } = options;
   const temperature = options.temperature ?? 0.2;
   const maxCompletionTokens = options.maxCompletionTokens ?? 72;
+  const model = options.model ?? env.MODEL_COMPLETION_MODEL;
+  const requestBody = {
+    messages: options.messages,
+    max_completion_tokens: maxCompletionTokens,
+    temperature,
+    n: 1,
+    ...(options.responseFormat ? { response_format: options.responseFormat } : {}),
+  };
 
   if (env.MODEL_PROVIDER === 'azure-openai') {
     const baseUrl = (env.MODEL_BASE_URL ?? '').replace(/\/$/, '');
@@ -54,19 +73,14 @@ export function buildModelProviderChatCompletionRequest(
     }
 
     return {
-      url: `${baseUrl}/openai/deployments/${env.MODEL_COMPLETION_MODEL}/chat/completions?api-version=${azureApiVersion}`,
+      url: `${baseUrl}/openai/deployments/${model}/chat/completions?api-version=${azureApiVersion}`,
       init: {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'api-key': env.MODEL_API_KEY,
         },
-        body: JSON.stringify({
-          messages: options.messages,
-          max_completion_tokens: maxCompletionTokens,
-          temperature,
-          n: 1,
-        }),
+        body: JSON.stringify(requestBody),
       },
     };
   }
@@ -82,11 +96,8 @@ export function buildModelProviderChatCompletionRequest(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: env.MODEL_COMPLETION_MODEL,
-        messages: options.messages,
-        max_completion_tokens: maxCompletionTokens,
-        temperature,
-        n: 1,
+        model,
+        ...requestBody,
       }),
     },
   };

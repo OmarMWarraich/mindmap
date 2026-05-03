@@ -59,6 +59,32 @@ test('buildModelProviderChatCompletionRequest targets the Azure OpenAI deploymen
   assert.equal(String(request.init.body).includes('"model"'), false);
 });
 
+test('buildModelProviderChatCompletionRequest supports generation model overrides and response_format', () => {
+  const request = buildModelProviderChatCompletionRequest({
+    env: {
+      MODEL_PROVIDER: 'openai',
+      MODEL_API_KEY: 'test-key',
+      MODEL_BASE_URL: undefined,
+      MODEL_COMPLETION_MODEL: 'gpt-5-mini',
+      MODEL_GENERATION_MODEL: 'gpt-5',
+    },
+    model: 'gpt-5',
+    responseFormat: {
+      type: 'json_schema',
+      json_schema: {
+        name: 'mindmap_overlay',
+        strict: true,
+        schema: { type: 'object', additionalProperties: false, required: [], properties: {} },
+      },
+    },
+    messages: [{ role: 'user', content: 'generate overlay' }],
+  });
+
+  assert.match(String(request.init.body), /"model":"gpt-5"/);
+  assert.match(String(request.init.body), /"response_format"/);
+  assert.match(String(request.init.body), /"json_schema"/);
+});
+
 test('extractAssistantText supports both string and text-part chat payloads', () => {
   assert.equal(
     extractAssistantText({
