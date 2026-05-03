@@ -1,32 +1,62 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 
 import {
   buildSvgPreviewModel,
   clampSvgPreviewScale,
   createDefaultSvgPreviewTransform,
   panSvgPreviewTransform,
+  type SvgPreviewTransform,
   zoomSvgPreviewAroundPoint,
 } from '../lib/mindmap/svg-preview';
 import type { MindmapLayoutResult } from '../lib/mindmap/layout';
 import type { GeneratedMindmap } from '../lib/mindmap/schema';
 
-export default function MindmapSvgPreview({
-  mindmap,
-  layoutResult,
-  layoutStatus,
-  layoutError,
-}: {
+export interface MindmapSvgPreviewHandle {
+  getExportSnapshot(): {
+    node: SVGSVGElement;
+    width: number;
+    height: number;
+  } | null;
+}
+
+const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
   mindmap: GeneratedMindmap | null;
   layoutResult: MindmapLayoutResult | null;
   layoutStatus: 'idle' | 'loading' | 'ready' | 'error';
   layoutError: string | null;
-}) {
+  transform?: SvgPreviewTransform;
+  onTransformChange?: (transform: SvgPreviewTransform) => void;
+}>(function MindmapSvgPreview({
+  mindmap,
+  layoutResult,
+  layoutStatus,
+  layoutError,
+  transform: controlledTransform,
+  onTransformChange,
+}, ref) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [transform, setTransform] = useState(createDefaultSvgPreviewTransform);
+  const [uncontrolledTransform, setUncontrolledTransform] = useState(createDefaultSvgPreviewTransform);
+  const transform = controlledTransform ?? uncontrolledTransform;
+  const setTransform = onTransformChange ?? setUncontrolledTransform;
+  const model = mindmap && layoutResult ? buildSvgPreviewModel(mindmap, layoutResult) : null;
+
+  useImperativeHandle(ref, () => ({
+    getExportSnapshot() {
+      if (!svgRef.current || !model) {
+        return null;
+      }
+
+      return {
+        node: svgRef.current,
+        width: Math.max(1, Math.ceil(model.width)),
+        height: Math.max(1, Math.ceil(model.height)),
+      };
+    },
+  }), [model]);
 
   if (!mindmap || (!layoutResult && layoutStatus !== 'error' && layoutStatus !== 'loading')) {
     return (
@@ -37,7 +67,7 @@ export default function MindmapSvgPreview({
           </div>
           <h3 className="text-lg font-semibold text-zinc-950">Preview placeholder</h3>
           <p className="text-sm leading-6 text-zinc-600">
-            The radial preview will appear here once the outline parses and the worker finishes layout.
+            The radial preview will appear here once the outline parses and layout finishes.
           </p>
         </div>
       </div>
@@ -53,7 +83,7 @@ export default function MindmapSvgPreview({
           </div>
           <h3 className="text-lg font-semibold text-sky-950">Computing layout</h3>
           <p className="text-sm leading-6 text-sky-900/80">
-            The worker is translating the latest outline into radial positions and routed edges.
+            The preview is translating the latest outline into radial positions and routed edges.
           </p>
         </div>
       </div>
@@ -69,7 +99,7 @@ export default function MindmapSvgPreview({
           </div>
           <h3 className="text-lg font-semibold text-rose-950">Layout failed</h3>
           <p className="text-sm leading-6 text-rose-900/80">
-            {layoutError ?? 'The worker could not compute a layout for the current outline.'}
+            {layoutError ?? 'The preview could not compute a layout for the current outline.'}
           </p>
         </div>
       </div>
@@ -80,7 +110,11 @@ export default function MindmapSvgPreview({
     return null;
   }
 
-  const model = buildSvgPreviewModel(mindmap, layoutResult);
+  if (!model) {
+    return null;
+  }
+
+  const previewModel = model;
 
   function getSvgPoint(event: { clientX: number; clientY: number }) {
     const rect = svgRef.current?.getBoundingClientRect();
@@ -90,8 +124,8 @@ export default function MindmapSvgPreview({
     }
 
     return {
-      x: ((event.clientX - rect.left) / rect.width) * model.width,
-      y: ((event.clientY - rect.top) / rect.height) * model.height,
+      x: ((event.clientX - rect.left) / rect.width) * previewModel.width,
+      y: ((event.clientY - rect.top) / rect.height) * previewModel.height,
     };
   }
 
@@ -151,7 +185,7 @@ export default function MindmapSvgPreview({
           };
 
           dragStartRef.current = nextPoint;
-          setTransform((currentTransform) => panSvgPreviewTransform(currentTransform, delta));
+          setTransform(panSvgPreviewTransform(transform, delta));
         }}
         onPointerUp={(event) => {
           dragStartRef.current = null;
@@ -170,24 +204,22 @@ export default function MindmapSvgPreview({
             transform.scale * (event.deltaY > 0 ? 0.92 : 1.08),
           );
 
-          setTransform((currentTransform) =>
-            zoomSvgPreviewAroundPoint(currentTransform, nextScale, anchor),
-          );
+          setTransform(zoomSvgPreviewAroundPoint(transform, nextScale, anchor));
         }}
         ref={svgRef}
         role="img"
-        viewBox={`0 0 ${Math.max(model.width, 1)} ${Math.max(model.height, 1)}`}
+        viewBox={`0 0 ${Math.max(previewModel.width, 1)} ${Math.max(previewModel.height, 1)}`}
       >
         <defs>
           <pattern height="32" id="mindmap-grid" patternUnits="userSpaceOnUse" width="32">
             <path d="M 32 0 L 0 0 0 32" fill="none" stroke="rgba(148,163,184,0.12)" strokeWidth="1" />
           </pattern>
         </defs>
-        <rect fill="url(#mindmap-grid)" height={model.height} width={model.width} x="0" y="0" />
+        <rect fill="url(#mindmap-grid)" height={previewModel.height} width={previewModel.width} x="0" y="0" />
 
         <g transform={`matrix(${transform.scale} 0 0 ${transform.scale} ${transform.translateX} ${transform.translateY})`}>
           <g fill="none" strokeLinecap="round" strokeLinejoin="round">
-            {model.edges.map((edge) => (
+            {previewModel.edges.map((edge) => (
               <path
                 d={edge.path}
                 key={edge.id}
@@ -199,7 +231,7 @@ export default function MindmapSvgPreview({
           </g>
 
           <g>
-            {model.nodes.map((node) => {
+            {previewModel.nodes.map((node) => {
               const lineStartY = node.kind === 'root' ? 50 : 42;
 
               return (
@@ -249,4 +281,6 @@ export default function MindmapSvgPreview({
       </svg>
     </div>
   );
-}
+});
+
+export default MindmapSvgPreview;

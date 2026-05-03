@@ -6,6 +6,7 @@ import type { Monaco } from '@monaco-editor/react';
 import type { CancellationToken, editor, languages } from 'monaco-editor';
 
 import MindmapSvgPreview from './MindmapSvgPreview';
+import type { MindmapSvgPreviewHandle } from './MindmapSvgPreview';
 import {
   requestInlineCompletionFromApi,
   trackInlineCompletionEvent,
@@ -21,7 +22,17 @@ import {
   layoutMindmapWithElk,
   type MindmapLayoutResult,
 } from '../lib/mindmap/layout';
+import {
+  createDefaultSvgPreviewTransform,
+  type SvgPreviewTransform,
+} from '../lib/mindmap/svg-preview';
+import type { GeneratedMindmap } from '../lib/mindmap/schema';
 import type { LayoutWorkerDiagnostics } from '../lib/mindmap/worker-diagnostics';
+import { downloadNodeAsPng } from '../lib/export/png';
+import {
+  loadWorkspaceDraft,
+  saveWorkspaceDraft,
+} from '../lib/persistence/workspace';
 import { parseMindmapDsl } from '../lib/dsl/parse';
 import { mindmapDslStarterOutline } from '../lib/dsl/mvp';
 import type { MindmapValidationIssue } from '../lib/dsl/validation';
@@ -42,7 +53,8 @@ const editorLoadingFallback = (
 export default function StudyWorkspace() {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const editorDisposablesRef = useRef<Array<{ dispose(): void }>>([]);
-  
+  const previewRef = useRef<MindmapSvgPreviewHandle | null>(null);
+  const hasRestoredDraftRef = useRef(false);
   const layoutRequestIdRef = useRef(0);
   const ghostTextDecorationIdsRef = useRef<string[]>([]);
   const ghostTextStateRef = useRef<{
@@ -52,10 +64,28 @@ export default function StudyWorkspace() {
   const [outline, setOutline] = useState(mindmapDslStarterOutline);
   const [debouncedOutline, setDebouncedOutline] = useState(mindmapDslStarterOutline);
   const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
+  const [latestMindmapSnapshot, setLatestMindmapSnapshot] = useState<GeneratedMindmap | null>(null);
   const [layoutResult, setLayoutResult] = useState<MindmapLayoutResult | null>(null);
   const [layoutStatus, setLayoutStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [layoutError, setLayoutError] = useState<string | null>(null);
-   const [layoutDiagnostics, setLayoutDiagnostics] = useState<LayoutWorkerDiagnostics>({
+  const [previewTransform, setPreviewTransform] = useState<SvgPreviewTransform>(
+    createDefaultSvgPreviewTransform,
+  );
+  const [exportStatus, setExportStatus] = useState<{
+    tone: 'idle' | 'progress' | 'success' | 'error';
+    message: string;
+  }>({
+    tone: 'idle',
+    message: 'PNG export is ready once a preview is visible.',
+  });
+  const [draftStatus, setDraftStatus] = useState<{
+    tone: 'idle' | 'progress' | 'success' | 'error';
+    message: string;
+  }>({
+    tone: 'progress',
+    message: 'Restoring local draft…',
+  });
+  const [layoutDiagnostics, setLayoutDiagnostics] = useState<LayoutWorkerDiagnostics>({
     phase: 'main-thread',
     summary: 'Using the in-page layout engine for beta preview rendering.',
   });
@@ -98,6 +128,7 @@ export default function StudyWorkspace() {
       errors: parseResult.errors,
     });
   }, [parseResult.ast, parseResult.errors, parseResult.warnings]);
+  const effectiveMindmap = generatedMindmap ?? latestMindmapSnapshot;
 
   const effectiveLayoutStatus = layoutStatus;
   const effectiveLayoutError = layoutError;
@@ -114,6 +145,61 @@ export default function StudyWorkspace() {
   useEffect(() => {
     mindmapDslInlineSuggestionPreference = inlineSuggestionPreference;
   }, [inlineSuggestionPreference]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void loadWorkspaceDraft()
+      .then((draft) => {
+        if (cancelled) {
+          return;
+        }
+
+        if (!draft) {
+          setDraftStatus({
+            tone: 'idle',
+            message: 'Local draft storage is ready for this workspace.',
+          });
+          return;
+        }
+
+        setOutline(draft.outline);
+        setDebouncedOutline(draft.outline);
+        setLatestMindmapSnapshot(draft.mindmap);
+        setPreviewTransform(draft.previewTransform);
+        setDraftStatus({
+          tone: 'success',
+          message: 'Restored the saved draft and preview state.',
+        });
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+
+        setDraftStatus({
+          tone: 'error',
+          message: error instanceof Error ? error.message : 'Local draft restore failed.',
+        });
+      })
+      .finally(() => {
+        if (!cancelled) {
+          hasRestoredDraftRef.current = true;
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!generatedMindmap) {
+      return;
+    }
+
+    setLatestMindmapSnapshot(generatedMindmap);
+  }, [generatedMindmap]);
 
   useEffect(() => {
     if (enableMonacoInlineCompletions) {
@@ -171,7 +257,7 @@ export default function StudyWorkspace() {
   }, [cursorPosition, preferredStubSuggestion]);
 
   useEffect(() => {
-    if (!generatedMindmap) {
+    if (!effectiveMindmap) {
       setLayoutResult(null);
       setLayoutStatus('idle');
       setLayoutError(null);
@@ -193,11 +279,11 @@ export default function StudyWorkspace() {
     setLayoutDiagnostics({
       phase: 'main-thread',
       summary: `Computing layout request ${requestId} in the page thread.`,
-      detail: `Running ELK for ${generatedMindmap.nodes.length} nodes and ${generatedMindmap.edges.length} edges without the dedicated worker path.`,
+      detail: `Running ELK for ${effectiveMindmap.nodes.length} nodes and ${effectiveMindmap.edges.length} edges without the dedicated worker path.`,
       requestId,
     });
 
-    void layoutMindmapWithElk(generatedMindmap)
+    void layoutMindmapWithElk(effectiveMindmap)
       .then((result) => {
         if (cancelled || layoutRequestIdRef.current !== requestId) {
           return;
@@ -240,7 +326,47 @@ export default function StudyWorkspace() {
     return () => {
       cancelled = true;
     };
-  }, [generatedMindmap]);
+  }, [effectiveMindmap]);
+
+  useEffect(() => {
+    if (!hasRestoredDraftRef.current) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void saveWorkspaceDraft({
+        version: 1,
+        updatedAt: new Date().toISOString(),
+        outline,
+        mindmap: latestMindmapSnapshot,
+        previewTransform,
+      })
+        .then((saved) => {
+          if (!saved) {
+            setDraftStatus({
+              tone: 'error',
+              message: 'Local draft storage is unavailable in this browser.',
+            });
+            return;
+          }
+
+          setDraftStatus({
+            tone: 'success',
+            message: 'Draft and preview state saved locally.',
+          });
+        })
+        .catch((error) => {
+          setDraftStatus({
+            tone: 'error',
+            message: error instanceof Error ? error.message : 'Local draft save failed.',
+          });
+        });
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [latestMindmapSnapshot, outline, previewTransform]);
 
   useEffect(() => {
     return () => {
@@ -250,6 +376,44 @@ export default function StudyWorkspace() {
       editorDisposablesRef.current = [];
     };
   }, []);
+
+  async function handleDownloadPng(): Promise<void> {
+    const snapshot = previewRef.current?.getExportSnapshot();
+
+    if (!snapshot) {
+      setExportStatus({
+        tone: 'error',
+        message: 'PNG export is unavailable until the preview finishes rendering.',
+      });
+      return;
+    }
+
+    setExportStatus({
+      tone: 'progress',
+      message: 'Rendering PNG export…',
+    });
+
+    try {
+      const dimensions = await downloadNodeAsPng(snapshot.node, {
+        backgroundColor: '#fffef8',
+        fileNameBase: effectiveMindmap?.metadata.title ?? parseResult.ast?.root.label ?? 'mindmap',
+        sourceWidth: snapshot.width,
+        sourceHeight: snapshot.height,
+      });
+
+      setExportStatus({
+        tone: 'success',
+        message: dimensions.wasClamped
+          ? `Downloaded a scaled PNG at ${dimensions.outputWidth}x${dimensions.outputHeight} to keep large exports reliable.`
+          : `Downloaded PNG at ${dimensions.outputWidth}x${dimensions.outputHeight}.`,
+      });
+    } catch (error) {
+      setExportStatus({
+        tone: 'error',
+        message: error instanceof Error ? error.message : 'PNG export failed unexpectedly.',
+      });
+    }
+  }
 
   return (
     <section className="grid gap-4 rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
@@ -271,10 +435,44 @@ export default function StudyWorkspace() {
           <button className="rounded-full border border-zinc-200 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
             Refresh preview
           </button>
-          <button className="rounded-full border border-zinc-200 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
+          <button
+            className="rounded-full border border-zinc-200 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={!layoutResult || layoutStatus === 'loading'}
+            onClick={() => {
+              void handleDownloadPng();
+            }}
+            type="button"
+          >
             Download PNG
           </button>
         </div>
+      </div>
+
+      <div className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
+        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
+          exportStatus.tone === 'success'
+            ? 'bg-emerald-100 text-emerald-700'
+            : exportStatus.tone === 'error'
+              ? 'bg-rose-100 text-rose-700'
+              : exportStatus.tone === 'progress'
+                ? 'bg-sky-100 text-sky-700'
+                : 'bg-zinc-100 text-zinc-700'
+        }`}>
+          Export
+        </span>
+        <span className="ml-3">{exportStatus.message}</span>
+        <span className={`ml-4 inline-flex rounded-full px-3 py-1 text-xs font-medium ${
+          draftStatus.tone === 'success'
+            ? 'bg-emerald-100 text-emerald-700'
+            : draftStatus.tone === 'error'
+              ? 'bg-rose-100 text-rose-700'
+              : draftStatus.tone === 'progress'
+                ? 'bg-sky-100 text-sky-700'
+                : 'bg-zinc-100 text-zinc-700'
+        }`}>
+          Draft
+        </span>
+        <span className="ml-3">{draftStatus.message}</span>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
@@ -439,7 +637,7 @@ export default function StudyWorkspace() {
               </span>
               <span className="rounded-full bg-zinc-100 px-3 py-1 font-medium text-zinc-700">
                 {effectiveLayoutStatus === 'ready'
-                  ? 'Layout layout ready'
+                  ? 'Layout ready'
                   : effectiveLayoutStatus === 'loading'
                     ? 'Layout computing'
                     : effectiveLayoutStatus === 'error'
@@ -552,10 +750,13 @@ export default function StudyWorkspace() {
           </div>
 
           <MindmapSvgPreview
+            ref={previewRef}
             layoutError={effectiveLayoutError}
             layoutResult={layoutResult}
             layoutStatus={effectiveLayoutStatus}
-            mindmap={generatedMindmap}
+            mindmap={effectiveMindmap}
+            onTransformChange={setPreviewTransform}
+            transform={previewTransform}
           />
         </aside>
       </div>

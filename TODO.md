@@ -242,22 +242,22 @@ Purpose: Gives users visibility into structural issues without preventing them f
 
 ### Phase 9 - Export and Local Persistence
 
-- [ ] Implement SVG or DOM-to-PNG export for the preview canvas
+- [x] Implement SVG or DOM-to-PNG export for the preview canvas
 Purpose: Lets users take their generated study map outside the app as a shareable or printable image.
 
-- [ ] Add a Download PNG action to the toolbar
+- [x] Add a Download PNG action to the toolbar
 Purpose: Exposes export as a primary workflow instead of a hidden developer feature.
 
-- [ ] Handle export edge cases such as large maps and clipped bounds
+- [x] Handle export edge cases such as large maps and clipped bounds
 Purpose: Makes exported images reliable for real study use rather than only for simple demos.
 
-- [ ] Persist current DSL text and latest generated mindmap locally
+- [x] Persist current DSL text and latest generated mindmap locally
 Purpose: Prevents students from losing work on refresh or accidental tab closure.
 
-- [ ] Restore the saved draft and preview state on app load
+- [x] Restore the saved draft and preview state on app load
 Purpose: Makes the app feel dependable and session-aware even before cloud sync exists.
 
-- [ ] Persist lightweight UI preferences such as zoom level or panel sizing if needed
+- [x] Persist lightweight UI preferences such as zoom level or panel sizing if needed
 Purpose: Improves repeat usability for people who return to the tool often.
 
 ### Phase 10 - Hardening and Release Readiness
