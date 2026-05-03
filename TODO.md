@@ -219,7 +219,7 @@ Purpose: Helps tune the system toward completions that genuinely teach and reduc
 
 ### Phase 8 - AI-Assisted Mindmap Generation
 
-- [ ] Implement the strict JSON generation prompt template
+- [x] Implement the strict JSON generation prompt template
 Purpose: Tells the model to improve wording and grouping while staying inside the app's exact data contract.
 
 - [ ] Add runtime schema validation for model responses
