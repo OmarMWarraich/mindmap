@@ -17,10 +17,11 @@ import {
   pickPreferredStubSuggestion,
 } from '../lib/dsl/inline-completion';
 import { generateMindmapFromAst } from '../lib/mindmap/from-ast';
-import type {
-  MindmapLayoutResult,
-  MindmapLayoutWorkerResponse,
+import {
+  layoutMindmapWithElk,
+  type MindmapLayoutResult,
 } from '../lib/mindmap/layout';
+import type { LayoutWorkerDiagnostics } from '../lib/mindmap/worker-diagnostics';
 import { parseMindmapDsl } from '../lib/dsl/parse';
 import { mindmapDslStarterOutline } from '../lib/dsl/mvp';
 import type { MindmapValidationIssue } from '../lib/dsl/validation';
@@ -41,7 +42,7 @@ const editorLoadingFallback = (
 export default function StudyWorkspace() {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const editorDisposablesRef = useRef<Array<{ dispose(): void }>>([]);
-  const layoutWorkerRef = useRef<Worker | null>(null);
+  
   const layoutRequestIdRef = useRef(0);
   const ghostTextDecorationIdsRef = useRef<string[]>([]);
   const ghostTextStateRef = useRef<{
@@ -54,6 +55,10 @@ export default function StudyWorkspace() {
   const [layoutResult, setLayoutResult] = useState<MindmapLayoutResult | null>(null);
   const [layoutStatus, setLayoutStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [layoutError, setLayoutError] = useState<string | null>(null);
+   const [layoutDiagnostics, setLayoutDiagnostics] = useState<LayoutWorkerDiagnostics>({
+    phase: 'main-thread',
+    summary: 'Using the in-page layout engine for beta preview rendering.',
+  });
   const [inlineSuggestionPreference, setInlineSuggestionPreference] =
     useState<InlineSuggestionPreference>('auto');
 
@@ -93,11 +98,10 @@ export default function StudyWorkspace() {
       errors: parseResult.errors,
     });
   }, [parseResult.ast, parseResult.errors, parseResult.warnings]);
-  const hasWorkerSupport = typeof window === 'undefined' ? true : typeof window.Worker !== 'undefined';
-  const effectiveLayoutStatus = hasWorkerSupport ? layoutStatus : 'error';
-  const effectiveLayoutError = hasWorkerSupport
-    ? layoutError
-    : 'This browser does not support Web Workers for ELK layout.';
+
+  const effectiveLayoutStatus = layoutStatus;
+  const effectiveLayoutError = layoutError;
+  const effectiveLayoutDiagnostics = layoutDiagnostics;
   const branchCount = parseResult.ast?.root.branches.length ?? 0;
   const nodeCount = (parseResult.ast?.root.branches ?? []).reduce((count, branch) => {
     const countChildren = (children: typeof branch.children): number => {
@@ -167,60 +171,75 @@ export default function StudyWorkspace() {
   }, [cursorPosition, preferredStubSuggestion]);
 
   useEffect(() => {
-    if (!window.Worker) {
-      return;
-    }
-
-    const worker = new Worker(new URL('../workers/mindmap-layout.worker.ts', import.meta.url), {
-      type: 'module',
-    });
-
-    worker.onmessage = (event: MessageEvent<MindmapLayoutWorkerResponse>) => {
-      if (event.data.requestId !== layoutRequestIdRef.current) {
-        return;
-      }
-
-      if (event.data.type === 'layout-success') {
-        setLayoutResult(event.data.result);
-        setLayoutStatus('ready');
-        setLayoutError(null);
-        return;
-      }
-
-      setLayoutStatus('error');
-      setLayoutError(event.data.message);
-    };
-    worker.onerror = () => {
-      setLayoutStatus('error');
-      setLayoutError('The layout worker crashed while computing the radial preview.');
-    };
-
-    layoutWorkerRef.current = worker;
-
-    return () => {
-      worker.terminate();
-      layoutWorkerRef.current = null;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!generatedMindmap || !layoutWorkerRef.current) {
+    if (!generatedMindmap) {
       setLayoutResult(null);
       setLayoutStatus('idle');
       setLayoutError(null);
+      setLayoutDiagnostics({
+        phase: 'idle',
+        summary: 'Preview is idle until the outline parses into a valid AST.',
+      });
       return;
     }
 
     const requestId = layoutRequestIdRef.current + 1;
     layoutRequestIdRef.current = requestId;
+    const startedAt = performance.now();
+    let cancelled = false;
+
     setLayoutStatus('loading');
     setLayoutError(null);
 
-    layoutWorkerRef.current.postMessage({
-      type: 'layout',
+    setLayoutDiagnostics({
+      phase: 'main-thread',
+      summary: `Computing layout request ${requestId} in the page thread.`,
+      detail: `Running ELK for ${generatedMindmap.nodes.length} nodes and ${generatedMindmap.edges.length} edges without the dedicated worker path.`,
       requestId,
-      mindmap: generatedMindmap,
     });
+
+    void layoutMindmapWithElk(generatedMindmap)
+      .then((result) => {
+        if (cancelled || layoutRequestIdRef.current !== requestId) {
+          return;
+        }
+
+        const elapsedMs = Math.max(0, Math.round(performance.now() - startedAt));
+        setLayoutResult(result);
+        setLayoutStatus('ready');
+        setLayoutError(null);
+        setLayoutDiagnostics({
+          phase: 'ready',
+          summary: `Layout completed in ${elapsedMs}ms on the page thread.`,
+          detail: `Request ${requestId} returned ${result.nodes.length} nodes and ${result.edges.length} routed edges.`,
+          requestId,
+          elapsedMs,
+        });
+      })
+      .catch((error) => {
+        if (cancelled || layoutRequestIdRef.current !== requestId) {
+          return;
+        }
+
+        const detail = error instanceof Error ? error.message : 'Unknown ELK layout failure.';
+        setLayoutStatus('error');
+        setLayoutError(detail);
+        setLayoutDiagnostics({
+          phase: 'response-error',
+          summary: 'In-page layout computation failed.',
+          detail,
+          requestId,
+          elapsedMs: Math.max(0, Math.round(performance.now() - startedAt)),
+        });
+        console.error('mindmap layout failure', {
+          phase: 'response-error',
+          detail,
+          requestId,
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [generatedMindmap]);
 
   useEffect(() => {
@@ -420,12 +439,12 @@ export default function StudyWorkspace() {
               </span>
               <span className="rounded-full bg-zinc-100 px-3 py-1 font-medium text-zinc-700">
                 {effectiveLayoutStatus === 'ready'
-                  ? 'Worker layout ready'
+                  ? 'Layout layout ready'
                   : effectiveLayoutStatus === 'loading'
-                    ? 'Worker computing'
+                    ? 'Layout computing'
                     : effectiveLayoutStatus === 'error'
-                      ? 'Worker failed'
-                      : 'Worker idle'}
+                      ? 'Layout failed'
+                      : 'Layout idle'}
               </span>
             </div>
             <p className="leading-6 text-zinc-600">
@@ -433,6 +452,13 @@ export default function StudyWorkspace() {
                 ? `Current topic: ${parseResult.ast.root.label}`
                 : 'The parser will resume once the outline contains a valid root declaration.'}
             </p>
+            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs leading-5 text-zinc-700">
+              <p className="font-medium text-zinc-900">Layout diagnostics</p>
+              <p>{effectiveLayoutDiagnostics.summary}</p>
+              {effectiveLayoutDiagnostics.detail ? (
+                <p className="text-zinc-600">{effectiveLayoutDiagnostics.detail}</p>
+              ) : null}
+            </div>
           </div>
 
           <div className="grid gap-3 rounded-2xl border border-sky-200 bg-sky-50/70 p-4 text-sm text-sky-950">
