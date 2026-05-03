@@ -41,7 +41,7 @@ function applyGroupingSuggestion(
 
   const selectedChildren = grouping.childNodeIds
     .map((childId) => nodeMap.get(childId))
-    .filter((child): child is MindmapNode => Boolean(child) && child.parentId === parentNode.id);
+    .filter((child): child is MindmapNode => child != null && child.parentId === parentNode.id);
 
   if (selectedChildren.length !== grouping.childNodeIds.length) {
     return;

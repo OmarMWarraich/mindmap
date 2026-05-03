@@ -64,6 +64,8 @@ export const generationOverlayResponseSchema = z.object({
   mindmap: generatedMindmapSchema,
   overlay: mindmapGenerationResponseSchema,
   suggestedMissingSubtopics: z.array(mindmapGenerationResponseSchema.shape.suggestedMissingSubtopics.element),
+  warnings: z.array(mindmapValidationWarningSchema).optional(),
+  errors: z.array(mindmapValidationErrorSchema).optional(),
 }).strict();
 
 export type GenerationRequest = z.infer<typeof generationRequestSchema>;
@@ -86,6 +88,8 @@ export async function generateMindmapOverlay(
     rawDsl: request.rawDsl,
     deterministicMindmap,
   });
+  const warnings = request.warnings ?? [];
+  const errors = request.errors ?? [];
   try {
     const completionText = await requestModelProviderChatCompletion({
       env,
@@ -114,6 +118,8 @@ export async function generateMindmapOverlay(
       mindmap: mergeDeterministicMindmapWithOverlay(deterministicMindmap, overlay),
       overlay,
       suggestedMissingSubtopics: overlay.suggestedMissingSubtopics,
+      warnings,
+      errors,
     });
   } catch {
     const fallbackOverlay = createFallbackOverlay(deterministicMindmap);
@@ -123,6 +129,8 @@ export async function generateMindmapOverlay(
       mindmap: deterministicMindmap,
       overlay: fallbackOverlay,
       suggestedMissingSubtopics: fallbackOverlay.suggestedMissingSubtopics,
+      warnings,
+      errors,
     });
   }
 }
