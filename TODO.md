@@ -237,7 +237,7 @@ Purpose: Helps the user spot gaps in their understanding or in the textbook cove
 - [x] Add best-effort fallback to deterministic generation when AI output is invalid
 Purpose: Ensures Generate/Refresh still works even when the model fails or returns unusable JSON.
 
-- [ ] Return validation warnings and errors with the generation result
+- [x] Return validation warnings and errors with the generation result
 Purpose: Gives users visibility into structural issues without preventing them from seeing a preview.
 
 ### Phase 9 - Export and Local Persistence
