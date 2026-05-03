@@ -8,6 +8,8 @@ import {
 import { getModelProviderEnv, type ModelProviderEnv } from '../config/env.ts';
 import { requestModelProviderChatCompletion } from '../completion/provider.ts';
 import { generateMindmapFromAst } from '../mindmap/from-ast.ts';
+import { generatedMindmapSchema } from '../mindmap/schema.ts';
+import { mergeDeterministicMindmapWithOverlay } from './merge.ts';
 import { createMindmapGenerationPrompt } from './prompt.ts';
 import {
   mindmapGenerationResponseJsonSchema,
@@ -58,6 +60,7 @@ export const generationRequestSchema = z.object({
 }).strict();
 
 export const generationOverlayResponseSchema = z.object({
+  mindmap: generatedMindmapSchema,
   overlay: mindmapGenerationResponseSchema,
 }).strict();
 
@@ -101,8 +104,11 @@ export async function generateMindmapOverlay(
     ],
   });
 
+  const overlay = parseMindmapGenerationOverlay(completionText);
+
   return generationOverlayResponseSchema.parse({
-    overlay: parseMindmapGenerationOverlay(completionText),
+    mindmap: mergeDeterministicMindmapWithOverlay(deterministicMindmap, overlay),
+    overlay,
   });
 }
 

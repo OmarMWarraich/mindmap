@@ -228,7 +228,7 @@ Purpose: Prevents malformed AI output from crashing generation or corrupting the
 - [x] Add the generation API route that accepts AST plus raw DSL
 Purpose: Creates a controlled server boundary for prompt execution, validation, and future provider changes.
 
-- [ ] Merge deterministic structure with AI-cleaned labels and grouping suggestions
+- [x] Merge deterministic structure with AI-cleaned labels and grouping suggestions
 Purpose: Preserves trustworthy hierarchy while still benefiting from AI readability improvements.
 
 - [ ] Let generation surface optional "suggested missing subtopics" alongside the main map output
