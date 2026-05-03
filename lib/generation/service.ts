@@ -62,6 +62,7 @@ export const generationRequestSchema = z.object({
 export const generationOverlayResponseSchema = z.object({
   mindmap: generatedMindmapSchema,
   overlay: mindmapGenerationResponseSchema,
+  suggestedMissingSubtopics: z.array(mindmapGenerationResponseSchema.shape.suggestedMissingSubtopics.element),
 }).strict();
 
 export type GenerationRequest = z.infer<typeof generationRequestSchema>;
@@ -109,6 +110,7 @@ export async function generateMindmapOverlay(
   return generationOverlayResponseSchema.parse({
     mindmap: mergeDeterministicMindmapWithOverlay(deterministicMindmap, overlay),
     overlay,
+    suggestedMissingSubtopics: overlay.suggestedMissingSubtopics,
   });
 }
 

@@ -231,7 +231,7 @@ Purpose: Creates a controlled server boundary for prompt execution, validation, 
 - [x] Merge deterministic structure with AI-cleaned labels and grouping suggestions
 Purpose: Preserves trustworthy hierarchy while still benefiting from AI readability improvements.
 
-- [ ] Let generation surface optional "suggested missing subtopics" alongside the main map output
+- [x] Let generation surface optional "suggested missing subtopics" alongside the main map output
 Purpose: Helps the user spot gaps in their understanding or in the textbook coverage without silently altering the core authored structure.
 
 - [ ] Add best-effort fallback to deterministic generation when AI output is invalid

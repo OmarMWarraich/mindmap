@@ -63,6 +63,11 @@ test('generation route returns a validated overlay for a valid request', async (
         reason: 'Students usually need the ATP and NADPH requirement here.',
       }],
     });
+    assert.deepEqual(payload.suggestedMissingSubtopics, [{
+      parentNodeId: 'branch-2-calvin-cycle',
+      label: 'Energy cost',
+      reason: 'Students usually need the ATP and NADPH requirement here.',
+    }]);
     assert.equal(payload.mindmap.metadata.title, 'Photosynthesis');
     assert.equal(
       payload.mindmap.nodes.find((node: { id: string; label: string }) => node.id === 'branch-1-overview')?.label,
