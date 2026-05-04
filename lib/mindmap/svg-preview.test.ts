@@ -34,7 +34,17 @@ test('createEdgePath converts routed points into an SVG path', () => {
       { x: 40, y: 60 },
       { x: 70, y: 90 },
     ]),
-    'M 10 20 L 40 60 L 70 90',
+    'M 10 20 Q 40 60 55 75 Q 40 60 70 90',
+  );
+});
+
+test('createEdgePath curves direct edges with a control point', () => {
+  assert.equal(
+    createEdgePath([
+      { x: 10, y: 20 },
+      { x: 90, y: 20 },
+    ]),
+    'M 10 20 Q 50 52 90 20',
   );
 });
 

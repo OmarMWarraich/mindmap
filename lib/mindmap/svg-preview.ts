@@ -163,9 +163,60 @@ function createSvgPreviewNode(
 }
 
 export function createEdgePath(points: Array<{ x: number; y: number }>): string {
-  return points
-    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
-    .join(' ');
+  if (points.length === 0) {
+    return '';
+  }
+
+  if (points.length === 1) {
+    const [point] = points;
+
+    return `M ${point.x} ${point.y}`;
+  }
+
+  if (points.length === 2) {
+    const [start, end] = points;
+    const control = createSingleCurveControlPoint(start, end);
+
+    return `M ${start.x} ${start.y} Q ${control.x} ${control.y} ${end.x} ${end.y}`;
+  }
+
+  const segments = [`M ${points[0]!.x} ${points[0]!.y}`];
+
+  for (let index = 1; index < points.length - 1; index += 1) {
+    const point = points[index]!;
+    const nextPoint = points[index + 1]!;
+    const midpoint = {
+      x: (point.x + nextPoint.x) / 2,
+      y: (point.y + nextPoint.y) / 2,
+    };
+
+    segments.push(`Q ${point.x} ${point.y} ${midpoint.x} ${midpoint.y}`);
+  }
+
+  const penultimatePoint = points[points.length - 2]!;
+  const finalPoint = points[points.length - 1]!;
+  segments.push(`Q ${penultimatePoint.x} ${penultimatePoint.y} ${finalPoint.x} ${finalPoint.y}`);
+
+  return segments.join(' ');
+}
+
+function createSingleCurveControlPoint(
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+): { x: number; y: number } {
+  const deltaX = end.x - start.x;
+  const deltaY = end.y - start.y;
+  const length = Math.hypot(deltaX, deltaY) || 1;
+  const curveStrength = Math.min(160, Math.max(32, length * 0.18));
+  const midpoint = {
+    x: (start.x + end.x) / 2,
+    y: (start.y + end.y) / 2,
+  };
+
+  return {
+    x: midpoint.x - (deltaY / length) * curveStrength,
+    y: midpoint.y + (deltaX / length) * curveStrength,
+  };
 }
 
 export function wrapMindmapLabel(label: string, maxCharsPerLine: number): string[] {

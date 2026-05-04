@@ -92,12 +92,34 @@ export function createMindmapRadialLayoutOptions(
   return {
     'elk.algorithm': 'radial',
     'org.eclipse.elk.radial.centerOnRoot': 'true',
-    'org.eclipse.elk.radial.compactor': 'NONE',
+    'org.eclipse.elk.radial.compactor': 'WEDGE_COMPACTION',
+    'org.eclipse.elk.radial.compactionStepSize': '2',
     'org.eclipse.elk.radial.wedgeCriteria': 'NODE_SIZE',
-    'org.eclipse.elk.radial.radius': String(layout.levelGap),
+    'org.eclipse.elk.radial.radius': String(getMindmapRadialRadius(mindmap)),
+    'org.eclipse.elk.radial.rotation.computeAdditionalWedgeSpace': 'true',
     'org.eclipse.elk.spacing.nodeNode': String(getMindmapRadialNodeSpacing(mindmap)),
-    'org.eclipse.elk.padding': formatElkPadding(layout.canvasPadding),
+    'org.eclipse.elk.padding': formatElkPadding(getMindmapCanvasPadding(mindmap)),
   };
+}
+
+function getMindmapCanvasPadding(mindmap: GeneratedMindmap): number {
+  return Math.max(32, Math.min(mindmap.metadata.layout.canvasPadding, 48));
+}
+
+function getMindmapRadialRadius(mindmap: GeneratedMindmap): number {
+  const largestNodeDiagonal = mindmap.nodes.reduce((maxDiagonal, node) => {
+    const nodeWidth = node.layout.minWidth + node.layout.paddingX * 2;
+    const nodeHeight = node.layout.minHeight + node.layout.paddingY * 2;
+
+    return Math.max(maxDiagonal, Math.hypot(nodeWidth, nodeHeight));
+  }, 0);
+
+  return Math.ceil(
+    Math.max(
+      mindmap.metadata.layout.levelGap,
+      largestNodeDiagonal + getMindmapRadialNodeSpacing(mindmap),
+    ),
+  );
 }
 
 function getMindmapRadialNodeSpacing(mindmap: GeneratedMindmap): number {

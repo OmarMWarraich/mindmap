@@ -12,11 +12,13 @@ test('createMindmapRadialLayoutOptions maps generation spacing hints to ELK radi
   assert.deepEqual(createMindmapRadialLayoutOptions(validGeneratedMindmapFixture), {
     'elk.algorithm': 'radial',
     'org.eclipse.elk.radial.centerOnRoot': 'true',
-    'org.eclipse.elk.radial.compactor': 'NONE',
+    'org.eclipse.elk.radial.compactor': 'WEDGE_COMPACTION',
+    'org.eclipse.elk.radial.compactionStepSize': '2',
     'org.eclipse.elk.radial.wedgeCriteria': 'NODE_SIZE',
-    'org.eclipse.elk.radial.radius': '168',
+    'org.eclipse.elk.radial.radius': '366',
+    'org.eclipse.elk.radial.rotation.computeAdditionalWedgeSpace': 'true',
     'org.eclipse.elk.spacing.nodeNode': '52',
-    'org.eclipse.elk.padding': '[top=96,left=96,bottom=96,right=96]',
+    'org.eclipse.elk.padding': '[top=48,left=48,bottom=48,right=48]',
   });
 });
 
