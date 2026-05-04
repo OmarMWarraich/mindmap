@@ -6,6 +6,7 @@ import {
   buildSvgPreviewModel,
   clampSvgPreviewScale,
   createDefaultSvgPreviewTransform,
+  getSvgPreviewRenderMetrics,
   panSvgPreviewTransform,
   type SvgPreviewTransform,
   zoomSvgPreviewAroundPoint,
@@ -43,6 +44,7 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
   const transform = controlledTransform ?? uncontrolledTransform;
   const setTransform = onTransformChange ?? setUncontrolledTransform;
   const model = mindmap && layoutResult ? buildSvgPreviewModel(mindmap, layoutResult) : null;
+  const previewMetrics = getSvgPreviewRenderMetrics();
 
   useImperativeHandle(ref, () => ({
     getExportSnapshot() {
@@ -225,39 +227,41 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
                 key={edge.id}
                 stroke={edge.color}
                 strokeOpacity="0.72"
-                strokeWidth="4"
+                strokeWidth={previewMetrics.edgeStrokeWidth}
               />
             ))}
           </g>
 
           <g>
             {previewModel.nodes.map((node) => {
-              const lineStartY = node.kind === 'root' ? 50 : 42;
+              const lineStartY = node.kind === 'root'
+                ? previewMetrics.rootLineStartY
+                : previewMetrics.nodeLineStartY;
 
               return (
                 <g key={node.id} transform={`translate(${node.x} ${node.y})`}>
                   <rect
                     fill={node.style.fill}
                     height={node.height}
-                    rx={node.kind === 'root' ? 28 : 24}
+                    rx={node.kind === 'root' ? previewMetrics.rootCornerRadius : previewMetrics.nodeCornerRadius}
                     stroke={node.style.stroke}
-                    strokeWidth={node.kind === 'root' ? 3 : 2}
+                    strokeWidth={node.kind === 'root' ? previewMetrics.rootStrokeWidth : previewMetrics.nodeStrokeWidth}
                     width={node.width}
                     x="0"
                     y="0"
                   />
                   <rect
                     fill={node.style.accent}
-                    height="6"
-                    rx="3"
-                    width={Math.max(44, node.width * 0.28)}
-                    x="18"
-                    y="16"
+                    height={previewMetrics.accentHeight}
+                    rx={previewMetrics.accentHeight / 2}
+                    width={Math.max(previewMetrics.accentMinWidth, node.width * previewMetrics.accentWidthRatio)}
+                    x={previewMetrics.accentInsetX}
+                    y={previewMetrics.accentInsetY}
                   />
                   <text
                     fill={node.style.text}
                     fontFamily="ui-sans-serif, system-ui, sans-serif"
-                    fontSize={node.kind === 'root' ? 22 : 16}
+                    fontSize={node.kind === 'root' ? previewMetrics.rootFontSize : previewMetrics.nodeFontSize}
                     fontWeight={node.kind === 'root' ? 700 : 600}
                     x={node.width / 2}
                   >
@@ -267,7 +271,7 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
                         key={`${node.id}-${index}`}
                         textAnchor="middle"
                         x={node.width / 2}
-                        y={lineStartY + index * 20}
+                        y={lineStartY + index * previewMetrics.lineHeight}
                       >
                         {line}
                       </tspan>

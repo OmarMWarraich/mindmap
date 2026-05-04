@@ -4,6 +4,7 @@ import test from 'node:test';
 import { generateMindmapFromAst } from './from-ast.ts';
 import { validGeneratedMindmapFixture } from './__fixtures__/generatedMindmap.ts';
 import {
+  createExportMindmapVariant,
   createMindmapRadialLayoutOptions,
   layoutMindmapWithElk,
 } from './layout.ts';
@@ -31,6 +32,27 @@ test('layoutMindmapWithElk returns positioned nodes and routed edges', async () 
   assert.equal(result.height > 0, true);
   assert.equal(result.nodes.every((node) => Number.isFinite(node.x) && Number.isFinite(node.y)), true);
   assert.equal(result.edges.every((edge) => edge.points.length >= 2), true);
+});
+
+test('createExportMindmapVariant scales node boxes and spacing for export layout', () => {
+  const exportMindmap = createExportMindmapVariant(validGeneratedMindmapFixture);
+
+  assert.equal(
+    exportMindmap.nodes[0]!.layout.minWidth > validGeneratedMindmapFixture.nodes[0]!.layout.minWidth,
+    true,
+  );
+  assert.equal(
+    exportMindmap.nodes[0]!.layout.minHeight > validGeneratedMindmapFixture.nodes[0]!.layout.minHeight,
+    true,
+  );
+  assert.equal(
+    exportMindmap.nodes[0]!.layout.paddingX > validGeneratedMindmapFixture.nodes[0]!.layout.paddingX,
+    true,
+  );
+  assert.equal(
+    exportMindmap.metadata.layout.levelGap > validGeneratedMindmapFixture.metadata.layout.levelGap,
+    true,
+  );
 });
 
 test('layoutMindmapWithElk avoids node overlap in dense radial layouts', async () => {

@@ -24,6 +24,14 @@ export interface MindmapLayoutResult {
   edges: MindmapLayoutEdge[];
 }
 
+export interface MindmapExportScaleOptions {
+  nodeWidthScale?: number;
+  nodeHeightScale?: number;
+  nodePaddingScale?: number;
+  siblingGapScale?: number;
+  levelGapScale?: number;
+}
+
 export interface MindmapLayoutWorkerRequest {
   type: 'layout';
   requestId: number;
@@ -48,6 +56,14 @@ export type MindmapLayoutWorkerResponse =
 
 const elk = new ELK();
 
+const defaultMindmapExportScaleOptions: Required<MindmapExportScaleOptions> = {
+  nodeWidthScale: 1.28,
+  nodeHeightScale: 1.36,
+  nodePaddingScale: 1.18,
+  siblingGapScale: 1.14,
+  levelGapScale: 1.08,
+};
+
 export async function layoutMindmapWithElk(
   mindmap: GeneratedMindmap,
 ): Promise<MindmapLayoutResult> {
@@ -71,6 +87,49 @@ export async function layoutMindmapWithElk(
       id: edge.id ?? 'edge',
       points: collectEdgePoints(edge),
     })),
+  };
+}
+
+export function createExportMindmapVariant(
+  mindmap: GeneratedMindmap,
+  options: MindmapExportScaleOptions = {},
+): GeneratedMindmap {
+  const exportScale = {
+    ...defaultMindmapExportScaleOptions,
+    ...options,
+  };
+
+  return {
+    ...mindmap,
+    metadata: {
+      ...mindmap.metadata,
+      layout: {
+        ...mindmap.metadata.layout,
+        levelGap: scalePositiveInt(mindmap.metadata.layout.levelGap, exportScale.levelGapScale),
+        siblingGap: scalePositiveInt(mindmap.metadata.layout.siblingGap, exportScale.siblingGapScale),
+        branchGap: scalePositiveInt(mindmap.metadata.layout.branchGap, exportScale.siblingGapScale),
+        branchWidthHint: scalePositiveInt(mindmap.metadata.layout.branchWidthHint, exportScale.nodeWidthScale),
+        branchHeightHint: scalePositiveInt(mindmap.metadata.layout.branchHeightHint, exportScale.nodeHeightScale),
+        leafWidthHint: scalePositiveInt(mindmap.metadata.layout.leafWidthHint, exportScale.nodeWidthScale),
+        leafHeightHint: scalePositiveInt(mindmap.metadata.layout.leafHeightHint, exportScale.nodeHeightScale),
+        nodePaddingX: scaleNonNegativeInt(mindmap.metadata.layout.nodePaddingX, exportScale.nodePaddingScale),
+        nodePaddingY: scaleNonNegativeInt(mindmap.metadata.layout.nodePaddingY, exportScale.nodePaddingScale),
+      },
+    },
+    nodes: mindmap.nodes.map((node) => ({
+      ...node,
+      layout: {
+        ...node.layout,
+        minWidth: scalePositiveInt(node.layout.minWidth, exportScale.nodeWidthScale),
+        minHeight: scalePositiveInt(node.layout.minHeight, exportScale.nodeHeightScale),
+        paddingX: scaleNonNegativeInt(node.layout.paddingX, exportScale.nodePaddingScale),
+        paddingY: scaleNonNegativeInt(node.layout.paddingY, exportScale.nodePaddingScale),
+        siblingGap: scalePositiveInt(node.layout.siblingGap, exportScale.siblingGapScale),
+      },
+    })),
+    edges: mindmap.edges.map((edge) => ({ ...edge })),
+    warnings: [...mindmap.warnings],
+    errors: [...mindmap.errors],
   };
 }
 
@@ -131,4 +190,12 @@ function getMindmapRadialNodeSpacing(mindmap: GeneratedMindmap): number {
 
 function formatElkPadding(padding: number): string {
   return `[top=${padding},left=${padding},bottom=${padding},right=${padding}]`;
+}
+
+function scalePositiveInt(value: number, factor: number): number {
+  return Math.max(1, Math.ceil(value * factor));
+}
+
+function scaleNonNegativeInt(value: number, factor: number): number {
+  return Math.max(0, Math.ceil(value * factor));
 }

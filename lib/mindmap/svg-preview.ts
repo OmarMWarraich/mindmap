@@ -44,6 +44,31 @@ export interface SvgPreviewTransform {
   translateY: number;
 }
 
+export interface SvgPreviewRenderScaleOptions {
+  scale?: number;
+}
+
+export type SvgPreviewRenderProfile = 'preview' | 'export';
+
+interface SvgPreviewRenderMetrics {
+  approxCharacterWidth: number;
+  lineHeight: number;
+  rootFontSize: number;
+  nodeFontSize: number;
+  rootLineStartY: number;
+  nodeLineStartY: number;
+  rootStrokeWidth: number;
+  nodeStrokeWidth: number;
+  rootCornerRadius: number;
+  nodeCornerRadius: number;
+  edgeStrokeWidth: number;
+  accentHeight: number;
+  accentMinWidth: number;
+  accentWidthRatio: number;
+  accentInsetX: number;
+  accentInsetY: number;
+}
+
 const rootNodeStyle: SvgPreviewNodeStyle = {
   fill: '#fff7ed',
   stroke: '#f97316',
@@ -91,10 +116,52 @@ const branchTokenStyles = {
   },
 } as const;
 
+const previewRenderMetrics: SvgPreviewRenderMetrics = {
+  approxCharacterWidth: 8,
+  lineHeight: 20,
+  rootFontSize: 22,
+  nodeFontSize: 16,
+  rootLineStartY: 50,
+  nodeLineStartY: 42,
+  rootStrokeWidth: 3,
+  nodeStrokeWidth: 2,
+  rootCornerRadius: 28,
+  nodeCornerRadius: 24,
+  edgeStrokeWidth: 4,
+  accentHeight: 6,
+  accentMinWidth: 44,
+  accentWidthRatio: 0.28,
+  accentInsetX: 18,
+  accentInsetY: 16,
+};
+
+const exportRenderMetrics: SvgPreviewRenderMetrics = {
+  approxCharacterWidth: 10,
+  lineHeight: 26,
+  rootFontSize: 30,
+  nodeFontSize: 21,
+  rootLineStartY: 62,
+  nodeLineStartY: 52,
+  rootStrokeWidth: 4,
+  nodeStrokeWidth: 3,
+  rootCornerRadius: 34,
+  nodeCornerRadius: 28,
+  edgeStrokeWidth: 5,
+  accentHeight: 8,
+  accentMinWidth: 56,
+  accentWidthRatio: 0.3,
+  accentInsetX: 22,
+  accentInsetY: 18,
+};
+
 export function buildSvgPreviewModel(
   mindmap: GeneratedMindmap,
   layoutResult: MindmapLayoutResult,
+  options: {
+    profile?: SvgPreviewRenderProfile;
+  } = {},
 ): SvgPreviewModel {
+  const metrics = getSvgPreviewRenderMetrics(options.profile);
   const layoutNodeMap = new Map(layoutResult.nodes.map((node) => [node.id, node]));
   const mindmapNodeMap = new Map(mindmap.nodes.map((node) => [node.id, node]));
 
@@ -105,7 +172,7 @@ export function buildSvgPreviewModel(
       return [];
     }
 
-    return [createSvgPreviewNode(node, layoutNode)];
+    return [createSvgPreviewNode(node, layoutNode, metrics)];
   });
 
   const edges = layoutResult.edges.flatMap((edge) => {
@@ -145,6 +212,7 @@ export function buildSvgPreviewModel(
 function createSvgPreviewNode(
   sourceNode: MindmapNode,
   layoutNode: MindmapLayoutResult['nodes'][number],
+  metrics: SvgPreviewRenderMetrics,
 ): SvgPreviewNode {
   return {
     id: sourceNode.id,
@@ -152,13 +220,166 @@ function createSvgPreviewNode(
     label: sourceNode.label,
     lines: wrapMindmapLabel(
       sourceNode.label,
-      Math.max(10, Math.floor((layoutNode.width - sourceNode.layout.paddingX * 2) / 8)),
+      Math.max(8, Math.floor((layoutNode.width - sourceNode.layout.paddingX * 2) / metrics.approxCharacterWidth)),
     ),
     x: layoutNode.x,
     y: layoutNode.y,
     width: layoutNode.width,
     height: layoutNode.height,
     style: getNodeVisualStyle(sourceNode),
+  };
+}
+
+export function getSvgPreviewRenderMetrics(
+  profile: SvgPreviewRenderProfile = 'preview',
+  options: SvgPreviewRenderScaleOptions = {},
+): SvgPreviewRenderMetrics {
+  const metrics = profile === 'export' ? exportRenderMetrics : previewRenderMetrics;
+  const scale = options.scale ?? 1;
+
+  if (scale === 1) {
+    return metrics;
+  }
+
+  return {
+    ...metrics,
+    approxCharacterWidth: Math.max(1, metrics.approxCharacterWidth * scale),
+    lineHeight: Math.max(1, metrics.lineHeight * scale),
+    rootFontSize: Math.max(1, metrics.rootFontSize * scale),
+    nodeFontSize: Math.max(1, metrics.nodeFontSize * scale),
+    rootLineStartY: Math.max(1, metrics.rootLineStartY * scale),
+    nodeLineStartY: Math.max(1, metrics.nodeLineStartY * scale),
+    rootStrokeWidth: Math.max(1, metrics.rootStrokeWidth * Math.max(1, scale * 0.9)),
+    nodeStrokeWidth: Math.max(1, metrics.nodeStrokeWidth * Math.max(1, scale * 0.9)),
+    rootCornerRadius: Math.max(1, metrics.rootCornerRadius * scale),
+    nodeCornerRadius: Math.max(1, metrics.nodeCornerRadius * scale),
+    edgeStrokeWidth: Math.max(1, metrics.edgeStrokeWidth * Math.max(1, scale * 0.9)),
+    accentHeight: Math.max(1, metrics.accentHeight * scale),
+    accentMinWidth: Math.max(1, metrics.accentMinWidth * scale),
+    accentInsetX: Math.max(1, metrics.accentInsetX * scale),
+    accentInsetY: Math.max(1, metrics.accentInsetY * scale),
+  };
+}
+
+export function createSvgPreviewSnapshot(
+  mindmap: GeneratedMindmap,
+  layoutResult: MindmapLayoutResult,
+  options: {
+    profile?: SvgPreviewRenderProfile;
+    renderScale?: number;
+  } = {},
+): { node: SVGSVGElement; width: number; height: number } {
+  if (typeof document === 'undefined') {
+    throw new Error('SVG preview snapshots require a browser document.');
+  }
+
+  const profile = options.profile ?? 'preview';
+  const metrics = getSvgPreviewRenderMetrics(profile, { scale: options.renderScale });
+  const model = buildSvgPreviewModel(mindmap, layoutResult, { profile });
+  const svgNs = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNs, 'svg');
+  const width = Math.max(1, Math.ceil(model.width));
+  const height = Math.max(1, Math.ceil(model.height));
+
+  svg.setAttribute('xmlns', svgNs);
+  svg.setAttribute('width', String(width));
+  svg.setAttribute('height', String(height));
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+  const defs = document.createElementNS(svgNs, 'defs');
+  const pattern = document.createElementNS(svgNs, 'pattern');
+  pattern.setAttribute('id', 'mindmap-export-grid');
+  pattern.setAttribute('width', '32');
+  pattern.setAttribute('height', '32');
+  pattern.setAttribute('patternUnits', 'userSpaceOnUse');
+  const patternPath = document.createElementNS(svgNs, 'path');
+  patternPath.setAttribute('d', 'M 32 0 L 0 0 0 32');
+  patternPath.setAttribute('fill', 'none');
+  patternPath.setAttribute('stroke', 'rgba(148,163,184,0.12)');
+  patternPath.setAttribute('stroke-width', '1');
+  pattern.append(patternPath);
+  defs.append(pattern);
+  svg.append(defs);
+
+  const background = document.createElementNS(svgNs, 'rect');
+  background.setAttribute('x', '0');
+  background.setAttribute('y', '0');
+  background.setAttribute('width', String(width));
+  background.setAttribute('height', String(height));
+  background.setAttribute('fill', 'url(#mindmap-export-grid)');
+  svg.append(background);
+
+  const edgeGroup = document.createElementNS(svgNs, 'g');
+  edgeGroup.setAttribute('fill', 'none');
+  edgeGroup.setAttribute('stroke-linecap', 'round');
+  edgeGroup.setAttribute('stroke-linejoin', 'round');
+
+  for (const edge of model.edges) {
+    const path = document.createElementNS(svgNs, 'path');
+    path.setAttribute('d', edge.path);
+    path.setAttribute('stroke', edge.color);
+    path.setAttribute('stroke-opacity', '0.72');
+    path.setAttribute('stroke-width', String(metrics.edgeStrokeWidth));
+    edgeGroup.append(path);
+  }
+
+  svg.append(edgeGroup);
+
+  const nodeGroup = document.createElementNS(svgNs, 'g');
+
+  for (const node of model.nodes) {
+    const nodeWrapper = document.createElementNS(svgNs, 'g');
+    nodeWrapper.setAttribute('transform', `translate(${node.x} ${node.y})`);
+
+    const frame = document.createElementNS(svgNs, 'rect');
+    frame.setAttribute('x', '0');
+    frame.setAttribute('y', '0');
+    frame.setAttribute('width', String(node.width));
+    frame.setAttribute('height', String(node.height));
+    frame.setAttribute('fill', node.style.fill);
+    frame.setAttribute('stroke', node.style.stroke);
+    frame.setAttribute('stroke-width', String(node.kind === 'root' ? metrics.rootStrokeWidth : metrics.nodeStrokeWidth));
+    frame.setAttribute('rx', String(node.kind === 'root' ? metrics.rootCornerRadius : metrics.nodeCornerRadius));
+    nodeWrapper.append(frame);
+
+    const accent = document.createElementNS(svgNs, 'rect');
+    accent.setAttribute('x', String(metrics.accentInsetX));
+    accent.setAttribute('y', String(metrics.accentInsetY));
+    accent.setAttribute('width', String(Math.max(metrics.accentMinWidth, node.width * metrics.accentWidthRatio)));
+    accent.setAttribute('height', String(metrics.accentHeight));
+    accent.setAttribute('rx', String(metrics.accentHeight / 2));
+    accent.setAttribute('fill', node.style.accent);
+    nodeWrapper.append(accent);
+
+    const text = document.createElementNS(svgNs, 'text');
+    text.setAttribute('x', String(node.width / 2));
+    text.setAttribute('fill', node.style.text);
+    text.setAttribute('font-family', 'ui-sans-serif, system-ui, sans-serif');
+    text.setAttribute('font-size', String(node.kind === 'root' ? metrics.rootFontSize : metrics.nodeFontSize));
+    text.setAttribute('font-weight', node.kind === 'root' ? '700' : '600');
+
+    const lineStartY = node.kind === 'root' ? metrics.rootLineStartY : metrics.nodeLineStartY;
+
+    for (const [index, line] of node.lines.entries()) {
+      const tspan = document.createElementNS(svgNs, 'tspan');
+      tspan.setAttribute('x', String(node.width / 2));
+      tspan.setAttribute('y', String(lineStartY + index * metrics.lineHeight));
+      tspan.setAttribute('text-anchor', 'middle');
+      tspan.setAttribute('dominant-baseline', 'hanging');
+      tspan.textContent = line;
+      text.append(tspan);
+    }
+
+    nodeWrapper.append(text);
+    nodeGroup.append(nodeWrapper);
+  }
+
+  svg.append(nodeGroup);
+
+  return {
+    node: svg,
+    width,
+    height,
   };
 }
 

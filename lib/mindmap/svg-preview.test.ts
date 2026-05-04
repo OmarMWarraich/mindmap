@@ -7,6 +7,7 @@ import {
   clampSvgPreviewScale,
   createDefaultSvgPreviewTransform,
   createEdgePath,
+  getSvgPreviewRenderMetrics,
   panSvgPreviewTransform,
   wrapMindmapLabel,
   zoomSvgPreviewAroundPoint,
@@ -108,4 +109,12 @@ test('clampSvgPreviewScale constrains zoom extremes', () => {
   assert.equal(clampSvgPreviewScale(0.2), 0.55);
   assert.equal(clampSvgPreviewScale(1.4), 1.4);
   assert.equal(clampSvgPreviewScale(4), 2.4);
+});
+
+test('getSvgPreviewRenderMetrics scales export typography metrics', () => {
+  const metrics = getSvgPreviewRenderMetrics('export', { scale: 1.5 });
+
+  assert.equal(metrics.nodeFontSize, 31.5);
+  assert.equal(metrics.lineHeight, 39);
+  assert.equal(metrics.edgeStrokeWidth, 6.75);
 });
