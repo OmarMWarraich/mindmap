@@ -191,7 +191,7 @@ export function wrapMindmapLabel(label: string, maxCharsPerLine: number): string
   }
 
   lines.push(currentLine);
-  return lines.slice(0, 4);
+  return lines;
 }
 
 function getNodeVisualStyle(node: MindmapNode | null): SvgPreviewNodeStyle {

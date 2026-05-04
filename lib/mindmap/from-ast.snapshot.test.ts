@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { join } from "node:path";
 import test from "node:test";
 
@@ -73,5 +74,53 @@ test("generateMindmapFromAst matches the grouped-branch snapshot", (t) => {
   snapshotAssert.fileSnapshot(
     JSON.stringify(generated, null, 2),
     join(snapshotDirectory, "from-ast.grouped.snapshot.json"),
+  );
+});
+
+test('generateMindmapFromAst preserves long leaf labels', () => {
+  const generated = generateMindmapFromAst({
+    root: {
+      id: 'root-law',
+      kind: 'root',
+      label: 'Intro',
+      source: {
+        line: 1,
+        column: 1,
+        indentLevel: 0,
+        raw: '@root: Intro',
+      },
+      branches: [
+        {
+          id: 'branch-definition',
+          kind: 'branch',
+          label: 'Definition',
+          source: {
+            line: 2,
+            column: 1,
+            indentLevel: 0,
+            raw: '- @branch: Definition',
+          },
+          children: [
+            {
+              id: 'leaf-1',
+              kind: 'leaf',
+              label: 'Sir John William Salmond - legal scholar judge public servant - Law is the body of principles recognized and applied by the state in the administration of justice',
+              source: {
+                line: 3,
+                column: 3,
+                indentLevel: 1,
+                raw: '  - Sir John William Salmond ...',
+              },
+              children: [],
+            },
+          ],
+        },
+      ],
+    },
+  });
+
+  assert.equal(
+    generated.nodes.find((node) => node.kind === 'leaf')?.label,
+    'Sir John William Salmond - legal scholar judge public servant - Law is the body of principles recognized and applied by the state in the administration of justice',
   );
 });

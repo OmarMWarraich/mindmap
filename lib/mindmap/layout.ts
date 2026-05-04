@@ -95,9 +95,16 @@ export function createMindmapRadialLayoutOptions(
     'org.eclipse.elk.radial.compactor': 'NONE',
     'org.eclipse.elk.radial.wedgeCriteria': 'NODE_SIZE',
     'org.eclipse.elk.radial.radius': String(layout.levelGap),
-    'org.eclipse.elk.spacing.nodeNode': String(layout.siblingGap),
+    'org.eclipse.elk.spacing.nodeNode': String(getMindmapRadialNodeSpacing(mindmap)),
     'org.eclipse.elk.padding': formatElkPadding(layout.canvasPadding),
   };
+}
+
+function getMindmapRadialNodeSpacing(mindmap: GeneratedMindmap): number {
+  return mindmap.nodes.reduce(
+    (maxSpacing, node) => Math.max(maxSpacing, node.layout.siblingGap),
+    mindmap.metadata.layout.siblingGap,
+  );
 }
 
 function formatElkPadding(padding: number): string {

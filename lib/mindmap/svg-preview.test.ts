@@ -20,6 +20,13 @@ test('wrapMindmapLabel splits long labels into multiple lines', () => {
   ]);
 });
 
+test('wrapMindmapLabel keeps all wrapped lines for long labels', () => {
+  assert.deepEqual(
+    wrapMindmapLabel('one two three four five six seven eight nine ten', 8),
+    ['one two', 'three', 'four', 'five six', 'seven', 'eight', 'nine ten'],
+  );
+});
+
 test('createEdgePath converts routed points into an SVG path', () => {
   assert.equal(
     createEdgePath([

@@ -50,6 +50,14 @@ const editorLoadingFallback = (
   </div>
 );
 
+function isIgnorableMonacoCancellation(reason: unknown): boolean {
+  if (!(reason instanceof Error) || reason.message !== 'Canceled') {
+    return false;
+  }
+
+  return typeof reason.stack === 'string' && reason.stack.includes('monaco-editor');
+}
+
 export default function StudyWorkspace() {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const editorDisposablesRef = useRef<Array<{ dispose(): void }>>([]);
@@ -65,6 +73,7 @@ export default function StudyWorkspace() {
   const [debouncedOutline, setDebouncedOutline] = useState(mindmapDslStarterOutline);
   const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
   const [latestMindmapSnapshot, setLatestMindmapSnapshot] = useState<GeneratedMindmap | null>(null);
+  const [latestMindmapSnapshotOutline, setLatestMindmapSnapshotOutline] = useState<string | null>(null);
   const [layoutResult, setLayoutResult] = useState<MindmapLayoutResult | null>(null);
   const [layoutStatus, setLayoutStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [layoutError, setLayoutError] = useState<string | null>(null);
@@ -128,7 +137,8 @@ export default function StudyWorkspace() {
       errors: parseResult.errors,
     });
   }, [parseResult.ast, parseResult.errors, parseResult.warnings]);
-  const effectiveMindmap = generatedMindmap ?? latestMindmapSnapshot;
+  const effectiveMindmap = generatedMindmap
+    ?? (latestMindmapSnapshotOutline === outline ? latestMindmapSnapshot : null);
 
   const effectiveLayoutStatus = layoutStatus;
   const effectiveLayoutError = layoutError;
@@ -145,6 +155,26 @@ export default function StudyWorkspace() {
   useEffect(() => {
     mindmapDslInlineSuggestionPreference = inlineSuggestionPreference;
   }, [inlineSuggestionPreference]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development') {
+      return;
+    }
+
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      if (!isIgnorableMonacoCancellation(event.reason)) {
+        return;
+      }
+
+      event.preventDefault();
+    };
+
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+    return () => {
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -166,6 +196,7 @@ export default function StudyWorkspace() {
         setOutline(draft.outline);
         setDebouncedOutline(draft.outline);
         setLatestMindmapSnapshot(draft.mindmap);
+        setLatestMindmapSnapshotOutline(draft.outline);
         setPreviewTransform(draft.previewTransform);
         setDraftStatus({
           tone: 'success',
@@ -199,7 +230,8 @@ export default function StudyWorkspace() {
     }
 
     setLatestMindmapSnapshot(generatedMindmap);
-  }, [generatedMindmap]);
+    setLatestMindmapSnapshotOutline(outline);
+  }, [generatedMindmap, outline]);
 
   useEffect(() => {
     if (enableMonacoInlineCompletions) {

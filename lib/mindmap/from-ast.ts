@@ -33,9 +33,10 @@ const antiCramLayoutDefaults: MindmapLayoutDefaults = {
   leafHeightHint: 60,
 };
 
-const maxMindmapLabelLength = 56;
 const maxDirectBranchChildrenBeforeGrouping = 6;
 const overflowGroupChunkSize = 4;
+const estimatedCharWidthPx = 8;
+const estimatedLineHeightPx = 20;
 
 interface GeneratedLeafInput {
   label: string;
@@ -214,22 +215,12 @@ function createEdgeId(from: string, to: string): string {
 }
 
 function normalizeMindmapLabel(label: string): string {
-  const compactLabel = label
+  return label
     .normalize("NFKC")
     .replace(/\s+/g, " ")
     .replace(/\s*([,:;])\s*/g, "$1 ")
     .replace(/\s+/g, " ")
     .trim();
-
-  if (compactLabel.length <= maxMindmapLabelLength) {
-    return compactLabel;
-  }
-
-  const truncatedLabel = compactLabel.slice(0, maxMindmapLabelLength - 3).trimEnd();
-  const wordBoundary = truncatedLabel.lastIndexOf(" ");
-  const safeTruncation = wordBoundary >= 24 ? truncatedLabel.slice(0, wordBoundary) : truncatedLabel;
-
-  return `${safeTruncation}...`;
 }
 
 function createStableSlug(label: string): string {
@@ -247,6 +238,8 @@ function createNodeLayout(
   childCount: number,
   level: number,
 ): MindmapNode["layout"] {
+  const paddingX = antiCramLayoutDefaults.nodePaddingX;
+  const paddingY = antiCramLayoutDefaults.nodePaddingY;
   const baseWidth =
     kind === "branch"
       ? antiCramLayoutDefaults.branchWidthHint
@@ -259,17 +252,51 @@ function createNodeLayout(
       : kind === "leaf"
         ? antiCramLayoutDefaults.leafHeightHint
         : antiCramLayoutDefaults.branchHeightHint + 12;
-  const widthFromLabel = Math.max(0, Math.min(label.length, 40) - 12) * 5;
+  const targetCharsPerLine =
+    kind === 'root' ? 28 : kind === 'branch' ? 24 : 22;
+  const wrappedLines = wrapLabelForLayout(label, targetCharsPerLine);
+  const longestLineLength = wrappedLines.reduce(
+    (longest, line) => Math.max(longest, line.length),
+    0,
+  );
+  const contentWidth = paddingX * 2 + Math.max(longestLineLength, 8) * estimatedCharWidthPx;
+  const labelBottom = (kind === 'root' ? 50 : 42) + wrappedLines.length * estimatedLineHeightPx + paddingY;
   const heightFromChildren = Math.min(childCount, 5) * 10;
   const levelTaper = Math.max(0, level - 2) * 4;
 
   return {
-    minWidth: baseWidth + widthFromLabel,
-    minHeight: baseHeight + heightFromChildren,
-    paddingX: antiCramLayoutDefaults.nodePaddingX,
-    paddingY: antiCramLayoutDefaults.nodePaddingY,
+    minWidth: Math.max(baseWidth, contentWidth),
+    minHeight: Math.max(baseHeight + heightFromChildren, labelBottom),
+    paddingX,
+    paddingY,
     siblingGap: antiCramLayoutDefaults.siblingGap + Math.min(childCount, 4) * 4 + levelTaper,
   };
+}
+
+function wrapLabelForLayout(label: string, maxCharsPerLine: number): string[] {
+  const words = label.split(/\s+/).filter(Boolean);
+
+  if (words.length === 0) {
+    return [''];
+  }
+
+  const lines: string[] = [];
+  let currentLine = words[0];
+
+  for (const word of words.slice(1)) {
+    const nextLine = `${currentLine} ${word}`;
+
+    if (nextLine.length <= maxCharsPerLine) {
+      currentLine = nextLine;
+      continue;
+    }
+
+    lines.push(currentLine);
+    currentLine = word;
+  }
+
+  lines.push(currentLine);
+  return lines;
 }
 
 function getBranchChildrenForGeneration(
