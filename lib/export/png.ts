@@ -1,7 +1,7 @@
 import { toBlob } from 'html-to-image';
 
-const defaultMaxExportEdge = 4096;
-const defaultMaxExportPixels = 16_777_216;
+const defaultMaxExportEdge = 8192;
+const defaultMaxExportPixels = 67_108_864;
 
 export interface PngExportDimensions {
   sourceWidth: number;

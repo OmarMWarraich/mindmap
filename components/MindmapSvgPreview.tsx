@@ -234,10 +234,6 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
 
           <g>
             {previewModel.nodes.map((node) => {
-              const lineStartY = node.kind === 'root'
-                ? previewMetrics.rootLineStartY
-                : previewMetrics.nodeLineStartY;
-
               return (
                 <g key={node.id} transform={`translate(${node.x} ${node.y})`}>
                   <rect
@@ -261,8 +257,8 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
                   <text
                     fill={node.style.text}
                     fontFamily="ui-sans-serif, system-ui, sans-serif"
-                    fontSize={node.kind === 'root' ? previewMetrics.rootFontSize : previewMetrics.nodeFontSize}
-                    fontWeight={node.kind === 'root' ? 700 : 600}
+                    fontSize={node.fontSize}
+                    fontWeight={node.kind === 'root' ? 800 : 700}
                     x={node.width / 2}
                   >
                     {node.lines.map((line, index) => (
@@ -271,7 +267,7 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
                         key={`${node.id}-${index}`}
                         textAnchor="middle"
                         x={node.width / 2}
-                        y={lineStartY + index * previewMetrics.lineHeight}
+                        y={node.lineStartY + index * node.lineHeight}
                       >
                         {line}
                       </tspan>

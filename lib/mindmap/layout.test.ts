@@ -55,6 +55,36 @@ test('createExportMindmapVariant scales node boxes and spacing for export layout
   );
 });
 
+test('createExportMindmapVariant enlarges boxes further when text scale increases', () => {
+  const exportMindmap = createExportMindmapVariant(validGeneratedMindmapFixture, {
+    textScale: 1.5,
+  });
+
+  assert.equal(
+    exportMindmap.nodes[0]!.layout.minWidth > validGeneratedMindmapFixture.nodes[0]!.layout.minWidth * 1.2,
+    true,
+  );
+  assert.equal(
+    exportMindmap.nodes[0]!.layout.minHeight > validGeneratedMindmapFixture.nodes[0]!.layout.minHeight * 1.2,
+    true,
+  );
+});
+
+test('createExportMindmapVariant grows text-driven boxes more slowly than text scale itself', () => {
+  const exportMindmap = createExportMindmapVariant(validGeneratedMindmapFixture, {
+    textScale: 2.5,
+  });
+
+  assert.equal(
+    exportMindmap.nodes[0]!.layout.minWidth < validGeneratedMindmapFixture.nodes[0]!.layout.minWidth * 2.5,
+    true,
+  );
+  assert.equal(
+    exportMindmap.nodes[0]!.layout.minHeight < validGeneratedMindmapFixture.nodes[0]!.layout.minHeight * 2.5,
+    true,
+  );
+});
+
 test('layoutMindmapWithElk avoids node overlap in dense radial layouts', async () => {
   const denseMindmap = generateMindmapFromAst({
     root: {

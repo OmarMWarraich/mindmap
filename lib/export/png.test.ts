@@ -20,9 +20,9 @@ test('calculatePngExportDimensions keeps small exports at full size', () => {
 test('calculatePngExportDimensions clamps oversized exports by edge and area', () => {
   const dimensions = calculatePngExportDimensions(9000, 6000);
 
-  assert.equal(dimensions.outputWidth <= 4096, true);
-  assert.equal(dimensions.outputHeight <= 4096, true);
-  assert.equal(dimensions.outputWidth * dimensions.outputHeight <= 16_777_216, true);
+  assert.equal(dimensions.outputWidth <= 8192, true);
+  assert.equal(dimensions.outputHeight <= 8192, true);
+  assert.equal(dimensions.outputWidth * dimensions.outputHeight <= 67_108_864, true);
   assert.equal(dimensions.wasClamped, true);
 });
 

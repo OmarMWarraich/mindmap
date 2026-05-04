@@ -18,6 +18,9 @@ export interface SvgPreviewNode {
   kind: MindmapNodeKind;
   label: string;
   lines: string[];
+  fontSize: number;
+  lineHeight: number;
+  lineStartY: number;
   x: number;
   y: number;
   width: number;
@@ -42,6 +45,12 @@ export interface SvgPreviewTransform {
   scale: number;
   translateX: number;
   translateY: number;
+}
+
+interface ExportTypographyTargets {
+  rootFontSize: number;
+  branchFontSize: number;
+  leafFontSize: number;
 }
 
 export interface SvgPreviewRenderScaleOptions {
@@ -72,10 +81,12 @@ interface SvgPreviewRenderMetrics {
 const rootNodeStyle: SvgPreviewNodeStyle = {
   fill: '#fff7ed',
   stroke: '#f97316',
-  text: '#7c2d12',
+  text: '#111827',
   accent: '#ea580c',
   edge: '#fb923c',
 };
+
+const readableNodeTextColor = '#111827';
 
 const branchTokenStyles = {
   amber: {
@@ -159,11 +170,16 @@ export function buildSvgPreviewModel(
   layoutResult: MindmapLayoutResult,
   options: {
     profile?: SvgPreviewRenderProfile;
+    renderScale?: number;
   } = {},
 ): SvgPreviewModel {
-  const metrics = getSvgPreviewRenderMetrics(options.profile);
+  const profile = options.profile ?? 'preview';
+  const metrics = getSvgPreviewRenderMetrics(profile, { scale: options.renderScale });
   const layoutNodeMap = new Map(layoutResult.nodes.map((node) => [node.id, node]));
   const mindmapNodeMap = new Map(mindmap.nodes.map((node) => [node.id, node]));
+  const exportTypographyTargets = profile === 'export'
+    ? createExportTypographyTargets(mindmap, layoutNodeMap, metrics)
+    : null;
 
   const nodes = mindmap.nodes.flatMap((node) => {
     const layoutNode = layoutNodeMap.get(node.id);
@@ -172,7 +188,7 @@ export function buildSvgPreviewModel(
       return [];
     }
 
-    return [createSvgPreviewNode(node, layoutNode, metrics)];
+    return [createSvgPreviewNode(node, layoutNode, metrics, profile, exportTypographyTargets)];
   });
 
   const edges = layoutResult.edges.flatMap((edge) => {
@@ -213,15 +229,29 @@ function createSvgPreviewNode(
   sourceNode: MindmapNode,
   layoutNode: MindmapLayoutResult['nodes'][number],
   metrics: SvgPreviewRenderMetrics,
+  profile: SvgPreviewRenderProfile,
+  exportTypographyTargets: ExportTypographyTargets | null,
 ): SvgPreviewNode {
+  const typography = createNodeTypography(
+    sourceNode,
+    layoutNode,
+    metrics,
+    profile,
+    sourceNode.kind === 'root'
+      ? exportTypographyTargets?.rootFontSize
+      : sourceNode.kind === 'branch'
+        ? exportTypographyTargets?.branchFontSize
+        : exportTypographyTargets?.leafFontSize,
+  );
+
   return {
     id: sourceNode.id,
     kind: sourceNode.kind,
     label: sourceNode.label,
-    lines: wrapMindmapLabel(
-      sourceNode.label,
-      Math.max(8, Math.floor((layoutNode.width - sourceNode.layout.paddingX * 2) / metrics.approxCharacterWidth)),
-    ),
+    lines: typography.lines,
+    fontSize: typography.fontSize,
+    lineHeight: typography.lineHeight,
+    lineStartY: typography.lineStartY,
     x: layoutNode.x,
     y: layoutNode.y,
     width: layoutNode.width,
@@ -275,7 +305,10 @@ export function createSvgPreviewSnapshot(
 
   const profile = options.profile ?? 'preview';
   const metrics = getSvgPreviewRenderMetrics(profile, { scale: options.renderScale });
-  const model = buildSvgPreviewModel(mindmap, layoutResult, { profile });
+  const model = buildSvgPreviewModel(mindmap, layoutResult, {
+    profile,
+    renderScale: options.renderScale,
+  });
   const svgNs = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(svgNs, 'svg');
   const width = Math.max(1, Math.ceil(model.width));
@@ -355,15 +388,13 @@ export function createSvgPreviewSnapshot(
     text.setAttribute('x', String(node.width / 2));
     text.setAttribute('fill', node.style.text);
     text.setAttribute('font-family', 'ui-sans-serif, system-ui, sans-serif');
-    text.setAttribute('font-size', String(node.kind === 'root' ? metrics.rootFontSize : metrics.nodeFontSize));
-    text.setAttribute('font-weight', node.kind === 'root' ? '700' : '600');
-
-    const lineStartY = node.kind === 'root' ? metrics.rootLineStartY : metrics.nodeLineStartY;
+    text.setAttribute('font-size', String(node.fontSize));
+    text.setAttribute('font-weight', node.kind === 'root' ? '800' : '700');
 
     for (const [index, line] of node.lines.entries()) {
       const tspan = document.createElementNS(svgNs, 'tspan');
       tspan.setAttribute('x', String(node.width / 2));
-      tspan.setAttribute('y', String(lineStartY + index * metrics.lineHeight));
+      tspan.setAttribute('y', String(node.lineStartY + index * node.lineHeight));
       tspan.setAttribute('text-anchor', 'middle');
       tspan.setAttribute('dominant-baseline', 'hanging');
       tspan.textContent = line;
@@ -421,6 +452,173 @@ export function createEdgePath(points: Array<{ x: number; y: number }>): string 
   return segments.join(' ');
 }
 
+function createNodeTypography(
+  sourceNode: MindmapNode,
+  layoutNode: MindmapLayoutResult['nodes'][number],
+  metrics: SvgPreviewRenderMetrics,
+  profile: SvgPreviewRenderProfile,
+  targetFontSize?: number,
+): Pick<SvgPreviewNode, 'lines' | 'fontSize' | 'lineHeight' | 'lineStartY'> {
+  const baseFontSize = sourceNode.kind === 'root' ? metrics.rootFontSize : metrics.nodeFontSize;
+  const baseLineStartY = sourceNode.kind === 'root' ? metrics.rootLineStartY : metrics.nodeLineStartY;
+  const availableWidth = Math.max(64, layoutNode.width - sourceNode.layout.paddingX * 2);
+
+  if (profile !== 'export') {
+    return {
+      lines: wrapMindmapLabel(
+        sourceNode.label,
+        Math.max(8, Math.floor(availableWidth / metrics.approxCharacterWidth)),
+      ),
+      fontSize: baseFontSize,
+      lineHeight: metrics.lineHeight,
+      lineStartY: baseLineStartY,
+    };
+  }
+
+  const availableHeight = Math.max(
+    metrics.lineHeight,
+    layoutNode.height - metrics.accentInsetY - metrics.accentHeight - sourceNode.layout.paddingY * 2,
+  );
+  const minimumFontSize = Math.max(12, baseFontSize * 0.68);
+  const initialFontSize = Math.min(baseFontSize, targetFontSize ?? baseFontSize);
+  let bestTypography = measureNodeTypography(
+    sourceNode.label,
+    availableWidth,
+    initialFontSize,
+    metrics,
+    baseFontSize,
+    baseLineStartY,
+  );
+
+  for (let fontSize = initialFontSize; fontSize >= minimumFontSize; fontSize -= 0.5) {
+    const candidate = measureNodeTypography(
+      sourceNode.label,
+      availableWidth,
+      fontSize,
+      metrics,
+      baseFontSize,
+      baseLineStartY,
+    );
+
+    if (doesNodeTypographyFit(candidate, availableWidth, availableHeight, metrics, baseFontSize)) {
+      bestTypography = candidate;
+      break;
+    }
+  }
+
+  return bestTypography;
+}
+
+function createExportTypographyTargets(
+  mindmap: GeneratedMindmap,
+  layoutNodeMap: Map<string, MindmapLayoutResult['nodes'][number]>,
+  metrics: SvgPreviewRenderMetrics,
+): ExportTypographyTargets {
+  let rootFontSize = metrics.rootFontSize;
+  let branchFontSize = metrics.nodeFontSize;
+  let leafFontSize = metrics.nodeFontSize;
+
+  for (const node of mindmap.nodes) {
+    const layoutNode = layoutNodeMap.get(node.id);
+
+    if (!layoutNode) {
+      continue;
+    }
+
+    const fittedFontSize = findFittingExportFontSize(node, layoutNode, metrics);
+
+    if (node.kind === 'root') {
+      rootFontSize = Math.min(rootFontSize, fittedFontSize);
+      continue;
+    }
+
+    if (node.kind === 'branch') {
+      branchFontSize = Math.min(branchFontSize, fittedFontSize);
+      continue;
+    }
+
+    leafFontSize = Math.min(leafFontSize, fittedFontSize);
+  }
+
+  return {
+    rootFontSize,
+    branchFontSize,
+    leafFontSize,
+  };
+}
+
+function findFittingExportFontSize(
+  sourceNode: MindmapNode,
+  layoutNode: MindmapLayoutResult['nodes'][number],
+  metrics: SvgPreviewRenderMetrics,
+): number {
+  const baseFontSize = sourceNode.kind === 'root' ? metrics.rootFontSize : metrics.nodeFontSize;
+  const baseLineStartY = sourceNode.kind === 'root' ? metrics.rootLineStartY : metrics.nodeLineStartY;
+  const availableWidth = Math.max(64, layoutNode.width - sourceNode.layout.paddingX * 2);
+  const availableHeight = Math.max(
+    metrics.lineHeight,
+    layoutNode.height - metrics.accentInsetY - metrics.accentHeight - sourceNode.layout.paddingY * 2,
+  );
+  const minimumFontSize = Math.max(12, baseFontSize * 0.68);
+
+  for (let fontSize = baseFontSize; fontSize >= minimumFontSize; fontSize -= 0.5) {
+    const candidate = measureNodeTypography(
+      sourceNode.label,
+      availableWidth,
+      fontSize,
+      metrics,
+      baseFontSize,
+      baseLineStartY,
+    );
+
+    if (doesNodeTypographyFit(candidate, availableWidth, availableHeight, metrics, baseFontSize)) {
+      return fontSize;
+    }
+  }
+
+  return minimumFontSize;
+}
+
+function measureNodeTypography(
+  label: string,
+  availableWidth: number,
+  fontSize: number,
+  metrics: SvgPreviewRenderMetrics,
+  baseFontSize: number,
+  baseLineStartY: number,
+): Pick<SvgPreviewNode, 'lines' | 'fontSize' | 'lineHeight' | 'lineStartY'> {
+  const scale = fontSize / baseFontSize;
+  const approxCharacterWidth = Math.max(1, metrics.approxCharacterWidth * scale);
+  const lineHeight = Math.max(fontSize * 1.18, metrics.lineHeight * scale);
+  const lineStartY = Math.max(
+    fontSize * 1.35,
+    Math.min(baseLineStartY * scale, metrics.accentInsetY + metrics.accentHeight + fontSize * 0.72),
+  );
+
+  return {
+    lines: wrapMindmapLabel(label, Math.max(8, Math.floor(availableWidth / approxCharacterWidth))),
+    fontSize,
+    lineHeight,
+    lineStartY,
+  };
+}
+
+function doesNodeTypographyFit(
+  typography: Pick<SvgPreviewNode, 'lines' | 'fontSize' | 'lineHeight' | 'lineStartY'>,
+  availableWidth: number,
+  availableHeight: number,
+  metrics: SvgPreviewRenderMetrics,
+  baseFontSize: number,
+): boolean {
+  const scale = typography.fontSize / baseFontSize;
+  const approxCharacterWidth = Math.max(1, metrics.approxCharacterWidth * scale * 1.08);
+  const widestLine = typography.lines.reduce((max, line) => Math.max(max, line.length), 0);
+  const fitsWidth = widestLine * approxCharacterWidth <= availableWidth;
+  const fitsHeight = typography.lineStartY + typography.lines.length * typography.lineHeight <= availableHeight;
+
+  return fitsWidth && fitsHeight;
+}
+
 function createSingleCurveControlPoint(
   start: { x: number; y: number },
   end: { x: number; y: number },
@@ -448,22 +646,79 @@ export function wrapMindmapLabel(label: string, maxCharsPerLine: number): string
   }
 
   const lines: string[] = [];
-  let currentLine = words[0];
+  let currentLine = '';
 
-  for (const word of words.slice(1)) {
-    const nextLine = `${currentLine} ${word}`;
+  for (const word of words) {
+    const fragments = splitLabelToken(word, maxCharsPerLine);
 
-    if (nextLine.length <= maxCharsPerLine) {
-      currentLine = nextLine;
-      continue;
+    for (const [fragmentIndex, fragment] of fragments.entries()) {
+      if (currentLine.length === 0) {
+        currentLine = fragment;
+        continue;
+      }
+
+      const nextLine = fragmentIndex === 0
+        ? `${currentLine} ${fragment}`
+        : `${currentLine}${fragment}`;
+
+      if (nextLine.length <= maxCharsPerLine) {
+        currentLine = nextLine;
+        continue;
+      }
+
+      lines.push(currentLine);
+      currentLine = fragment;
     }
-
-    lines.push(currentLine);
-    currentLine = word;
   }
 
   lines.push(currentLine);
   return lines;
+}
+
+function splitLabelToken(token: string, maxCharsPerLine: number): string[] {
+  if (token.length <= maxCharsPerLine) {
+    return [token];
+  }
+
+  const separatedFragments = token.match(/[^/-]+(?:[-/])?|[-/]/g);
+
+  if (separatedFragments && separatedFragments.length > 1) {
+    const packedFragments: string[] = [];
+    let currentFragment = '';
+
+    for (const fragment of separatedFragments) {
+      const candidate = `${currentFragment}${fragment}`;
+
+      if (candidate.length <= maxCharsPerLine) {
+        currentFragment = candidate;
+        continue;
+      }
+
+      if (currentFragment) {
+        packedFragments.push(currentFragment);
+      }
+
+      currentFragment = fragment;
+    }
+
+    if (currentFragment) {
+      packedFragments.push(currentFragment);
+    }
+
+    return packedFragments.flatMap((fragment) => hardSplitLabelToken(fragment, maxCharsPerLine));
+  }
+
+  return hardSplitLabelToken(token, maxCharsPerLine);
+}
+
+function hardSplitLabelToken(token: string, maxCharsPerLine: number): string[] {
+  const fragments: string[] = [];
+
+  for (let index = 0; index < token.length; index += maxCharsPerLine) {
+    fragments.push(token.slice(index, index + maxCharsPerLine));
+  }
+
+  return fragments;
 }
 
 function getNodeVisualStyle(node: MindmapNode | null): SvgPreviewNodeStyle {
@@ -471,7 +726,10 @@ function getNodeVisualStyle(node: MindmapNode | null): SvgPreviewNodeStyle {
     return rootNodeStyle;
   }
 
-  return branchTokenStyles[node.style.colorToken][node.style.tintTone ?? 'base'];
+  return {
+    ...branchTokenStyles[node.style.colorToken][node.style.tintTone ?? 'base'],
+    text: readableNodeTextColor,
+  };
 }
 
 export function createDefaultSvgPreviewTransform(): SvgPreviewTransform {

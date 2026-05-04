@@ -805,7 +805,7 @@ export default function StudyWorkspace() {
                   <span>{formatScaleLabel(exportControls.fontScale)}</span>
                 </span>
                 <input
-                  max="1.9"
+                  max="2.5"
                   min="0.9"
                   onChange={(event) => {
                     updateExportControl('fontScale', Number(event.target.value));
@@ -850,6 +850,7 @@ function getExportScaleOptions(controls: ExportControlState): MindmapExportScale
     nodePaddingScale: controls.nodePaddingScale,
     siblingGapScale: controls.siblingGapScale,
     levelGapScale: controls.levelGapScale,
+    textScale: controls.fontScale,
   };
 }
 

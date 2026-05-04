@@ -30,6 +30,7 @@ export interface MindmapExportScaleOptions {
   nodePaddingScale?: number;
   siblingGapScale?: number;
   levelGapScale?: number;
+  textScale?: number;
 }
 
 export interface MindmapLayoutWorkerRequest {
@@ -62,6 +63,7 @@ const defaultMindmapExportScaleOptions: Required<MindmapExportScaleOptions> = {
   nodePaddingScale: 1.18,
   siblingGapScale: 1.14,
   levelGapScale: 1.08,
+  textScale: 1,
 };
 
 export async function layoutMindmapWithElk(
@@ -98,6 +100,11 @@ export function createExportMindmapVariant(
     ...defaultMindmapExportScaleOptions,
     ...options,
   };
+  const textDrivenBoxScale = scaleWithTextInfluence(exportScale.textScale, 0.45);
+  const textDrivenPaddingScale = scaleWithTextInfluence(exportScale.textScale, 0.32);
+  const effectiveWidthScale = exportScale.nodeWidthScale * textDrivenBoxScale;
+  const effectiveHeightScale = exportScale.nodeHeightScale * textDrivenBoxScale;
+  const effectivePaddingScale = exportScale.nodePaddingScale * textDrivenPaddingScale;
 
   return {
     ...mindmap,
@@ -108,22 +115,22 @@ export function createExportMindmapVariant(
         levelGap: scalePositiveInt(mindmap.metadata.layout.levelGap, exportScale.levelGapScale),
         siblingGap: scalePositiveInt(mindmap.metadata.layout.siblingGap, exportScale.siblingGapScale),
         branchGap: scalePositiveInt(mindmap.metadata.layout.branchGap, exportScale.siblingGapScale),
-        branchWidthHint: scalePositiveInt(mindmap.metadata.layout.branchWidthHint, exportScale.nodeWidthScale),
-        branchHeightHint: scalePositiveInt(mindmap.metadata.layout.branchHeightHint, exportScale.nodeHeightScale),
-        leafWidthHint: scalePositiveInt(mindmap.metadata.layout.leafWidthHint, exportScale.nodeWidthScale),
-        leafHeightHint: scalePositiveInt(mindmap.metadata.layout.leafHeightHint, exportScale.nodeHeightScale),
-        nodePaddingX: scaleNonNegativeInt(mindmap.metadata.layout.nodePaddingX, exportScale.nodePaddingScale),
-        nodePaddingY: scaleNonNegativeInt(mindmap.metadata.layout.nodePaddingY, exportScale.nodePaddingScale),
+        branchWidthHint: scalePositiveInt(mindmap.metadata.layout.branchWidthHint, effectiveWidthScale),
+        branchHeightHint: scalePositiveInt(mindmap.metadata.layout.branchHeightHint, effectiveHeightScale),
+        leafWidthHint: scalePositiveInt(mindmap.metadata.layout.leafWidthHint, effectiveWidthScale),
+        leafHeightHint: scalePositiveInt(mindmap.metadata.layout.leafHeightHint, effectiveHeightScale),
+        nodePaddingX: scaleNonNegativeInt(mindmap.metadata.layout.nodePaddingX, effectivePaddingScale),
+        nodePaddingY: scaleNonNegativeInt(mindmap.metadata.layout.nodePaddingY, effectivePaddingScale),
       },
     },
     nodes: mindmap.nodes.map((node) => ({
       ...node,
       layout: {
         ...node.layout,
-        minWidth: scalePositiveInt(node.layout.minWidth, exportScale.nodeWidthScale),
-        minHeight: scalePositiveInt(node.layout.minHeight, exportScale.nodeHeightScale),
-        paddingX: scaleNonNegativeInt(node.layout.paddingX, exportScale.nodePaddingScale),
-        paddingY: scaleNonNegativeInt(node.layout.paddingY, exportScale.nodePaddingScale),
+        minWidth: scalePositiveInt(node.layout.minWidth, effectiveWidthScale),
+        minHeight: scalePositiveInt(node.layout.minHeight, effectiveHeightScale),
+        paddingX: scaleNonNegativeInt(node.layout.paddingX, effectivePaddingScale),
+        paddingY: scaleNonNegativeInt(node.layout.paddingY, effectivePaddingScale),
         siblingGap: scalePositiveInt(node.layout.siblingGap, exportScale.siblingGapScale),
       },
     })),
@@ -198,4 +205,12 @@ function scalePositiveInt(value: number, factor: number): number {
 
 function scaleNonNegativeInt(value: number, factor: number): number {
   return Math.max(0, Math.ceil(value * factor));
+}
+
+function scaleWithTextInfluence(textScale: number, influence: number): number {
+  if (textScale <= 1) {
+    return textScale;
+  }
+
+  return 1 + (textScale - 1) * influence;
 }
