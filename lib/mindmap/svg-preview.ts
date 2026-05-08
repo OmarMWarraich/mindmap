@@ -171,15 +171,19 @@ export function buildSvgPreviewModel(
   options: {
     profile?: SvgPreviewRenderProfile;
     renderScale?: number;
+    canvasPadding?: number;
   } = {},
 ): SvgPreviewModel {
   const profile = options.profile ?? 'preview';
   const metrics = getSvgPreviewRenderMetrics(profile, { scale: options.renderScale });
   const layoutNodeMap = new Map(layoutResult.nodes.map((node) => [node.id, node]));
   const mindmapNodeMap = new Map(mindmap.nodes.map((node) => [node.id, node]));
+  const canvasPadding = Math.max(0, options.canvasPadding ?? 0);
   const exportTypographyTargets = profile === 'export'
     ? createExportTypographyTargets(mindmap, layoutNodeMap, metrics)
     : null;
+
+  const bounds = resolveSvgPreviewBounds(layoutResult, canvasPadding);
 
   const nodes = mindmap.nodes.flatMap((node) => {
     const layoutNode = layoutNodeMap.get(node.id);
@@ -188,7 +192,17 @@ export function buildSvgPreviewModel(
       return [];
     }
 
-    return [createSvgPreviewNode(node, layoutNode, metrics, profile, exportTypographyTargets)];
+    return [createSvgPreviewNode(
+      node,
+      {
+        ...layoutNode,
+        x: layoutNode.x + bounds.offsetX,
+        y: layoutNode.y + bounds.offsetY,
+      },
+      metrics,
+      profile,
+      exportTypographyTargets,
+    )];
   });
 
   const edges = layoutResult.edges.flatMap((edge) => {
@@ -200,28 +214,64 @@ export function buildSvgPreviewModel(
     const color = sourceEdge
       ? getNodeVisualStyle(mindmapNodeMap.get(sourceEdge.from) ?? null).edge
       : '#a1a1aa';
+    const adjustedPoints = edge.points.map((point) => ({
+      x: point.x + bounds.offsetX,
+      y: point.y + bounds.offsetY,
+    }));
 
     return [{
       id: edge.id,
-      path: createEdgePath(edge.points),
+      path: createEdgePath(adjustedPoints),
       color,
     }];
   });
 
-  const width = Math.max(
-    layoutResult.width,
-    ...layoutResult.nodes.map((node) => node.x + node.width),
-  );
-  const height = Math.max(
-    layoutResult.height,
-    ...layoutResult.nodes.map((node) => node.y + node.height),
-  );
-
   return {
-    width,
-    height,
+    width: bounds.width,
+    height: bounds.height,
     nodes,
     edges,
+  };
+}
+
+function resolveSvgPreviewBounds(
+  layoutResult: MindmapLayoutResult,
+  canvasPadding: number,
+): {
+  width: number;
+  height: number;
+  offsetX: number;
+  offsetY: number;
+} {
+  let minX = 0;
+  let minY = 0;
+  let maxX = Math.max(0, layoutResult.width);
+  let maxY = Math.max(0, layoutResult.height);
+
+  for (const node of layoutResult.nodes) {
+    minX = Math.min(minX, node.x);
+    minY = Math.min(minY, node.y);
+    maxX = Math.max(maxX, node.x + node.width);
+    maxY = Math.max(maxY, node.y + node.height);
+  }
+
+  for (const edge of layoutResult.edges) {
+    for (const point of edge.points) {
+      minX = Math.min(minX, point.x);
+      minY = Math.min(minY, point.y);
+      maxX = Math.max(maxX, point.x);
+      maxY = Math.max(maxY, point.y);
+    }
+  }
+
+  const offsetX = canvasPadding - minX;
+  const offsetY = canvasPadding - minY;
+
+  return {
+    width: Math.max(1, Math.ceil(maxX + offsetX + canvasPadding)),
+    height: Math.max(1, Math.ceil(maxY + offsetY + canvasPadding)),
+    offsetX,
+    offsetY,
   };
 }
 
@@ -305,9 +355,13 @@ export function createSvgPreviewSnapshot(
 
   const profile = options.profile ?? 'preview';
   const metrics = getSvgPreviewRenderMetrics(profile, { scale: options.renderScale });
+  const exportPadding = Math.ceil(
+    Math.max(metrics.edgeStrokeWidth, metrics.rootStrokeWidth, metrics.nodeStrokeWidth) + 4,
+  );
   const model = buildSvgPreviewModel(mindmap, layoutResult, {
     profile,
     renderScale: options.renderScale,
+    canvasPadding: exportPadding,
   });
   const svgNs = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(svgNs, 'svg');

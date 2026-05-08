@@ -89,6 +89,60 @@ test('buildSvgPreviewModel combines layout coordinates with node styling', () =>
   assert.ok(model.nodes[0]?.lines.length >= 1);
 });
 
+test('buildSvgPreviewModel shifts negative layout coordinates into the export canvas', () => {
+  const rootNode = validGeneratedMindmapFixture.nodes[0]!;
+  const branchNode = validGeneratedMindmapFixture.nodes[1]!;
+  const model = buildSvgPreviewModel(
+    {
+      ...validGeneratedMindmapFixture,
+      nodes: [rootNode, branchNode],
+      edges: [validGeneratedMindmapFixture.edges[0]!],
+    },
+    {
+      width: 300,
+      height: 220,
+      nodes: [
+        {
+          id: rootNode.id,
+          x: -42,
+          y: -18,
+          width: 248,
+          height: 96,
+        },
+        {
+          id: branchNode.id,
+          x: 190,
+          y: 70,
+          width: 220,
+          height: 104,
+        },
+      ],
+      edges: [
+        {
+          id: validGeneratedMindmapFixture.edges[0]!.id,
+          points: [
+            { x: -30, y: 20 },
+            { x: 90, y: -12 },
+            { x: 210, y: 110 },
+          ],
+        },
+      ],
+    },
+    {
+      profile: 'export',
+      canvasPadding: 12,
+    },
+  );
+
+  assert.equal(model.width, 476);
+  assert.equal(model.height, 262);
+  assert.equal(model.nodes[0]!.x, 12);
+  assert.equal(model.nodes[0]!.y, 12);
+  assert.equal(model.nodes[1]!.x, 244);
+  assert.equal(model.nodes[1]!.y, 100);
+  assert.equal(model.edges[0]!.path.startsWith('M 24 50'), true);
+});
+
 test('buildSvgPreviewModel wraps export text more aggressively when render scale increases', () => {
   const node = validGeneratedMindmapFixture.nodes[1]!;
   const model = buildSvgPreviewModel(
