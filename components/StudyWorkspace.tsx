@@ -19,10 +19,13 @@ import {
 } from '../lib/dsl/inline-completion';
 import { generateMindmapFromAst } from '../lib/mindmap/from-ast';
 import {
+  createExportMindmapVariant,
   layoutMindmapWithElk,
+  type MindmapExportScaleOptions,
   type MindmapLayoutResult,
 } from '../lib/mindmap/layout';
 import {
+  createSvgPreviewSnapshot,
   createDefaultSvgPreviewTransform,
   type SvgPreviewTransform,
 } from '../lib/mindmap/svg-preview';
@@ -44,11 +47,37 @@ let mindmapDslInlineSuggestionPreference: InlineSuggestionPreference = 'auto';
 
 type InlineSuggestionPreference = 'auto' | 'continuation' | 'enrichment';
 
+interface ExportControlState {
+  nodeWidthScale: number;
+  nodeHeightScale: number;
+  nodePaddingScale: number;
+  siblingGapScale: number;
+  levelGapScale: number;
+  fontScale: number;
+}
+
+const defaultExportControlState: ExportControlState = {
+  nodeWidthScale: 1.28,
+  nodeHeightScale: 1.36,
+  nodePaddingScale: 1.18,
+  siblingGapScale: 1.14,
+  levelGapScale: 1.08,
+  fontScale: 1,
+};
+
 const editorLoadingFallback = (
   <div className="flex h-[460px] items-center justify-center rounded-2xl border border-zinc-200 bg-zinc-100 text-sm text-zinc-500">
     Loading Monaco editor...
   </div>
 );
+
+function isIgnorableMonacoCancellation(reason: unknown): boolean {
+  if (!(reason instanceof Error) || reason.message !== 'Canceled') {
+    return false;
+  }
+
+  return typeof reason.stack === 'string' && reason.stack.includes('monaco-editor');
+}
 
 export default function StudyWorkspace() {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
@@ -65,6 +94,7 @@ export default function StudyWorkspace() {
   const [debouncedOutline, setDebouncedOutline] = useState(mindmapDslStarterOutline);
   const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
   const [latestMindmapSnapshot, setLatestMindmapSnapshot] = useState<GeneratedMindmap | null>(null);
+  const [latestMindmapSnapshotOutline, setLatestMindmapSnapshotOutline] = useState<string | null>(null);
   const [layoutResult, setLayoutResult] = useState<MindmapLayoutResult | null>(null);
   const [layoutStatus, setLayoutStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [layoutError, setLayoutError] = useState<string | null>(null);
@@ -91,6 +121,7 @@ export default function StudyWorkspace() {
   });
   const [inlineSuggestionPreference, setInlineSuggestionPreference] =
     useState<InlineSuggestionPreference>('auto');
+  const [exportControls, setExportControls] = useState<ExportControlState>(defaultExportControlState);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -128,7 +159,8 @@ export default function StudyWorkspace() {
       errors: parseResult.errors,
     });
   }, [parseResult.ast, parseResult.errors, parseResult.warnings]);
-  const effectiveMindmap = generatedMindmap ?? latestMindmapSnapshot;
+  const effectiveMindmap = generatedMindmap
+    ?? (latestMindmapSnapshotOutline === outline ? latestMindmapSnapshot : null);
 
   const effectiveLayoutStatus = layoutStatus;
   const effectiveLayoutError = layoutError;
@@ -145,6 +177,26 @@ export default function StudyWorkspace() {
   useEffect(() => {
     mindmapDslInlineSuggestionPreference = inlineSuggestionPreference;
   }, [inlineSuggestionPreference]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development') {
+      return;
+    }
+
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      if (!isIgnorableMonacoCancellation(event.reason)) {
+        return;
+      }
+
+      event.preventDefault();
+    };
+
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+    return () => {
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -166,6 +218,7 @@ export default function StudyWorkspace() {
         setOutline(draft.outline);
         setDebouncedOutline(draft.outline);
         setLatestMindmapSnapshot(draft.mindmap);
+        setLatestMindmapSnapshotOutline(draft.outline);
         setPreviewTransform(draft.previewTransform);
         setDraftStatus({
           tone: 'success',
@@ -199,7 +252,8 @@ export default function StudyWorkspace() {
     }
 
     setLatestMindmapSnapshot(generatedMindmap);
-  }, [generatedMindmap]);
+    setLatestMindmapSnapshotOutline(outline);
+  }, [generatedMindmap, outline]);
 
   useEffect(() => {
     if (enableMonacoInlineCompletions) {
@@ -378,9 +432,7 @@ export default function StudyWorkspace() {
   }, []);
 
   async function handleDownloadPng(): Promise<void> {
-    const snapshot = previewRef.current?.getExportSnapshot();
-
-    if (!snapshot) {
+    if (!effectiveMindmap) {
       setExportStatus({
         tone: 'error',
         message: 'PNG export is unavailable until the preview finishes rendering.',
@@ -390,10 +442,25 @@ export default function StudyWorkspace() {
 
     setExportStatus({
       tone: 'progress',
-      message: 'Rendering PNG export…',
+      message: 'Computing export layout…',
     });
 
     try {
+      const exportMindmap = createExportMindmapVariant(
+        effectiveMindmap,
+        getExportScaleOptions(exportControls),
+      );
+      const exportLayout = await layoutMindmapWithElk(exportMindmap);
+      const snapshot = createSvgPreviewSnapshot(exportMindmap, exportLayout, {
+        profile: 'export',
+        renderScale: exportControls.fontScale,
+      });
+
+      setExportStatus({
+        tone: 'progress',
+        message: 'Rendering PNG export…',
+      });
+
       const dimensions = await downloadNodeAsPng(snapshot.node, {
         backgroundColor: '#fffef8',
         fileNameBase: effectiveMindmap?.metadata.title ?? parseResult.ast?.root.label ?? 'mindmap',
@@ -627,125 +694,127 @@ export default function StudyWorkspace() {
             </p>
           </div>
 
-          <div className="grid gap-3 rounded-2xl border border-zinc-200 bg-white p-4 text-sm text-zinc-700">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-zinc-100 px-3 py-1 font-medium text-zinc-700">
-                {parseResult.ast ? 'AST ready' : 'Awaiting valid root'}
-              </span>
-              <span className="rounded-full bg-zinc-100 px-3 py-1 font-medium text-zinc-700">
-                {branchCount} branches
-              </span>
-              <span className="rounded-full bg-zinc-100 px-3 py-1 font-medium text-zinc-700">
-                {effectiveLayoutStatus === 'ready'
-                  ? 'Layout ready'
-                  : effectiveLayoutStatus === 'loading'
-                    ? 'Layout computing'
-                    : effectiveLayoutStatus === 'error'
-                      ? 'Layout failed'
-                      : 'Layout idle'}
-              </span>
-            </div>
-            <p className="leading-6 text-zinc-600">
-              {parseResult.ast
-                ? `Current topic: ${parseResult.ast.root.label}`
-                : 'The parser will resume once the outline contains a valid root declaration.'}
-            </p>
-            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs leading-5 text-zinc-700">
-              <p className="font-medium text-zinc-900">Layout diagnostics</p>
-              <p>{effectiveLayoutDiagnostics.summary}</p>
-              {effectiveLayoutDiagnostics.detail ? (
-                <p className="text-zinc-600">{effectiveLayoutDiagnostics.detail}</p>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="grid gap-3 rounded-2xl border border-sky-200 bg-sky-50/70 p-4 text-sm text-sky-950">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-white px-3 py-1 font-medium text-sky-900">
-                Cursor line {sectionContext.cursor.lineNumber}
-              </span>
-              <span className="rounded-full bg-white px-3 py-1 font-medium text-sky-900">
-                {sectionContext.currentLineKind}
-              </span>
-            </div>
-            <p className="leading-6 text-sky-900/80">
-              {sectionContext.branchLabel
-                ? `Active branch: ${sectionContext.branchLabel}`
-                : 'Move into a branch to get section-aware study help.'}
-            </p>
-            <p className="leading-6 text-sky-900/80">
-              {sectionContext.subBranchTrail.length > 0
-                ? `Sub-branch trail: ${sectionContext.subBranchTrail.join(' / ')}`
-                : 'No nested sub-branch is active at the current cursor position.'}
-            </p>
-          </div>
-
-          <div className="grid gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 text-sm text-emerald-950">
-            <div className="grid gap-1">
-              <h3 className="text-base font-semibold text-emerald-950">Study guidance</h3>
-              <p className="leading-6 text-emerald-900/80">
-                This hint surface still shows the local study heuristics, while Monaco now
-                requests inline completions from the completion endpoint for live ghost text.
-              </p>
+          <div className="grid gap-3 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+              <div className="grid gap-1">
+                <h3 className="text-sm font-semibold text-amber-950">Export scaling</h3>
+                <p className="text-sm leading-6 text-amber-900/80">
+                  These controls affect PNG export only. Increase box size, spacing, and text without changing the on-screen preview.
+                </p>
+              </div>
+              <button
+                className="rounded-full border border-amber-200 bg-white px-4 py-2 text-sm font-medium text-amber-900 transition hover:bg-amber-100"
+                onClick={() => {
+                  setExportControls(defaultExportControlState);
+                }}
+                type="button"
+              >
+                Reset export scaling
+              </button>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              {(['auto', 'continuation', 'enrichment'] as InlineSuggestionPreference[]).map((mode) => (
-                <button
-                  className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                    inlineSuggestionPreference === mode
-                      ? 'bg-emerald-950 text-emerald-50'
-                      : 'border border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-100'
-                  }`}
-                  key={mode}
-                  onClick={() => {
-                    setInlineSuggestionPreference(mode);
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
+              <label className="grid gap-2 rounded-2xl border border-amber-200 bg-white/80 p-3 text-sm text-zinc-700">
+                <span className="flex items-center justify-between font-medium text-zinc-900">
+                  <span>Box width</span>
+                  <span>{formatScaleLabel(exportControls.nodeWidthScale)}</span>
+                </span>
+                <input
+                  max="2.2"
+                  min="1"
+                  onChange={(event) => {
+                    updateExportControl('nodeWidthScale', Number(event.target.value));
                   }}
-                  type="button"
-                >
-                  {mode === 'auto' ? 'Auto' : mode}
-                </button>
-              ))}
-            </div>
+                  step="0.02"
+                  type="range"
+                  value={exportControls.nodeWidthScale}
+                />
+              </label>
 
-            <div className="rounded-2xl border border-emerald-200 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
-                Current focus
-              </p>
-              <p className="mt-2 leading-6 text-emerald-950">
-                {sectionContext.branchLabel
-                  ? `${sectionContext.branchLabel}${
-                      sectionContext.subBranchTrail.length > 0
-                        ? ` -> ${sectionContext.subBranchTrail.join(' -> ')}`
-                        : ''
-                    }`
-                  : sectionContext.rootLabel ?? 'Start with a root topic'}
-              </p>
-            </div>
+              <label className="grid gap-2 rounded-2xl border border-amber-200 bg-white/80 p-3 text-sm text-zinc-700">
+                <span className="flex items-center justify-between font-medium text-zinc-900">
+                  <span>Box height</span>
+                  <span>{formatScaleLabel(exportControls.nodeHeightScale)}</span>
+                </span>
+                <input
+                  max="2.2"
+                  min="1"
+                  onChange={(event) => {
+                    updateExportControl('nodeHeightScale', Number(event.target.value));
+                  }}
+                  step="0.02"
+                  type="range"
+                  value={exportControls.nodeHeightScale}
+                />
+              </label>
 
-            <div className="grid gap-3 lg:grid-cols-2">
-              <SuggestionCard
-                active={inlineSuggestionPreference === 'continuation'}
-                label="Continuation"
-                suggestion={stubSuggestionSet.continuation}
-              />
-              <SuggestionCard
-                active={inlineSuggestionPreference === 'enrichment'}
-                label="Enrichment"
-                suggestion={stubSuggestionSet.enrichment}
-              />
-            </div>
+              <label className="grid gap-2 rounded-2xl border border-amber-200 bg-white/80 p-3 text-sm text-zinc-700">
+                <span className="flex items-center justify-between font-medium text-zinc-900">
+                  <span>Box padding</span>
+                  <span>{formatScaleLabel(exportControls.nodePaddingScale)}</span>
+                </span>
+                <input
+                  max="2"
+                  min="1"
+                  onChange={(event) => {
+                    updateExportControl('nodePaddingScale', Number(event.target.value));
+                  }}
+                  step="0.02"
+                  type="range"
+                  value={exportControls.nodePaddingScale}
+                />
+              </label>
 
-            <div className="rounded-2xl border border-emerald-200 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
-                Active ghost text
-              </p>
-              <p className="mt-2 rounded-xl bg-emerald-950 px-3 py-2 font-mono text-sm text-emerald-50">
-                {preferredStubSuggestion?.insertText || 'No inline hint for this cursor position.'}
-              </p>
-              <p className="mt-3 leading-6 text-emerald-900/80">
-                {preferredStubSuggestion?.explanation || 'Move the cursor into a partial label or a blank study slot to preview the local fallback hint.'}
-              </p>
+              <label className="grid gap-2 rounded-2xl border border-amber-200 bg-white/80 p-3 text-sm text-zinc-700">
+                <span className="flex items-center justify-between font-medium text-zinc-900">
+                  <span>Sibling spacing</span>
+                  <span>{formatScaleLabel(exportControls.siblingGapScale)}</span>
+                </span>
+                <input
+                  max="1.8"
+                  min="0.85"
+                  onChange={(event) => {
+                    updateExportControl('siblingGapScale', Number(event.target.value));
+                  }}
+                  step="0.01"
+                  type="range"
+                  value={exportControls.siblingGapScale}
+                />
+              </label>
+
+              <label className="grid gap-2 rounded-2xl border border-amber-200 bg-white/80 p-3 text-sm text-zinc-700">
+                <span className="flex items-center justify-between font-medium text-zinc-900">
+                  <span>Root distance</span>
+                  <span>{formatScaleLabel(exportControls.levelGapScale)}</span>
+                </span>
+                <input
+                  max="1.8"
+                  min="0.9"
+                  onChange={(event) => {
+                    updateExportControl('levelGapScale', Number(event.target.value));
+                  }}
+                  step="0.01"
+                  type="range"
+                  value={exportControls.levelGapScale}
+                />
+              </label>
+
+              <label className="grid gap-2 rounded-2xl border border-amber-200 bg-white/80 p-3 text-sm text-zinc-700">
+                <span className="flex items-center justify-between font-medium text-zinc-900">
+                  <span>Text size</span>
+                  <span>{formatScaleLabel(exportControls.fontScale)}</span>
+                </span>
+                <input
+                  max="2.5"
+                  min="0.9"
+                  onChange={(event) => {
+                    updateExportControl('fontScale', Number(event.target.value));
+                  }}
+                  step="0.01"
+                  type="range"
+                  value={exportControls.fontScale}
+                />
+              </label>
             </div>
           </div>
 
@@ -762,6 +831,31 @@ export default function StudyWorkspace() {
       </div>
     </section>
   );
+
+  function updateExportControl<Key extends keyof ExportControlState>(
+    key: Key,
+    value: ExportControlState[Key],
+  ): void {
+    setExportControls((current) => ({
+      ...current,
+      [key]: value,
+    }));
+  }
+}
+
+function getExportScaleOptions(controls: ExportControlState): MindmapExportScaleOptions {
+  return {
+    nodeWidthScale: controls.nodeWidthScale,
+    nodeHeightScale: controls.nodeHeightScale,
+    nodePaddingScale: controls.nodePaddingScale,
+    siblingGapScale: controls.siblingGapScale,
+    levelGapScale: controls.levelGapScale,
+    textScale: controls.fontScale,
+  };
+}
+
+function formatScaleLabel(value: number): string {
+  return `${Math.round(value * 100)}%`;
 }
 
 function ValidationPanel({
@@ -992,37 +1086,4 @@ function configureMindmapDslMonaco(monaco: Monaco): void {
   });
 
   mindmapDslInlineCompletionRegistered = true;
-}
-
-function SuggestionCard({
-  active,
-  label,
-  suggestion,
-}: {
-  active: boolean;
-  label: string;
-  suggestion: ReturnType<typeof getStubInlineSuggestionSet>['continuation'];
-}) {
-  return (
-    <div
-      className={`rounded-2xl border bg-white p-4 ${
-        active ? 'border-emerald-500 shadow-[0_0_0_1px_rgba(16,185,129,0.2)]' : 'border-emerald-200'
-      }`}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
-          {label}
-        </p>
-        <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800">
-          {active ? 'active' : 'available'}
-        </span>
-      </div>
-      <p className="mt-2 rounded-xl bg-emerald-950 px-3 py-2 font-mono text-sm text-emerald-50">
-        {suggestion?.insertText || 'No suggestion'}
-      </p>
-      <p className="mt-3 leading-6 text-emerald-900/80">
-        {suggestion?.explanation || 'This mode has nothing useful to add at the current cursor position.'}
-      </p>
-    </div>
-  );
 }

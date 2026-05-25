@@ -24,6 +24,15 @@ export interface MindmapLayoutResult {
   edges: MindmapLayoutEdge[];
 }
 
+export interface MindmapExportScaleOptions {
+  nodeWidthScale?: number;
+  nodeHeightScale?: number;
+  nodePaddingScale?: number;
+  siblingGapScale?: number;
+  levelGapScale?: number;
+  textScale?: number;
+}
+
 export interface MindmapLayoutWorkerRequest {
   type: 'layout';
   requestId: number;
@@ -47,6 +56,15 @@ export type MindmapLayoutWorkerResponse =
   | MindmapLayoutWorkerFailure;
 
 const elk = new ELK();
+
+const defaultMindmapExportScaleOptions: Required<MindmapExportScaleOptions> = {
+  nodeWidthScale: 1.28,
+  nodeHeightScale: 1.36,
+  nodePaddingScale: 1.18,
+  siblingGapScale: 1.14,
+  levelGapScale: 1.08,
+  textScale: 1,
+};
 
 export async function layoutMindmapWithElk(
   mindmap: GeneratedMindmap,
@@ -74,6 +92,54 @@ export async function layoutMindmapWithElk(
   };
 }
 
+export function createExportMindmapVariant(
+  mindmap: GeneratedMindmap,
+  options: MindmapExportScaleOptions = {},
+): GeneratedMindmap {
+  const exportScale = {
+    ...defaultMindmapExportScaleOptions,
+    ...options,
+  };
+  const textDrivenBoxScale = scaleWithTextInfluence(exportScale.textScale, 0.45);
+  const textDrivenPaddingScale = scaleWithTextInfluence(exportScale.textScale, 0.32);
+  const effectiveWidthScale = exportScale.nodeWidthScale * textDrivenBoxScale;
+  const effectiveHeightScale = exportScale.nodeHeightScale * textDrivenBoxScale;
+  const effectivePaddingScale = exportScale.nodePaddingScale * textDrivenPaddingScale;
+
+  return {
+    ...mindmap,
+    metadata: {
+      ...mindmap.metadata,
+      layout: {
+        ...mindmap.metadata.layout,
+        levelGap: scalePositiveInt(mindmap.metadata.layout.levelGap, exportScale.levelGapScale),
+        siblingGap: scalePositiveInt(mindmap.metadata.layout.siblingGap, exportScale.siblingGapScale),
+        branchGap: scalePositiveInt(mindmap.metadata.layout.branchGap, exportScale.siblingGapScale),
+        branchWidthHint: scalePositiveInt(mindmap.metadata.layout.branchWidthHint, effectiveWidthScale),
+        branchHeightHint: scalePositiveInt(mindmap.metadata.layout.branchHeightHint, effectiveHeightScale),
+        leafWidthHint: scalePositiveInt(mindmap.metadata.layout.leafWidthHint, effectiveWidthScale),
+        leafHeightHint: scalePositiveInt(mindmap.metadata.layout.leafHeightHint, effectiveHeightScale),
+        nodePaddingX: scaleNonNegativeInt(mindmap.metadata.layout.nodePaddingX, effectivePaddingScale),
+        nodePaddingY: scaleNonNegativeInt(mindmap.metadata.layout.nodePaddingY, effectivePaddingScale),
+      },
+    },
+    nodes: mindmap.nodes.map((node) => ({
+      ...node,
+      layout: {
+        ...node.layout,
+        minWidth: scalePositiveInt(node.layout.minWidth, effectiveWidthScale),
+        minHeight: scalePositiveInt(node.layout.minHeight, effectiveHeightScale),
+        paddingX: scaleNonNegativeInt(node.layout.paddingX, effectivePaddingScale),
+        paddingY: scaleNonNegativeInt(node.layout.paddingY, effectivePaddingScale),
+        siblingGap: scalePositiveInt(node.layout.siblingGap, exportScale.siblingGapScale),
+      },
+    })),
+    edges: mindmap.edges.map((edge) => ({ ...edge })),
+    warnings: [...mindmap.warnings],
+    errors: [...mindmap.errors],
+  };
+}
+
 function collectEdgePoints(edge: NonNullable<ElkNode['edges']>[number]): ElkPoint[] {
   const section = edge.sections?.[0];
 
@@ -92,14 +158,59 @@ export function createMindmapRadialLayoutOptions(
   return {
     'elk.algorithm': 'radial',
     'org.eclipse.elk.radial.centerOnRoot': 'true',
-    'org.eclipse.elk.radial.compactor': 'NONE',
+    'org.eclipse.elk.radial.compactor': 'WEDGE_COMPACTION',
+    'org.eclipse.elk.radial.compactionStepSize': '2',
     'org.eclipse.elk.radial.wedgeCriteria': 'NODE_SIZE',
-    'org.eclipse.elk.radial.radius': String(layout.levelGap),
-    'org.eclipse.elk.spacing.nodeNode': String(layout.siblingGap),
-    'org.eclipse.elk.padding': formatElkPadding(layout.canvasPadding),
+    'org.eclipse.elk.radial.radius': String(getMindmapRadialRadius(mindmap)),
+    'org.eclipse.elk.radial.rotation.computeAdditionalWedgeSpace': 'true',
+    'org.eclipse.elk.spacing.nodeNode': String(getMindmapRadialNodeSpacing(mindmap)),
+    'org.eclipse.elk.padding': formatElkPadding(getMindmapCanvasPadding(mindmap)),
   };
+}
+
+function getMindmapCanvasPadding(mindmap: GeneratedMindmap): number {
+  return Math.max(32, Math.min(mindmap.metadata.layout.canvasPadding, 48));
+}
+
+function getMindmapRadialRadius(mindmap: GeneratedMindmap): number {
+  const largestNodeDiagonal = mindmap.nodes.reduce((maxDiagonal, node) => {
+    const nodeWidth = node.layout.minWidth + node.layout.paddingX * 2;
+    const nodeHeight = node.layout.minHeight + node.layout.paddingY * 2;
+
+    return Math.max(maxDiagonal, Math.hypot(nodeWidth, nodeHeight));
+  }, 0);
+
+  return Math.ceil(
+    Math.max(
+      mindmap.metadata.layout.levelGap,
+      largestNodeDiagonal + getMindmapRadialNodeSpacing(mindmap),
+    ),
+  );
+}
+
+function getMindmapRadialNodeSpacing(mindmap: GeneratedMindmap): number {
+  return mindmap.nodes.reduce(
+    (maxSpacing, node) => Math.max(maxSpacing, node.layout.siblingGap),
+    mindmap.metadata.layout.siblingGap,
+  );
 }
 
 function formatElkPadding(padding: number): string {
   return `[top=${padding},left=${padding},bottom=${padding},right=${padding}]`;
+}
+
+function scalePositiveInt(value: number, factor: number): number {
+  return Math.max(1, Math.ceil(value * factor));
+}
+
+function scaleNonNegativeInt(value: number, factor: number): number {
+  return Math.max(0, Math.ceil(value * factor));
+}
+
+function scaleWithTextInfluence(textScale: number, influence: number): number {
+  if (textScale <= 1) {
+    return textScale;
+  }
+
+  return 1 + (textScale - 1) * influence;
 }

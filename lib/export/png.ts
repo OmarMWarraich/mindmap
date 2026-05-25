@@ -1,7 +1,7 @@
 import { toBlob } from 'html-to-image';
 
-const defaultMaxExportEdge = 4096;
-const defaultMaxExportPixels = 16_777_216;
+const defaultMaxExportEdge = 8192;
+const defaultMaxExportPixels = 67_108_864;
 
 export interface PngExportDimensions {
   sourceWidth: number;
@@ -66,15 +66,18 @@ export async function downloadNodeAsPng(
     maxEdge: options.maxEdge,
     maxPixels: options.maxPixels,
   });
-  const blob = await toBlob(node as unknown as HTMLElement, {
-    backgroundColor: options.backgroundColor ?? '#ffffff',
-    cacheBust: true,
-    canvasWidth: dimensions.outputWidth,
-    canvasHeight: dimensions.outputHeight,
-    height: dimensions.sourceHeight,
-    pixelRatio: 1,
-    width: dimensions.sourceWidth,
-  });
+  const blob = node instanceof SVGSVGElement
+    ? await renderSvgNodeToBlob(node, dimensions, options.backgroundColor)
+    : await toBlob(node as unknown as HTMLElement, {
+      backgroundColor: options.backgroundColor ?? '#ffffff',
+      cacheBust: true,
+      canvasWidth: dimensions.outputWidth,
+      canvasHeight: dimensions.outputHeight,
+      height: dimensions.sourceHeight,
+      pixelRatio: 1,
+      skipFonts: true,
+      width: dimensions.sourceWidth,
+    });
 
   if (!blob) {
     throw new Error('PNG export returned an empty image blob.');
@@ -92,4 +95,69 @@ export async function downloadNodeAsPng(
   }
 
   return dimensions;
+}
+
+async function renderSvgNodeToBlob(
+  node: SVGSVGElement,
+  dimensions: PngExportDimensions,
+  backgroundColor = '#ffffff',
+): Promise<Blob | null> {
+  const serializedSvg = serializeSvgForExport(node, dimensions.sourceWidth, dimensions.sourceHeight);
+  const svgBlob = new Blob([serializedSvg], { type: 'image/svg+xml;charset=utf-8' });
+  const svgUrl = URL.createObjectURL(svgBlob);
+
+  try {
+    const image = await loadImage(svgUrl);
+    const canvas = document.createElement('canvas');
+    canvas.width = dimensions.outputWidth;
+    canvas.height = dimensions.outputHeight;
+
+    const context = canvas.getContext('2d');
+
+    if (!context) {
+      throw new Error('PNG export could not acquire a 2D canvas context.');
+    }
+
+    context.fillStyle = backgroundColor;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+    return await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((blob) => {
+        resolve(blob);
+      }, 'image/png');
+    });
+  } finally {
+    URL.revokeObjectURL(svgUrl);
+  }
+}
+
+function serializeSvgForExport(
+  node: SVGSVGElement,
+  width: number,
+  height: number,
+): string {
+  const clone = node.cloneNode(true) as SVGSVGElement;
+  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  clone.setAttribute('width', String(width));
+  clone.setAttribute('height', String(height));
+
+  if (!clone.hasAttribute('viewBox')) {
+    clone.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  }
+
+  return new XMLSerializer().serializeToString(clone);
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      resolve(image);
+    };
+    image.onerror = () => {
+      reject(new Error('PNG export could not decode the SVG preview.'));
+    };
+    image.src = src;
+  });
 }
