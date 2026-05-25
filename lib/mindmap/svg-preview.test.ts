@@ -210,6 +210,40 @@ test('buildSvgPreviewModel keeps export text close to the shared target size for
   assert.equal(model.nodes[0]!.lineHeight >= metrics.lineHeight * 0.85, true);
 });
 
+test('buildSvgPreviewModel keeps a single export branch line at the base size when vertical space fits', () => {
+  const node = validGeneratedMindmapFixture.nodes[1]!;
+  const metrics = getSvgPreviewRenderMetrics('export', { scale: 1.4 });
+  const model = buildSvgPreviewModel(
+    {
+      ...validGeneratedMindmapFixture,
+      nodes: [{
+        ...node,
+        label: 'Overview',
+      }],
+      edges: [],
+    },
+    {
+      width: 420,
+      height: 240,
+      nodes: [{
+        id: node.id,
+        x: 40,
+        y: 50,
+        width: 260,
+        height: 120,
+      }],
+      edges: [],
+    },
+    {
+      profile: 'export',
+      renderScale: 1.4,
+    },
+  );
+
+  assert.deepEqual(model.nodes[0]!.lines, ['Overview']);
+  assert.equal(model.nodes[0]!.fontSize, metrics.nodeFontSize);
+});
+
 test('buildSvgPreviewModel keeps export text size consistent across equally fitting branch nodes', () => {
   const [firstNode, secondNode] = validGeneratedMindmapFixture.nodes.filter((node) => node.kind === 'branch');
   const metrics = getSvgPreviewRenderMetrics('export', { scale: 1.3 });

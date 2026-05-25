@@ -529,10 +529,7 @@ function createNodeTypography(
     };
   }
 
-  const availableHeight = Math.max(
-    metrics.lineHeight,
-    layoutNode.height - metrics.accentInsetY - metrics.accentHeight - sourceNode.layout.paddingY * 2,
-  );
+  const availableBottomY = Math.max(metrics.lineHeight, layoutNode.height - sourceNode.layout.paddingY);
   const minimumFontSize = Math.max(12, baseFontSize * 0.68);
   const initialFontSize = Math.min(baseFontSize, targetFontSize ?? baseFontSize);
   let bestTypography = measureNodeTypography(
@@ -554,7 +551,7 @@ function createNodeTypography(
       baseLineStartY,
     );
 
-    if (doesNodeTypographyFit(candidate, availableWidth, availableHeight, metrics, baseFontSize)) {
+    if (doesNodeTypographyFit(candidate, availableWidth, availableBottomY, metrics, baseFontSize)) {
       bestTypography = candidate;
       break;
     }
@@ -609,10 +606,7 @@ function findFittingExportFontSize(
   const baseFontSize = sourceNode.kind === 'root' ? metrics.rootFontSize : metrics.nodeFontSize;
   const baseLineStartY = sourceNode.kind === 'root' ? metrics.rootLineStartY : metrics.nodeLineStartY;
   const availableWidth = Math.max(64, layoutNode.width - sourceNode.layout.paddingX * 2);
-  const availableHeight = Math.max(
-    metrics.lineHeight,
-    layoutNode.height - metrics.accentInsetY - metrics.accentHeight - sourceNode.layout.paddingY * 2,
-  );
+  const availableBottomY = Math.max(metrics.lineHeight, layoutNode.height - sourceNode.layout.paddingY);
   const minimumFontSize = Math.max(12, baseFontSize * 0.68);
 
   for (let fontSize = baseFontSize; fontSize >= minimumFontSize; fontSize -= 0.5) {
@@ -625,7 +619,7 @@ function findFittingExportFontSize(
       baseLineStartY,
     );
 
-    if (doesNodeTypographyFit(candidate, availableWidth, availableHeight, metrics, baseFontSize)) {
+    if (doesNodeTypographyFit(candidate, availableWidth, availableBottomY, metrics, baseFontSize)) {
       return fontSize;
     }
   }
@@ -660,7 +654,7 @@ function measureNodeTypography(
 function doesNodeTypographyFit(
   typography: Pick<SvgPreviewNode, 'lines' | 'fontSize' | 'lineHeight' | 'lineStartY'>,
   availableWidth: number,
-  availableHeight: number,
+  availableBottomY: number,
   metrics: SvgPreviewRenderMetrics,
   baseFontSize: number,
 ): boolean {
@@ -668,7 +662,7 @@ function doesNodeTypographyFit(
   const approxCharacterWidth = Math.max(1, metrics.approxCharacterWidth * scale * 1.08);
   const widestLine = typography.lines.reduce((max, line) => Math.max(max, line.length), 0);
   const fitsWidth = widestLine * approxCharacterWidth <= availableWidth;
-  const fitsHeight = typography.lineStartY + typography.lines.length * typography.lineHeight <= availableHeight;
+  const fitsHeight = typography.lineStartY + typography.lines.length * typography.lineHeight <= availableBottomY;
 
   return fitsWidth && fitsHeight;
 }
