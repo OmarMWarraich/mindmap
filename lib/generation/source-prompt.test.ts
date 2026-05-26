@@ -26,6 +26,7 @@ test('createSourceMindmapGenerationPrompt injects source density targets', () =>
   assert.match(prompt.user, /Target generated meaningful line count range: 7 to 8/);
   assert.match(prompt.user, /Every branch should normally contain at least 2 child lines/i);
   assert.match(prompt.user, /Detail preference: standard/i);
+  assert.match(prompt.user, /instead of mirroring the notes verbatim/i);
   assert.match(prompt.user, /SOURCE NOTES:/);
   assert.match(prompt.user, /Photosynthesis/);
   assert.match(
@@ -48,5 +49,6 @@ test('createSourceMindmapGenerationPrompt includes retry guidance when revising 
   assert.match(prompt.user, /REVISION REQUIRED:/);
   assert.match(prompt.user, /Previous DSL attempt was too weak/i);
   assert.match(prompt.user, /Detail preference: detailed/i);
+  assert.match(prompt.user, /Replace mirrored note labels with short explanatory rewrites/i);
   assert.match(prompt.user, /@root: Aspects/);
 });

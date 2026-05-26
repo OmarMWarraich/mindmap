@@ -45,12 +45,17 @@ export async function generateMindmapDslFromSource(
     sourceMeaningfulLineCount,
     targetMinLineCount,
     targetMaxLineCount,
+    detailLevel,
     prompt,
     env,
     options.fetchImpl,
   );
 
-  if (!attempt.validation.expansionTargetSatisfied || attempt.validation.underdevelopedBranches.length > 0) {
+  if (
+    !attempt.validation.expansionTargetSatisfied
+    || attempt.validation.underdevelopedBranches.length > 0
+    || attempt.validation.overlyExtractive
+  ) {
     const retryPrompt = createSourceMindmapGenerationPrompt({
       sourceText: validatedRequest.sourceText,
       sourceMeaningfulLineCount,
@@ -67,6 +72,7 @@ export async function generateMindmapDslFromSource(
       sourceMeaningfulLineCount,
       targetMinLineCount,
       targetMaxLineCount,
+      detailLevel,
       retryPrompt,
       env,
       options.fetchImpl,
@@ -105,6 +111,10 @@ export async function generateMindmapDslFromSource(
 }
 
 function summarizeRetryReason(validation: DslAttemptResult['validation']): string {
+  if (validation.overlyExtractive) {
+    return 'The outline copies source labels too literally instead of rewriting them into explanatory child lines.';
+  }
+
   if (!validation.expansionTargetSatisfied && validation.underdevelopedBranches.length > 0) {
     return `The outline is too sparse and these branches need child lines: ${validation.underdevelopedBranches.join(', ')}.`;
   }
@@ -127,6 +137,7 @@ interface DslAttemptResult {
     lineWordLimitSatisfied: boolean;
     expansionTargetSatisfied: boolean;
     underdevelopedBranches: string[];
+    overlyExtractive: boolean;
   };
 }
 
@@ -135,6 +146,7 @@ async function generateDslAttempt(
   sourceMeaningfulLineCount: number,
   targetMinLineCount: number,
   targetMaxLineCount: number,
+  detailLevel: SourceMindmapGenerationRequest['detailLevel'],
   prompt: ReturnType<typeof createSourceMindmapGenerationPrompt>,
   env: ModelProviderEnv,
   fetchImpl?: typeof fetch,
@@ -166,6 +178,9 @@ async function generateDslAttempt(
     ? generatedMeaningfulLineCount
     : generatedMeaningfulLineCount / sourceMeaningfulLineCount;
   const lineWordLimitSatisfied = getMaxWordCountPerLine(resolvedDsl.dsl) <= maxWordsPerLine;
+  const overlyExtractive = detailLevel === 'detailed'
+    ? isOverlyExtractiveDetailedDsl(resolvedDsl.dsl, sourceText)
+    : false;
 
   if (!lineWordLimitSatisfied) {
     throw new Error('Generated DSL exceeded the 15-word per-line limit.');
@@ -182,6 +197,7 @@ async function generateDslAttempt(
       lineWordLimitSatisfied,
       expansionTargetSatisfied: generatedMeaningfulLineCount >= targetMinLineCount,
       underdevelopedBranches: findUnderdevelopedBranches(resolvedDsl.dsl),
+      overlyExtractive,
     },
   };
 }
@@ -489,4 +505,41 @@ function countWordsInLine(line: string): number {
   }
 
   return content.split(/\s+/u).length;
+}
+
+function isOverlyExtractiveDetailedDsl(dsl: string, sourceText: string): boolean {
+  const normalizedSourceLines = new Set(
+    sourceText
+      .split(/\r?\n/)
+      .map(normalizeSimilarityLine)
+      .filter((line) => line.length > 0),
+  );
+
+  if (normalizedSourceLines.size === 0) {
+    return false;
+  }
+
+  const childLines = dsl
+    .split(/\r?\n/)
+    .filter((line) => /^\s{2,}-\s.+$/u.test(line))
+    .map((line) => line.replace(/^\s*[-]\s*/u, ''))
+    .map(normalizeSimilarityLine)
+    .filter((line) => line.length > 0);
+
+  if (childLines.length < 2) {
+    return false;
+  }
+
+  const mirroredChildLineCount = childLines.filter((line) => normalizedSourceLines.has(line)).length;
+  return mirroredChildLineCount >= Math.max(2, Math.ceil(childLines.length * 0.34));
+}
+
+function normalizeSimilarityLine(line: string): string {
+  return line
+    .replace(/^@root:\s*/u, '')
+    .replace(/^\s*-\s*@branch:\s*/u, '')
+    .replace(/^\s*-\s*/u, '')
+    .replace(/\s+/gu, ' ')
+    .trim()
+    .toLowerCase();
 }

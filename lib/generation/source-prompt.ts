@@ -40,6 +40,8 @@ Content goals:
 - Preserve the source meaning and hierarchy as faithfully as possible.
 - Detect main topics, sub-topics, and deeper sub-topics from the notes.
 - Add concise explanations and examples where they improve clarity.
+- Rewrite raw note fragments into compact explanatory DSL lines instead of mirroring the notes verbatim.
+- Do not repeat a source heading or bullet as a child line unless the term itself needs preservation.
 - Prefer short phrase blocks over long sentences.
 - Use symbols such as =, =>, +, -> when they shorten wording naturally.
 - Never exceed 15 words on any DSL line.
@@ -90,7 +92,8 @@ export function createSourceMindmapGenerationPrompt(
 - Previous DSL attempt was too weak.
 - Reason: ${input.retryReason}
 - Fix the density and branch development problems.
-- Keep the same topic coverage, but add concise explanatory child lines.
+  - Keep the same topic coverage, but add concise explanatory child lines.
+  - Replace mirrored note labels with short explanatory rewrites wherever possible.
 
 PREVIOUS DSL ATTEMPT:
 ${input.previousDslAttempt}

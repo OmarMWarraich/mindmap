@@ -10,6 +10,7 @@ test('parsePersistedWorkspaceDraft returns a validated draft payload', () => {
     updatedAt: '2026-05-03T00:00:00.000Z',
     outline: '@root: Photosynthesis',
     rawNotes: 'Main Topic: Photosynthesis',
+    selectedDetailLevel: 'detailed',
     latestDslGeneration: {
       dsl: '@root: Photosynthesis',
       metrics: {
@@ -43,6 +44,7 @@ test('parsePersistedWorkspaceDraft returns a validated draft payload', () => {
 
   assert.equal(draft?.outline, '@root: Photosynthesis');
   assert.equal(draft?.rawNotes, 'Main Topic: Photosynthesis');
+  assert.equal(draft?.selectedDetailLevel, 'detailed');
   assert.equal(draft?.latestDslGeneration?.quality.mode, 'first-pass');
   assert.equal(draft?.previewTransform.scale, 1.2);
   assert.equal(draft?.mindmap?.metadata.rootId, validGeneratedMindmapFixture.metadata.rootId);
@@ -62,6 +64,7 @@ test('parsePersistedWorkspaceDraft accepts older draft payloads without generati
   });
 
   assert.equal(draft?.rawNotes, undefined);
+  assert.equal(draft?.selectedDetailLevel, undefined);
   assert.equal(draft?.latestDslGeneration, undefined);
 });
 

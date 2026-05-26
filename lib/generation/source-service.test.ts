@@ -285,3 +285,71 @@ test('generateMindmapDslFromSource reports below-target density when even the re
   assert.equal(response.validation.expansionTargetSatisfied, false);
   assert.equal(response.quality.densityStatus, 'below-target');
 });
+
+test('generateMindmapDslFromSource retries detailed generation when the first result mostly mirrors the source labels', async () => {
+  let requestCount = 0;
+
+  const response = await generateMindmapDslFromSource(
+    {
+      sourceText: [
+        'Photosynthesis',
+        'Light reactions',
+        'Calvin cycle',
+        'Importance',
+      ].join('\n'),
+      detailLevel: 'detailed',
+    },
+    {
+      env: testEnv,
+      fetchImpl: async () => {
+        requestCount += 1;
+
+        if (requestCount === 1) {
+          return new Response(JSON.stringify({
+            choices: [{ message: { content: JSON.stringify({
+              dsl: [
+                '@root: Photosynthesis',
+                '- @branch: Light reactions',
+                '  - Light reactions',
+                '  - captures light energy in chloroplast membranes',
+                '- @branch: Calvin cycle',
+                '  - Calvin cycle',
+                '  - fixes carbon dioxide into sugars',
+                '- @branch: Importance',
+                '  - Importance',
+                '  - supports glucose formation for plant growth',
+              ].join('\n'),
+            }) } }],
+          }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        return new Response(JSON.stringify({
+          choices: [{ message: { content: JSON.stringify({
+            dsl: [
+              '@root: Photosynthesis',
+              '- @branch: Light reactions',
+              '  - converts light energy into ATP and NADPH',
+              '  - water splitting releases oxygen as a by-product',
+              '- @branch: Calvin cycle',
+              '  - uses ATP and NADPH to fix carbon dioxide',
+              '  - produces carbohydrate precursors in the stroma',
+              '- @branch: Importance',
+              '  - stores solar energy in organic molecules',
+              '  - sustains plant biomass and food chains',
+            ].join('\n'),
+          }) } }],
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      },
+    },
+  );
+
+  assert.equal(requestCount, 2);
+  assert.equal(response.quality.mode, 'retry');
+  assert.match(response.dsl, /converts light energy into ATP and NADPH/i);
+});

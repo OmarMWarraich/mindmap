@@ -48,6 +48,7 @@ const enableMonacoInlineCompletions = true;
 let mindmapDslInlineSuggestionPreference: InlineSuggestionPreference = 'auto';
 
 type InlineSuggestionPreference = 'auto' | 'continuation' | 'enrichment';
+type SourceGenerationDetailLevel = 'standard' | 'detailed';
 
 interface ExportControlState {
   nodeWidthScale: number;
@@ -125,6 +126,7 @@ export default function StudyWorkspace() {
     tone: 'idle',
     message: 'Paste raw notes, then generate parser-ready DSL into the editor.',
   });
+  const [selectedDetailLevel, setSelectedDetailLevel] = useState<SourceGenerationDetailLevel>('standard');
   const [latestDslGeneration, setLatestDslGeneration] = useState<SourceMindmapGenerationResponse | null>(null);
   const [layoutDiagnostics, setLayoutDiagnostics] = useState<LayoutWorkerDiagnostics>({
     phase: 'main-thread',
@@ -229,6 +231,7 @@ export default function StudyWorkspace() {
         setOutline(draft.outline);
         setDebouncedOutline(draft.outline);
         setRawNotes(draft.rawNotes ?? '');
+        setSelectedDetailLevel(draft.selectedDetailLevel ?? 'standard');
         setLatestDslGeneration(draft.latestDslGeneration ?? null);
         setLatestMindmapSnapshot(draft.mindmap);
         setLatestMindmapSnapshotOutline(draft.outline);
@@ -406,6 +409,7 @@ export default function StudyWorkspace() {
         updatedAt: new Date().toISOString(),
         outline,
         rawNotes,
+        selectedDetailLevel,
         latestDslGeneration,
         mindmap: latestMindmapSnapshot,
         previewTransform,
@@ -435,7 +439,7 @@ export default function StudyWorkspace() {
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [latestDslGeneration, latestMindmapSnapshot, outline, previewTransform, rawNotes]);
+  }, [latestDslGeneration, latestMindmapSnapshot, outline, previewTransform, rawNotes, selectedDetailLevel]);
 
   useEffect(() => {
     return () => {
@@ -497,7 +501,7 @@ export default function StudyWorkspace() {
     }
   }
 
-  async function handleGenerateDsl(detailLevel: 'standard' | 'detailed' = 'standard'): Promise<void> {
+  async function handleGenerateDsl(detailLevel: SourceGenerationDetailLevel = selectedDetailLevel): Promise<void> {
     const sourceText = rawNotes.trim();
 
     if (sourceText.length === 0) {
@@ -507,6 +511,8 @@ export default function StudyWorkspace() {
       });
       return;
     }
+
+    setSelectedDetailLevel(detailLevel);
 
     setGenerationStatus({
       tone: 'progress',
@@ -618,6 +624,9 @@ export default function StudyWorkspace() {
         </span>
         <span className="ml-3">{draftStatus.message}</span>
       </div>
+      {latestDslGeneration?.quality.mode === 'retry' ? (
+        <p className="text-xs text-zinc-500">Last generated from retry pass for higher detail coverage.</p>
+      ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
         <section className="grid gap-4 rounded-3xl border border-zinc-200 bg-zinc-50 p-4">
@@ -638,7 +647,40 @@ export default function StudyWorkspace() {
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="grid gap-3 justify-items-start sm:justify-items-end">
+                <div className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-white p-1 text-sm text-sky-950 shadow-sm">
+                  <span className="px-2 text-xs font-medium uppercase tracking-[0.12em] text-sky-700">Detail</span>
+                  <button
+                    aria-pressed={selectedDetailLevel === 'standard'}
+                    className={`rounded-full px-3 py-1.5 font-medium transition ${
+                      selectedDetailLevel === 'standard'
+                        ? 'bg-sky-950 text-white'
+                        : 'text-sky-900 hover:bg-sky-100'
+                    }`}
+                    onClick={() => {
+                      setSelectedDetailLevel('standard');
+                    }}
+                    type="button"
+                  >
+                    Standard
+                  </button>
+                  <button
+                    aria-pressed={selectedDetailLevel === 'detailed'}
+                    className={`rounded-full px-3 py-1.5 font-medium transition ${
+                      selectedDetailLevel === 'detailed'
+                        ? 'bg-sky-950 text-white'
+                        : 'text-sky-900 hover:bg-sky-100'
+                    }`}
+                    onClick={() => {
+                      setSelectedDetailLevel('detailed');
+                    }}
+                    type="button"
+                  >
+                    Detailed
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
                 <button
                   className="rounded-full bg-sky-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-sky-300"
                   disabled={generationStatus.tone === 'progress'}
@@ -647,7 +689,9 @@ export default function StudyWorkspace() {
                   }}
                   type="button"
                 >
-                  {generationStatus.tone === 'progress' ? 'Generating…' : 'Generate DSL'}
+                  {generationStatus.tone === 'progress'
+                    ? 'Generating…'
+                    : `Generate ${selectedDetailLevel === 'detailed' ? 'detailed' : 'standard'} DSL`}
                 </button>
                 {latestDslGeneration && !latestDslGeneration.validation.expansionTargetSatisfied ? (
                   <button
@@ -670,6 +714,7 @@ export default function StudyWorkspace() {
                 >
                   Clear notes
                 </button>
+                </div>
               </div>
             </div>
 
