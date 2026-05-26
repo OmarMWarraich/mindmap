@@ -1,6 +1,7 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import { z } from 'zod';
 
+import { sourceMindmapGenerationResponseSchema } from '../generation/source-schema.ts';
 import { generatedMindmapSchema } from '../mindmap/schema.ts';
 
 const workspaceDraftStoreName = 'workspace-drafts';
@@ -18,6 +19,8 @@ export const persistedWorkspaceDraftSchema = z.object({
   version: z.literal(1),
   updatedAt: z.string(),
   outline: z.string(),
+  rawNotes: z.string().optional(),
+  latestDslGeneration: sourceMindmapGenerationResponseSchema.nullable().optional(),
   mindmap: generatedMindmapSchema.nullable(),
   previewTransform: svgPreviewTransformSchema,
 }).strict();

@@ -228,6 +228,8 @@ export default function StudyWorkspace() {
 
         setOutline(draft.outline);
         setDebouncedOutline(draft.outline);
+        setRawNotes(draft.rawNotes ?? '');
+        setLatestDslGeneration(draft.latestDslGeneration ?? null);
         setLatestMindmapSnapshot(draft.mindmap);
         setLatestMindmapSnapshotOutline(draft.outline);
         setPreviewTransform(draft.previewTransform);
@@ -403,6 +405,8 @@ export default function StudyWorkspace() {
         version: 1,
         updatedAt: new Date().toISOString(),
         outline,
+        rawNotes,
+        latestDslGeneration,
         mindmap: latestMindmapSnapshot,
         previewTransform,
       })
@@ -431,7 +435,7 @@ export default function StudyWorkspace() {
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [latestMindmapSnapshot, outline, previewTransform]);
+  }, [latestDslGeneration, latestMindmapSnapshot, outline, previewTransform, rawNotes]);
 
   useEffect(() => {
     return () => {
@@ -687,6 +691,16 @@ export default function StudyWorkspace() {
                 }`}>
                   Quality: {latestDslGeneration.quality.mode === 'retry' ? 'retry pass' : 'first pass'}
                 </span>
+                {latestDslGeneration.quality.mode === 'retry' ? (
+                  <button
+                    aria-label="Retry pass explanation"
+                    className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-amber-300 bg-white text-[11px] font-semibold text-amber-800"
+                    title="Retry pass means the first DSL result was too sparse or underdeveloped, so the app asked the model for a denser revision."
+                    type="button"
+                  >
+                    i
+                  </button>
+                ) : null}
                 <span className={`rounded-full px-3 py-1 font-medium ${
                   latestDslGeneration.quality.densityStatus === 'target-met'
                     ? 'bg-emerald-100 text-emerald-800'
@@ -694,6 +708,16 @@ export default function StudyWorkspace() {
                 }`}>
                   Density: {latestDslGeneration.quality.densityStatus === 'target-met' ? 'target met' : 'below target'}
                 </span>
+                {latestDslGeneration.quality.densityStatus === 'below-target' ? (
+                  <button
+                    aria-label="Below target explanation"
+                    className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-amber-300 bg-white text-[11px] font-semibold text-amber-800"
+                    title="Below target means the DSL is still lighter than the preferred detail level, so you can regenerate with more detail."
+                    type="button"
+                  >
+                    i
+                  </button>
+                ) : null}
                 <span>
                   {latestDslGeneration.metrics.generatedMeaningfulLineCount} lines, ratio {latestDslGeneration.metrics.expansionRatio.toFixed(2)}x
                 </span>
