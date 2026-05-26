@@ -58,7 +58,31 @@ test('parseSourceMindmapGenerationClientResponse rejects malformed payloads', ()
   assert.throws(() => parseSourceMindmapGenerationClientResponse(null), /invalid response payload/i);
   assert.throws(
     () => parseSourceMindmapGenerationClientResponse({ metrics: {}, validation: {} }),
-    /missing DSL output/i,
+    /invalid response payload/i,
+  );
+  assert.throws(
+    () => parseSourceMindmapGenerationClientResponse({
+      dsl: '@root: Photosynthesis',
+      metrics: {
+        sourceMeaningfulLineCount: 3,
+        generatedMeaningfulLineCount: 7,
+        expansionRatio: 2.33,
+        targetMinLineCount: 7,
+        targetMaxLineCount: 8,
+        maxWordsPerLine: 15,
+      },
+      validation: {
+        parserWarnings: [],
+        parserErrors: [],
+        lineWordLimitSatisfied: true,
+        expansionTargetSatisfied: true,
+      },
+      quality: {
+        attemptCount: 1,
+        mode: 'first-pass',
+      },
+    }),
+    /invalid response payload/i,
   );
 });
 

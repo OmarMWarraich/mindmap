@@ -2,6 +2,7 @@ import type {
   SourceMindmapGenerationRequest,
   SourceMindmapGenerationResponse,
 } from './source-schema.ts';
+import { sourceMindmapGenerationResponseSchema } from './source-schema.ts';
 
 interface SourceMindmapGenerationErrorResponse {
   error?: string;
@@ -35,25 +36,13 @@ export async function requestMindmapDslGenerationFromApi(
 export function parseSourceMindmapGenerationClientResponse(
   value: unknown,
 ): SourceMindmapGenerationResponse {
-  if (!value || typeof value !== 'object') {
+  const parsedResponse = sourceMindmapGenerationResponseSchema.safeParse(value);
+
+  if (!parsedResponse.success) {
     throw new Error('Mindmap generation returned an invalid response payload.');
   }
 
-  const candidate = value as Partial<SourceMindmapGenerationResponse>;
-
-  if (typeof candidate.dsl !== 'string') {
-    throw new Error('Mindmap generation response is missing DSL output.');
-  }
-
-  if (!candidate.metrics || typeof candidate.metrics !== 'object') {
-    throw new Error('Mindmap generation response is missing metrics.');
-  }
-
-  if (!candidate.validation || typeof candidate.validation !== 'object') {
-    throw new Error('Mindmap generation response is missing validation details.');
-  }
-
-  return candidate as SourceMindmapGenerationResponse;
+  return parsedResponse.data;
 }
 
 async function parseErrorPayload(response: Response): Promise<SourceMindmapGenerationErrorResponse> {
