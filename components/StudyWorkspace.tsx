@@ -11,6 +11,8 @@ import {
   requestInlineCompletionFromApi,
   trackInlineCompletionEvent,
 } from '../lib/completion/client';
+import { requestMindmapDslGenerationFromApi } from '../lib/generation/client';
+import type { SourceMindmapGenerationResponse } from '../lib/generation/source-schema';
 import { getMindmapSectionContext } from '../lib/dsl/editor-context';
 import {
   createInlineSuggestionRange,
@@ -46,6 +48,7 @@ const enableMonacoInlineCompletions = true;
 let mindmapDslInlineSuggestionPreference: InlineSuggestionPreference = 'auto';
 
 type InlineSuggestionPreference = 'auto' | 'continuation' | 'enrichment';
+type SourceGenerationDetailLevel = 'standard' | 'detailed';
 
 interface ExportControlState {
   nodeWidthScale: number;
@@ -92,6 +95,7 @@ export default function StudyWorkspace() {
   } | null>(null);
   const [outline, setOutline] = useState(mindmapDslStarterOutline);
   const [debouncedOutline, setDebouncedOutline] = useState(mindmapDslStarterOutline);
+  const [rawNotes, setRawNotes] = useState('');
   const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
   const [latestMindmapSnapshot, setLatestMindmapSnapshot] = useState<GeneratedMindmap | null>(null);
   const [latestMindmapSnapshotOutline, setLatestMindmapSnapshotOutline] = useState<string | null>(null);
@@ -115,6 +119,15 @@ export default function StudyWorkspace() {
     tone: 'progress',
     message: 'Restoring local draft…',
   });
+  const [generationStatus, setGenerationStatus] = useState<{
+    tone: 'idle' | 'progress' | 'success' | 'error';
+    message: string;
+  }>({
+    tone: 'idle',
+    message: 'Paste raw notes, then generate parser-ready DSL into the editor.',
+  });
+  const [selectedDetailLevel, setSelectedDetailLevel] = useState<SourceGenerationDetailLevel>('standard');
+  const [latestDslGeneration, setLatestDslGeneration] = useState<SourceMindmapGenerationResponse | null>(null);
   const [layoutDiagnostics, setLayoutDiagnostics] = useState<LayoutWorkerDiagnostics>({
     phase: 'main-thread',
     summary: 'Using the in-page layout engine for beta preview rendering.',
@@ -217,6 +230,9 @@ export default function StudyWorkspace() {
 
         setOutline(draft.outline);
         setDebouncedOutline(draft.outline);
+        setRawNotes(draft.rawNotes ?? '');
+        setSelectedDetailLevel(draft.selectedDetailLevel ?? 'standard');
+        setLatestDslGeneration(draft.latestDslGeneration ?? null);
         setLatestMindmapSnapshot(draft.mindmap);
         setLatestMindmapSnapshotOutline(draft.outline);
         setPreviewTransform(draft.previewTransform);
@@ -392,6 +408,9 @@ export default function StudyWorkspace() {
         version: 1,
         updatedAt: new Date().toISOString(),
         outline,
+        rawNotes,
+        selectedDetailLevel,
+        latestDslGeneration,
         mindmap: latestMindmapSnapshot,
         previewTransform,
       })
@@ -420,7 +439,7 @@ export default function StudyWorkspace() {
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [latestMindmapSnapshot, outline, previewTransform]);
+  }, [latestDslGeneration, latestMindmapSnapshot, outline, previewTransform, rawNotes, selectedDetailLevel]);
 
   useEffect(() => {
     return () => {
@@ -482,13 +501,73 @@ export default function StudyWorkspace() {
     }
   }
 
+  async function handleGenerateDsl(detailLevel: SourceGenerationDetailLevel = selectedDetailLevel): Promise<void> {
+    const sourceText = rawNotes.trim();
+
+    if (sourceText.length === 0) {
+      setGenerationStatus({
+        tone: 'error',
+        message: 'Add some raw notes before generating DSL.',
+      });
+      return;
+    }
+
+    setSelectedDetailLevel(detailLevel);
+
+    setGenerationStatus({
+      tone: 'progress',
+      message: 'Generating DSL from your notes…',
+    });
+
+    try {
+      const response = await requestMindmapDslGenerationFromApi({ sourceText, detailLevel });
+
+      editorRef.current?.setValue(response.dsl);
+      editorRef.current?.focus();
+      editorRef.current?.setPosition({ lineNumber: 1, column: 1 });
+      setOutline(response.dsl);
+      setDebouncedOutline(response.dsl);
+      setLatestDslGeneration(response);
+      setGenerationStatus({
+        tone: 'success',
+        message: response.quality.densityStatus === 'target-met'
+          ? `Generated ${response.metrics.generatedMeaningfulLineCount} DSL lines from ${response.metrics.sourceMeaningfulLineCount} source lines.`
+          : response.quality.densityStatus === 'below-target'
+            ? `Generated DSL is ready, but landed below the target expansion band (${response.metrics.generatedMeaningfulLineCount} lines).`
+            : `Generated DSL is ready and denser than the target expansion band (${response.metrics.generatedMeaningfulLineCount} lines).`,
+      });
+    } catch (error) {
+      setLatestDslGeneration(null);
+      setGenerationStatus({
+        tone: 'error',
+        message: error instanceof Error ? error.message : 'DSL generation failed unexpectedly.',
+      });
+    }
+  }
+
+  function handleGenerateMindmapFromDsl(): void {
+    const currentOutline = editorRef.current?.getValue() ?? outline;
+
+    setOutline(currentOutline);
+    setDebouncedOutline(currentOutline);
+  }
+
+  function handleClearNotes(): void {
+    setRawNotes('');
+    setLatestDslGeneration(null);
+    setGenerationStatus({
+      tone: 'idle',
+      message: 'Paste raw notes, then generate parser-ready DSL into the editor.',
+    });
+  }
+
   return (
     <section className="grid gap-4 rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="grid gap-1">
-          <h2 className="text-lg font-semibold text-zinc-950">Toolbar area</h2>
+          <h2 className="text-lg font-semibold text-zinc-950">Workspace</h2>
           <p className="text-sm leading-6 text-zinc-600">
-            Generate, refresh, export, and status controls will live here.
+            Generate DSL from source notes, then generate the mindmap from the DSL editor and export it from here.
           </p>
         </div>
 
@@ -496,12 +575,6 @@ export default function StudyWorkspace() {
           <span className="inline-flex items-center rounded-full bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700">
             {isParsing ? 'Parsing…' : `Parsed ${nodeCount} nodes`}
           </span>
-          <button className="rounded-full bg-zinc-950 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800">
-            Generate mindmap
-          </button>
-          <button className="rounded-full border border-zinc-200 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
-            Refresh preview
-          </button>
           <button
             className="rounded-full border border-zinc-200 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={!layoutResult || layoutStatus === 'loading'}
@@ -516,6 +589,18 @@ export default function StudyWorkspace() {
       </div>
 
       <div className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
+        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
+          generationStatus.tone === 'success'
+            ? 'bg-emerald-100 text-emerald-700'
+            : generationStatus.tone === 'error'
+              ? 'bg-rose-100 text-rose-700'
+              : generationStatus.tone === 'progress'
+                ? 'bg-sky-100 text-sky-700'
+                : 'bg-zinc-100 text-zinc-700'
+        }`}>
+          DSL
+        </span>
+        <span className="ml-3">{generationStatus.message}</span>
         <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
           exportStatus.tone === 'success'
             ? 'bg-emerald-100 text-emerald-700'
@@ -541,36 +626,190 @@ export default function StudyWorkspace() {
         </span>
         <span className="ml-3">{draftStatus.message}</span>
       </div>
+      {latestDslGeneration?.quality.mode === 'retry' ? (
+        <p className="text-xs text-zinc-500">Last generated from retry pass for higher detail coverage.</p>
+      ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
         <section className="grid gap-4 rounded-3xl border border-zinc-200 bg-zinc-50 p-4">
           <div className="grid gap-1">
             <h2 className="text-xl font-semibold text-zinc-950">Study editor</h2>
             <p className="max-w-2xl text-sm leading-6 text-zinc-600">
-              Monaco now hosts the study outline directly in the app shell so later
-              parsing, completions, and preview updates can build on the real editor.
+              Paste raw notes, generate compact mindmap DSL, then inspect or refine the
+              result in Monaco before exporting.
             </p>
+          </div>
+
+          <div className="grid gap-3 rounded-2xl border border-sky-200 bg-sky-50/70 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="grid gap-1">
+                <p className="text-sm font-medium text-sky-950">Source notes</p>
+                <p className="text-sm leading-6 text-sky-900/80">
+                  Paste class notes, textbook bullets, or the old .txt source here. Generate will convert them into parser-ready DSL and load it into Monaco.
+                </p>
+              </div>
+
+              <div className="grid gap-3 justify-items-start sm:justify-items-end">
+                <div className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-white p-1 text-sm text-sky-950 shadow-sm">
+                  <span className="px-2 text-xs font-medium uppercase tracking-[0.12em] text-sky-700">Detail</span>
+                  <button
+                    aria-pressed={selectedDetailLevel === 'standard'}
+                    className={`rounded-full px-3 py-1.5 font-medium transition ${
+                      selectedDetailLevel === 'standard'
+                        ? 'bg-sky-950 text-white'
+                        : 'text-sky-900 hover:bg-sky-100'
+                    }`}
+                    disabled={generationStatus.tone === 'progress'}
+                    onClick={() => {
+                      setSelectedDetailLevel('standard');
+                    }}
+                    type="button"
+                  >
+                    Standard
+                  </button>
+                  <button
+                    aria-pressed={selectedDetailLevel === 'detailed'}
+                    className={`rounded-full px-3 py-1.5 font-medium transition ${
+                      selectedDetailLevel === 'detailed'
+                        ? 'bg-sky-950 text-white'
+                        : 'text-sky-900 hover:bg-sky-100'
+                    }`}
+                    disabled={generationStatus.tone === 'progress'}
+                    onClick={() => {
+                      setSelectedDetailLevel('detailed');
+                    }}
+                    type="button"
+                  >
+                    Detailed
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                <button
+                  className="rounded-full bg-sky-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-sky-300"
+                  disabled={generationStatus.tone === 'progress'}
+                  onClick={() => {
+                    void handleGenerateDsl();
+                  }}
+                  type="button"
+                >
+                  {generationStatus.tone === 'progress'
+                    ? 'Generating…'
+                    : `Generate ${selectedDetailLevel === 'detailed' ? 'detailed' : 'standard'} DSL`}
+                </button>
+                {latestDslGeneration?.quality.densityStatus === 'below-target' ? (
+                  <button
+                    className="rounded-full border border-sky-300 bg-white px-4 py-2 text-sm font-medium text-sky-950 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={generationStatus.tone === 'progress'}
+                    onClick={() => {
+                      void handleGenerateDsl('detailed');
+                    }}
+                    type="button"
+                  >
+                    Regenerate DSL with more detail
+                  </button>
+                ) : null}
+                <button
+                  className="rounded-full border border-sky-300 bg-white px-4 py-2 text-sm font-medium text-sky-950 transition hover:bg-sky-100"
+                  onClick={() => {
+                    handleClearNotes();
+                  }}
+                  type="button"
+                >
+                  Clear notes
+                </button>
+                </div>
+              </div>
+            </div>
+
+            <textarea
+              className="min-h-[180px] rounded-2xl border border-sky-200 bg-white px-4 py-3 text-sm leading-6 text-zinc-800 shadow-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-200"
+              onChange={(event) => {
+                setRawNotes(event.target.value);
+              }}
+              placeholder="Paste raw notes here..."
+              value={rawNotes}
+            />
+
+            {latestDslGeneration ? (
+              <div className="flex flex-wrap items-center gap-2 text-xs text-sky-950">
+                <span className={`rounded-full px-3 py-1 font-medium ${
+                  latestDslGeneration.quality.mode === 'retry'
+                    ? 'bg-amber-100 text-amber-800'
+                    : 'bg-emerald-100 text-emerald-800'
+                }`}>
+                  Quality: {latestDslGeneration.quality.mode === 'retry' ? 'retry pass' : 'first pass'}
+                </span>
+                {latestDslGeneration.quality.mode === 'retry' ? (
+                  <span
+                    aria-label="Retry pass means the first DSL result was too sparse or underdeveloped, so the app asked the model for a denser revision."
+                    className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-amber-300 bg-white text-[11px] font-semibold text-amber-800"
+                    role="img"
+                    title="Retry pass means the first DSL result was too sparse or underdeveloped, so the app asked the model for a denser revision."
+                  >
+                    i
+                  </span>
+                ) : null}
+                <span className={`rounded-full px-3 py-1 font-medium ${
+                  latestDslGeneration.quality.densityStatus === 'target-met'
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : latestDslGeneration.quality.densityStatus === 'below-target'
+                      ? 'bg-amber-100 text-amber-800'
+                      : 'bg-sky-100 text-sky-800'
+                }`}>
+                  Density: {latestDslGeneration.quality.densityStatus === 'target-met'
+                    ? 'target met'
+                    : latestDslGeneration.quality.densityStatus === 'below-target'
+                      ? 'below target'
+                      : 'over target'}
+                </span>
+                {latestDslGeneration.quality.densityStatus === 'below-target' ? (
+                  <span
+                    aria-label="Below target means the DSL is still lighter than the preferred detail level, so you can regenerate with more detail."
+                    className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-amber-300 bg-white text-[11px] font-semibold text-amber-800"
+                    role="img"
+                    title="Below target means the DSL is still lighter than the preferred detail level, so you can regenerate with more detail."
+                  >
+                    i
+                  </span>
+                ) : null}
+                <span>
+                  {latestDslGeneration.metrics.generatedMeaningfulLineCount} lines, ratio {latestDslGeneration.metrics.expansionRatio.toFixed(2)}x
+                </span>
+              </div>
+            ) : null}
           </div>
 
           <div className="flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="grid gap-1">
-              <p className="text-sm font-medium text-emerald-900">Starter outline loaded</p>
+              <p className="text-sm font-medium text-emerald-900">DSL editor</p>
               <p className="text-sm leading-6 text-emerald-800/80">
-                The editor opens with a working DSL example so users can learn the
-                format from a concrete root, branch, and nested leaf structure.
+                Generated DSL lands here automatically. Review or edit it, then generate the mindmap from this editor.
               </p>
             </div>
 
-            <button
-              className="rounded-full border border-emerald-300 bg-white px-4 py-2 text-sm font-medium text-emerald-900 transition hover:bg-emerald-100"
-              onClick={() => {
-                editorRef.current?.setValue(mindmapDslStarterOutline);
-                setOutline(mindmapDslStarterOutline);
-              }}
-              type="button"
-            >
-              Reset starter outline
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="rounded-full bg-emerald-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-800"
+                onClick={() => {
+                  handleGenerateMindmapFromDsl();
+                }}
+                type="button"
+              >
+                Generate mindmap
+              </button>
+              <button
+                className="rounded-full border border-emerald-300 bg-white px-4 py-2 text-sm font-medium text-emerald-900 transition hover:bg-emerald-100"
+                onClick={() => {
+                  editorRef.current?.setValue(mindmapDslStarterOutline);
+                  setOutline(mindmapDslStarterOutline);
+                  setDebouncedOutline(mindmapDslStarterOutline);
+                }}
+                type="button"
+              >
+                Reset DSL
+              </button>
+            </div>
           </div>
 
           <div className="h-[460px] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
