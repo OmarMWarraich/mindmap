@@ -530,9 +530,11 @@ export default function StudyWorkspace() {
       setLatestDslGeneration(response);
       setGenerationStatus({
         tone: 'success',
-        message: response.validation.expansionTargetSatisfied
+        message: response.quality.densityStatus === 'target-met'
           ? `Generated ${response.metrics.generatedMeaningfulLineCount} DSL lines from ${response.metrics.sourceMeaningfulLineCount} source lines.`
-          : `Generated DSL is ready, but landed outside the target expansion band (${response.metrics.generatedMeaningfulLineCount} lines).`,
+          : response.quality.densityStatus === 'below-target'
+            ? `Generated DSL is ready, but landed below the target expansion band (${response.metrics.generatedMeaningfulLineCount} lines).`
+            : `Generated DSL is ready and denser than the target expansion band (${response.metrics.generatedMeaningfulLineCount} lines).`,
       });
     } catch (error) {
       setLatestDslGeneration(null);
@@ -657,6 +659,7 @@ export default function StudyWorkspace() {
                         ? 'bg-sky-950 text-white'
                         : 'text-sky-900 hover:bg-sky-100'
                     }`}
+                    disabled={generationStatus.tone === 'progress'}
                     onClick={() => {
                       setSelectedDetailLevel('standard');
                     }}
@@ -671,6 +674,7 @@ export default function StudyWorkspace() {
                         ? 'bg-sky-950 text-white'
                         : 'text-sky-900 hover:bg-sky-100'
                     }`}
+                    disabled={generationStatus.tone === 'progress'}
                     onClick={() => {
                       setSelectedDetailLevel('detailed');
                     }}
@@ -693,7 +697,7 @@ export default function StudyWorkspace() {
                     ? 'Generating…'
                     : `Generate ${selectedDetailLevel === 'detailed' ? 'detailed' : 'standard'} DSL`}
                 </button>
-                {latestDslGeneration && !latestDslGeneration.validation.expansionTargetSatisfied ? (
+                {latestDslGeneration?.quality.densityStatus === 'below-target' ? (
                   <button
                     className="rounded-full border border-sky-300 bg-white px-4 py-2 text-sm font-medium text-sky-950 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
                     disabled={generationStatus.tone === 'progress'}
@@ -737,31 +741,37 @@ export default function StudyWorkspace() {
                   Quality: {latestDslGeneration.quality.mode === 'retry' ? 'retry pass' : 'first pass'}
                 </span>
                 {latestDslGeneration.quality.mode === 'retry' ? (
-                  <button
-                    aria-label="Retry pass explanation"
+                  <span
+                    aria-label="Retry pass means the first DSL result was too sparse or underdeveloped, so the app asked the model for a denser revision."
                     className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-amber-300 bg-white text-[11px] font-semibold text-amber-800"
+                    role="img"
                     title="Retry pass means the first DSL result was too sparse or underdeveloped, so the app asked the model for a denser revision."
-                    type="button"
                   >
                     i
-                  </button>
+                  </span>
                 ) : null}
                 <span className={`rounded-full px-3 py-1 font-medium ${
                   latestDslGeneration.quality.densityStatus === 'target-met'
                     ? 'bg-emerald-100 text-emerald-800'
-                    : 'bg-amber-100 text-amber-800'
+                    : latestDslGeneration.quality.densityStatus === 'below-target'
+                      ? 'bg-amber-100 text-amber-800'
+                      : 'bg-sky-100 text-sky-800'
                 }`}>
-                  Density: {latestDslGeneration.quality.densityStatus === 'target-met' ? 'target met' : 'below target'}
+                  Density: {latestDslGeneration.quality.densityStatus === 'target-met'
+                    ? 'target met'
+                    : latestDslGeneration.quality.densityStatus === 'below-target'
+                      ? 'below target'
+                      : 'over target'}
                 </span>
                 {latestDslGeneration.quality.densityStatus === 'below-target' ? (
-                  <button
-                    aria-label="Below target explanation"
+                  <span
+                    aria-label="Below target means the DSL is still lighter than the preferred detail level, so you can regenerate with more detail."
                     className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-amber-300 bg-white text-[11px] font-semibold text-amber-800"
+                    role="img"
                     title="Below target means the DSL is still lighter than the preferred detail level, so you can regenerate with more detail."
-                    type="button"
                   >
                     i
-                  </button>
+                  </span>
                 ) : null}
                 <span>
                   {latestDslGeneration.metrics.generatedMeaningfulLineCount} lines, ratio {latestDslGeneration.metrics.expansionRatio.toFixed(2)}x

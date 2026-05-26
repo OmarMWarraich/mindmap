@@ -17,6 +17,8 @@ const minimumExpansionRatio = 2.3;
 const maximumExpansionRatio = 2.7;
 const maxWordsPerLine = 15;
 
+type DensityStatus = 'below-target' | 'target-met' | 'over-target';
+
 export { sourceMindmapGenerationRequestSchema };
 
 export async function generateMindmapDslFromSource(
@@ -52,7 +54,7 @@ export async function generateMindmapDslFromSource(
   );
 
   if (
-    !attempt.validation.expansionTargetSatisfied
+    attempt.validation.densityStatus === 'below-target'
     || attempt.validation.underdevelopedBranches.length > 0
     || attempt.validation.overlyExtractive
   ) {
@@ -104,7 +106,7 @@ export async function generateMindmapDslFromSource(
     quality: {
       attemptCount,
       mode: attemptCount > 1 ? 'retry' : 'first-pass',
-      densityStatus: attempt.validation.expansionTargetSatisfied ? 'target-met' : 'below-target',
+      densityStatus: attempt.validation.densityStatus,
       underdevelopedBranchCount: attempt.validation.underdevelopedBranches.length,
     },
   });
@@ -115,11 +117,11 @@ function summarizeRetryReason(validation: DslAttemptResult['validation']): strin
     return 'The outline copies source labels too literally instead of rewriting them into explanatory child lines.';
   }
 
-  if (!validation.expansionTargetSatisfied && validation.underdevelopedBranches.length > 0) {
+  if (validation.densityStatus === 'below-target' && validation.underdevelopedBranches.length > 0) {
     return `The outline is too sparse and these branches need child lines: ${validation.underdevelopedBranches.join(', ')}.`;
   }
 
-  if (!validation.expansionTargetSatisfied) {
+  if (validation.densityStatus === 'below-target') {
     return 'The outline is too sparse for the target line-count range.';
   }
 
@@ -136,9 +138,26 @@ interface DslAttemptResult {
   validation: {
     lineWordLimitSatisfied: boolean;
     expansionTargetSatisfied: boolean;
+    densityStatus: DensityStatus;
     underdevelopedBranches: string[];
     overlyExtractive: boolean;
   };
+}
+
+function getDensityStatus(
+  generatedMeaningfulLineCount: number,
+  targetMinLineCount: number,
+  targetMaxLineCount: number,
+): DensityStatus {
+  if (generatedMeaningfulLineCount < targetMinLineCount) {
+    return 'below-target';
+  }
+
+  if (generatedMeaningfulLineCount > targetMaxLineCount) {
+    return 'over-target';
+  }
+
+  return 'target-met';
 }
 
 async function generateDslAttempt(
@@ -177,6 +196,11 @@ async function generateDslAttempt(
   const expansionRatio = sourceMeaningfulLineCount === 0
     ? generatedMeaningfulLineCount
     : generatedMeaningfulLineCount / sourceMeaningfulLineCount;
+  const densityStatus = getDensityStatus(
+    generatedMeaningfulLineCount,
+    targetMinLineCount,
+    targetMaxLineCount,
+  );
   const lineWordLimitSatisfied = getMaxWordCountPerLine(resolvedDsl.dsl) <= maxWordsPerLine;
   const overlyExtractive = detailLevel === 'detailed'
     ? isOverlyExtractiveDetailedDsl(resolvedDsl.dsl, sourceText)
@@ -195,7 +219,8 @@ async function generateDslAttempt(
     },
     validation: {
       lineWordLimitSatisfied,
-      expansionTargetSatisfied: generatedMeaningfulLineCount >= targetMinLineCount,
+      expansionTargetSatisfied: densityStatus === 'target-met',
+      densityStatus,
       underdevelopedBranches: findUnderdevelopedBranches(resolvedDsl.dsl),
       overlyExtractive,
     },

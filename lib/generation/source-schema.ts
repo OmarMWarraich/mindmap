@@ -35,7 +35,7 @@ export const sourceMindmapGenerationValidationSchema = z.object({
 export const sourceMindmapGenerationQualitySchema = z.object({
   attemptCount: z.number().int().positive(),
   mode: z.enum(['first-pass', 'retry']),
-  densityStatus: z.enum(['below-target', 'target-met']),
+  densityStatus: z.enum(['below-target', 'target-met', 'over-target']),
   underdevelopedBranchCount: z.number().int().nonnegative(),
 }).strict();
 

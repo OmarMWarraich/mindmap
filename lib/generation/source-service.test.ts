@@ -257,10 +257,10 @@ test('generateMindmapDslFromSource retries when the first parser-safe result is 
 
   assert.equal(requestCount, 2);
   assert.equal(response.dsl.startsWith('@root: Aspects of Political Science'), true);
-  assert.equal(response.validation.expansionTargetSatisfied, true);
+  assert.equal(response.validation.expansionTargetSatisfied, false);
   assert.equal(response.quality.mode, 'retry');
   assert.equal(response.quality.attemptCount, 2);
-  assert.equal(response.quality.densityStatus, 'target-met');
+  assert.equal(response.quality.densityStatus, 'over-target');
 });
 
 test('generateMindmapDslFromSource reports below-target density when even the retry remains too sparse', async () => {
