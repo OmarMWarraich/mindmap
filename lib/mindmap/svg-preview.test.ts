@@ -368,6 +368,76 @@ test('buildSvgPreviewModel reduces export root font size when long words would o
   assert.equal(estimateLongestLineWidth(model.nodes[0]!, metrics, 'root') <= 140, true);
 });
 
+test('buildSvgPreviewModel keeps high-scale export root text inside the root node box', () => {
+  const node = validGeneratedMindmapFixture.nodes[0]!;
+  const model = buildSvgPreviewModel(
+    {
+      ...validGeneratedMindmapFixture,
+      nodes: [{
+        ...node,
+        label: 'Photosynthesis and cellular energy transfer in multicellular organisms',
+      }],
+      edges: [],
+    },
+    {
+      width: 420,
+      height: 220,
+      nodes: [{
+        id: node.id,
+        x: 40,
+        y: 40,
+        width: node.layout.minWidth,
+        height: node.layout.minHeight,
+      }],
+      edges: [],
+    },
+    {
+      profile: 'export',
+      renderScale: 2.5,
+    },
+  );
+
+  const renderedNode = model.nodes[0]!;
+  const textBottomY = renderedNode.lineStartY + renderedNode.lines.length * renderedNode.lineHeight;
+
+  assert.equal(textBottomY <= node.layout.minHeight - node.layout.paddingY, true);
+});
+
+test('buildSvgPreviewModel keeps high-scale export branch text inside the branch node box', () => {
+  const node = validGeneratedMindmapFixture.nodes[1]!;
+  const model = buildSvgPreviewModel(
+    {
+      ...validGeneratedMindmapFixture,
+      nodes: [{
+        ...node,
+        label: 'Comparative constitutional interpretation and institutional legitimacy across systems',
+      }],
+      edges: [],
+    },
+    {
+      width: 420,
+      height: 220,
+      nodes: [{
+        id: node.id,
+        x: 40,
+        y: 40,
+        width: node.layout.minWidth,
+        height: node.layout.minHeight,
+      }],
+      edges: [],
+    },
+    {
+      profile: 'export',
+      renderScale: 2.5,
+    },
+  );
+
+  const renderedNode = model.nodes[0]!;
+  const textBottomY = renderedNode.lineStartY + renderedNode.lines.length * renderedNode.lineHeight;
+
+  assert.equal(textBottomY <= node.layout.minHeight - node.layout.paddingY, true);
+});
+
 test('buildSvgPreviewModel splits long hyphenated export tokens into separate lines', () => {
   const metrics = getSvgPreviewRenderMetrics('export', { scale: 1.6 });
   const node = validGeneratedMindmapFixture.nodes[1]!;

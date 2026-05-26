@@ -530,7 +530,7 @@ function createNodeTypography(
   }
 
   const availableBottomY = Math.max(metrics.lineHeight, layoutNode.height - sourceNode.layout.paddingY);
-  const minimumFontSize = Math.max(12, baseFontSize * 0.68);
+  const minimumFontSize = 12;
   const initialFontSize = Math.min(baseFontSize, targetFontSize ?? baseFontSize);
   let bestTypography = measureNodeTypography(
     sourceNode.label,
@@ -551,8 +551,9 @@ function createNodeTypography(
       baseLineStartY,
     );
 
+    bestTypography = candidate;
+
     if (doesNodeTypographyFit(candidate, availableWidth, availableBottomY, metrics, baseFontSize)) {
-      bestTypography = candidate;
       break;
     }
   }
@@ -607,7 +608,7 @@ function findFittingExportFontSize(
   const baseLineStartY = sourceNode.kind === 'root' ? metrics.rootLineStartY : metrics.nodeLineStartY;
   const availableWidth = Math.max(64, layoutNode.width - sourceNode.layout.paddingX * 2);
   const availableBottomY = Math.max(metrics.lineHeight, layoutNode.height - sourceNode.layout.paddingY);
-  const minimumFontSize = Math.max(12, baseFontSize * 0.68);
+  const minimumFontSize = 12;
 
   for (let fontSize = baseFontSize; fontSize >= minimumFontSize; fontSize -= 0.5) {
     const candidate = measureNodeTypography(
