@@ -63,6 +63,8 @@ test('generateMindmapDslFromSource returns validated DSL metrics for parser-safe
   assert.equal(response.metrics.generatedMeaningfulLineCount, 12);
   assert.equal(response.validation.lineWordLimitSatisfied, true);
   assert.equal(response.validation.expansionTargetSatisfied, true);
+  assert.equal(response.quality.mode, 'retry');
+  assert.equal(response.quality.attemptCount, 2);
   assert.deepEqual(response.validation.parserErrors, []);
 });
 
@@ -108,4 +110,178 @@ test('generateMindmapDslFromSource rejects lines above the 15-word limit', async
     ),
     /15-word per-line limit/i,
   );
+});
+
+test('generateMindmapDslFromSource salvages Main Topic and Sub Topic style output into valid DSL', async () => {
+  const response = await generateMindmapDslFromSource(
+    {
+      sourceText: [
+        'Main Topic: Aspects',
+        'Sub Topic: Introduction to the Aspects',
+        'Sub Topic: Political Theory',
+        'Sub Topic: Comparative Politics',
+        'Sub Topic: Public Administration',
+        'Sub Topic: International Relations',
+        'Sub Topic: Political Economy',
+      ].join('\n'),
+    },
+    {
+      env: testEnv,
+      fetchImpl: async () => new Response(JSON.stringify({
+        choices: [{ message: { content: JSON.stringify({
+          dsl: [
+            'Main Topic: Aspects',
+            'Sub Topic: Introduction to the Aspects',
+            'Sub Topic: Political Theory',
+            'Sub Topic: Comparative Politics',
+            'Sub Topic: Public Administration',
+            'Sub Topic: International Relations',
+            'Sub Topic: Political Economy',
+          ].join('\n'),
+        }) } }],
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    },
+  );
+
+  assert.equal(response.dsl, [
+    '@root: Aspects',
+    '- @branch: Introduction to the Aspects',
+    '- @branch: Political Theory',
+    '- @branch: Comparative Politics',
+    '- @branch: Public Administration',
+    '- @branch: International Relations',
+    '- @branch: Political Economy',
+  ].join('\n'));
+  assert.equal(response.quality.mode, 'retry');
+  assert.deepEqual(response.validation.parserErrors, []);
+});
+
+test('generateMindmapDslFromSource retries when the first parser-safe result is too sparse', async () => {
+  let requestCount = 0;
+
+  const response = await generateMindmapDslFromSource(
+    {
+      sourceText: [
+        'Main Topic: Aspects',
+        'Sub Topic: Introduction to the Aspects',
+        'Sub Topic: Political Theory',
+        'Sub Topic: Comparative Politics',
+        'Sub Topic: Public Administration',
+        'Sub Topic: International Relations',
+        'Sub Topic: Political Economy',
+        'Sub Topic: Political Sociology',
+        'Sub Topic: Public Law',
+        'Sub Topic: Political Philosophy',
+        'Sub Topic: Comparative Government',
+        'Sub Topic: Development Studies',
+      ].join('\n'),
+    },
+    {
+      env: testEnv,
+      fetchImpl: async () => {
+        requestCount += 1;
+
+        if (requestCount === 1) {
+          return new Response(JSON.stringify({
+            choices: [{ message: { content: JSON.stringify({
+              dsl: [
+                '@root: Aspects',
+                '- @branch: Introduction to the Aspects',
+                '- @branch: Political Theory',
+                '- @branch: Comparative Politics',
+                '- @branch: Public Administration',
+                '- @branch: International Relations',
+                '- @branch: Political Economy',
+                '- @branch: Political Sociology',
+                '- @branch: Public Law',
+                '- @branch: Political Philosophy',
+                '- @branch: Comparative Government',
+                '- @branch: Development Studies',
+              ].join('\n'),
+            }) } }],
+          }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        return new Response(JSON.stringify({
+          choices: [{ message: { content: JSON.stringify({
+            dsl: [
+              '@root: Aspects of Political Science',
+              '- @branch: Introduction to the Aspects',
+              '  - aspects identify major divisions within the political science field',
+              '  - each division studies politics from a different analytical viewpoint',
+              '- @branch: Political Theory',
+              '  - political theory develops concepts of justice, liberty, equality, and state',
+              '  - it interprets ideals guiding institutions, authority, and citizenship',
+              '- @branch: Comparative Politics',
+              '  - it compares political systems, parties, institutions, and regimes',
+              '  - comparison explains why countries produce different political outcomes',
+              '- @branch: Public Administration',
+              '  - this aspect studies bureaucracy, management, accountability, and service delivery',
+              '  - it focuses on implementing laws, programs, and public policy',
+              '- @branch: International Relations',
+              '  - it studies relations among states, organizations, and global actors',
+              '  - war, diplomacy, trade, and cooperation shape this field',
+              '- @branch: Political Economy',
+              '  - political economy links economic resources with political power structures',
+              '  - it studies markets, classes, taxation, and development choices',
+              '- @branch: Political Sociology',
+              '  - this aspect studies how society shapes political behavior and institutions',
+              '  - class, religion, identity, and groups influence political life',
+              '- @branch: Public Law',
+              '  - public law studies constitutional, administrative, and governmental legal rules',
+              '  - it defines powers, limits, rights, and institutional responsibilities',
+              '- @branch: Political Philosophy',
+              '  - it asks foundational questions about justice, morality, and authority',
+              '  - it evaluates ideal political order and ethical public conduct',
+              '- @branch: Comparative Government',
+              '  - comparative government examines constitutions, executives, legislatures, and courts',
+              '  - it contrasts parliamentary, presidential, unitary, and federal systems',
+              '- @branch: Development Studies',
+              '  - development studies explores political change in developing societies',
+              '  - it links governance, growth, welfare, participation, reform, and modernization',
+            ].join('\n'),
+          }) } }],
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      },
+    },
+  );
+
+  assert.equal(requestCount, 2);
+  assert.equal(response.dsl.startsWith('@root: Aspects of Political Science'), true);
+  assert.equal(response.validation.expansionTargetSatisfied, true);
+  assert.equal(response.quality.mode, 'retry');
+  assert.equal(response.quality.attemptCount, 2);
+  assert.equal(response.quality.densityStatus, 'target-met');
+});
+
+test('generateMindmapDslFromSource reports below-target density when even the retry remains too sparse', async () => {
+  const response = await generateMindmapDslFromSource(
+    {
+      sourceText: 'Main Topic: Aspects\nSub Topic: Political Theory\nSub Topic: Public Law',
+      detailLevel: 'detailed',
+    },
+    {
+      env: testEnv,
+      fetchImpl: async () => new Response(JSON.stringify({
+        choices: [{ message: { content: JSON.stringify({
+          dsl: '@root: Aspects\n- @branch: Political Theory\n  - studies ideas of justice\n- @branch: Public Law\n  - studies constitutional rules',
+        }) } }],
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    },
+  );
+
+  assert.equal(response.validation.expansionTargetSatisfied, false);
+  assert.equal(response.quality.densityStatus, 'below-target');
 });

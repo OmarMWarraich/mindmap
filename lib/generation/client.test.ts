@@ -23,6 +23,12 @@ test('parseSourceMindmapGenerationClientResponse accepts the expected route payl
       lineWordLimitSatisfied: true,
       expansionTargetSatisfied: true,
     },
+    quality: {
+      attemptCount: 1,
+      mode: 'first-pass',
+      densityStatus: 'target-met',
+      underdevelopedBranchCount: 0,
+    },
   }), {
     dsl: '@root: Photosynthesis',
     metrics: {
@@ -38,6 +44,12 @@ test('parseSourceMindmapGenerationClientResponse accepts the expected route payl
       parserErrors: [],
       lineWordLimitSatisfied: true,
       expansionTargetSatisfied: true,
+    },
+    quality: {
+      attemptCount: 1,
+      mode: 'first-pass',
+      densityStatus: 'target-met',
+      underdevelopedBranchCount: 0,
     },
   });
 });
@@ -78,6 +90,12 @@ test('requestMindmapDslGenerationFromApi posts raw notes to the DSL generation e
             parserErrors: [],
             lineWordLimitSatisfied: true,
             expansionTargetSatisfied: true,
+          },
+          quality: {
+            attemptCount: 1,
+            mode: 'first-pass',
+            densityStatus: 'target-met',
+            underdevelopedBranchCount: 0,
           },
         }), {
           status: 200,

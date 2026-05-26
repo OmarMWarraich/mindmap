@@ -52,6 +52,7 @@ test('dsl generation route returns validated DSL output for a valid request', as
     assert.equal(payload.metrics.generatedMeaningfulLineCount, 12);
     assert.equal(payload.validation.lineWordLimitSatisfied, true);
     assert.equal(payload.validation.expansionTargetSatisfied, true);
+    assert.equal(payload.quality.mode, 'retry');
   } finally {
     process.env = originalEnv;
     globalThis.fetch = originalFetch;

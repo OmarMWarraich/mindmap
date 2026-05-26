@@ -3,6 +3,9 @@ export interface SourceMindmapGenerationPromptInput {
   sourceMeaningfulLineCount: number;
   targetMinLineCount: number;
   targetMaxLineCount: number;
+  detailLevel?: 'standard' | 'detailed';
+  previousDslAttempt?: string;
+  retryReason?: string;
 }
 
 export interface SourceMindmapGenerationPrompt {
@@ -42,17 +45,34 @@ Content goals:
 - Never exceed 15 words on any DSL line.
 - Expand the outline through additional valid child lines, not longer lines.
 
+Minimum density rules:
+- Every branch should normally contain at least 2 child lines when the source supports it.
+- If a branch has no explicit sub-sub-topic, add compact explanation lines instead of leaving it empty.
+- Do not stop at bare topic labels.
+- If the source is a list of aspects or branches, explain what each aspect studies or why it matters.
+- Prefer one more valid child line over an underdeveloped branch.
+
 Density target:
 - Source meaningful non-empty line count: {{SOURCE_LINE_COUNT}}
 - Target generated meaningful line count range: {{TARGET_MIN_LINE_COUNT}} to {{TARGET_MAX_LINE_COUNT}}
 - Aim to stay within that range when the source supports it.
+- Detail preference: {{DETAIL_PREFERENCE}}
 
 Output rules:
 - Use exactly one @root.
 - If the source already has one clear umbrella topic, use it as the root.
 - If the source has multiple top-level topics, invent one concise umbrella root for the whole set.
+- If the source root label is generic, improve it to a clearer academic label when justified.
 - Keep labels readable for mindmap nodes.
 - Do not use markdown headings, code fences, or prose outside the DSL.
+
+Validation requirements before you answer:
+- The DSL must parse with one @root.
+- Each generated line must stay within 15 words.
+- The outline should approach the target range when the source supports it.
+- Avoid outputs that are only bare branch lists.
+
+{{RETRY_BLOCK}}
 
 SOURCE NOTES:
 {{SOURCE_TEXT}}
@@ -62,12 +82,29 @@ ${sourceMindmapGenerationOutputContract}`;
 export function createSourceMindmapGenerationPrompt(
   input: SourceMindmapGenerationPromptInput,
 ): SourceMindmapGenerationPrompt {
+  const detailPreference = input.detailLevel === 'detailed'
+    ? 'detailed: prefer the upper half of the target range and develop thin branches further'
+    : 'standard: meet the target range without padding';
+  const retryBlock = input.previousDslAttempt && input.retryReason
+    ? `REVISION REQUIRED:
+- Previous DSL attempt was too weak.
+- Reason: ${input.retryReason}
+- Fix the density and branch development problems.
+- Keep the same topic coverage, but add concise explanatory child lines.
+
+PREVIOUS DSL ATTEMPT:
+${input.previousDslAttempt}
+`
+    : '';
+
   return {
     system: sourceMindmapGenerationSystemPrompt,
     user: sourceMindmapGenerationUserPromptTemplate
       .replace('{{SOURCE_LINE_COUNT}}', String(input.sourceMeaningfulLineCount))
       .replace('{{TARGET_MIN_LINE_COUNT}}', String(input.targetMinLineCount))
       .replace('{{TARGET_MAX_LINE_COUNT}}', String(input.targetMaxLineCount))
+      .replace('{{DETAIL_PREFERENCE}}', detailPreference)
+      .replace('{{RETRY_BLOCK}}', retryBlock)
       .replace('{{SOURCE_TEXT}}', input.sourceText),
   };
 }
