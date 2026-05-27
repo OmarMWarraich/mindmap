@@ -35,7 +35,11 @@ import type { GeneratedMindmap } from '../lib/mindmap/schema';
 import type { LayoutWorkerDiagnostics } from '../lib/mindmap/worker-diagnostics';
 import { downloadNodeAsPng } from '../lib/export/png';
 import {
+  getOrCreateActiveProject,
+  loadCloudDraft,
   loadWorkspaceDraft,
+  recordGenerationHistory,
+  saveCloudDraft,
   saveWorkspaceDraft,
 } from '../lib/persistence/workspace';
 import { parseMindmapDsl } from '../lib/dsl/parse';
@@ -48,6 +52,10 @@ const enableMonacoInlineCompletions = true;
 let mindmapDslInlineSuggestionPreference: InlineSuggestionPreference = 'auto';
 
 type InlineSuggestionPreference = 'auto' | 'continuation' | 'enrichment';
+
+interface StudyWorkspaceProps {
+  userId: string;
+}
 type SourceGenerationDetailLevel = 'standard' | 'detailed';
 
 interface ExportControlState {
@@ -82,7 +90,7 @@ function isIgnorableMonacoCancellation(reason: unknown): boolean {
   return typeof reason.stack === 'string' && reason.stack.includes('monaco-editor');
 }
 
-export default function StudyWorkspace() {
+export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const editorDisposablesRef = useRef<Array<{ dispose(): void }>>([]);
   const previewRef = useRef<MindmapSvgPreviewHandle | null>(null);
@@ -135,6 +143,7 @@ export default function StudyWorkspace() {
   const [inlineSuggestionPreference, setInlineSuggestionPreference] =
     useState<InlineSuggestionPreference>('auto');
   const [exportControls, setExportControls] = useState<ExportControlState>(defaultExportControlState);
+  const [projectId, setProjectId] = useState<string | null>(null);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -214,48 +223,74 @@ export default function StudyWorkspace() {
   useEffect(() => {
     let cancelled = false;
 
-    void loadWorkspaceDraft()
-      .then((draft) => {
-        if (cancelled) {
+    void (async () => {
+      try {
+        // 1. Get or create the user's active project
+        const project = await getOrCreateActiveProject();
+
+        if (cancelled) return;
+        setProjectId(project.id);
+
+        // 2. Try cloud draft first
+        const cloudDraft = await loadCloudDraft(project.id);
+
+        if (cancelled) return;
+
+        if (cloudDraft) {
+          setOutline(cloudDraft.outline);
+          setDebouncedOutline(cloudDraft.outline);
+          setRawNotes(cloudDraft.rawNotes ?? '');
+          setSelectedDetailLevel(cloudDraft.selectedDetailLevel ?? 'standard');
+          setLatestDslGeneration(cloudDraft.latestDslGeneration ?? null);
+          setLatestMindmapSnapshot(cloudDraft.mindmap);
+          setLatestMindmapSnapshotOutline(cloudDraft.outline);
+          setPreviewTransform(cloudDraft.previewTransform);
+          setDraftStatus({
+            tone: 'success',
+            message: 'Restored saved project from the cloud.',
+          });
+          hasRestoredDraftRef.current = true;
           return;
         }
 
-        if (!draft) {
+        // 3. Fall back to IndexedDB local draft
+        const localDraft = await loadWorkspaceDraft();
+
+        if (cancelled) return;
+
+        if (localDraft) {
+          setOutline(localDraft.outline);
+          setDebouncedOutline(localDraft.outline);
+          setRawNotes(localDraft.rawNotes ?? '');
+          setSelectedDetailLevel(localDraft.selectedDetailLevel ?? 'standard');
+          setLatestDslGeneration(localDraft.latestDslGeneration ?? null);
+          setLatestMindmapSnapshot(localDraft.mindmap);
+          setLatestMindmapSnapshotOutline(localDraft.outline);
+          setPreviewTransform(localDraft.previewTransform);
+          setDraftStatus({
+            tone: 'success',
+            message: 'Restored the saved draft and preview state.',
+          });
+          // Migrate local draft to cloud
+          void saveCloudDraft(project.id, localDraft);
+        } else {
           setDraftStatus({
             tone: 'idle',
-            message: 'Local draft storage is ready for this workspace.',
+            message: 'Project ready. Paste notes to begin.',
           });
-          return;
         }
-
-        setOutline(draft.outline);
-        setDebouncedOutline(draft.outline);
-        setRawNotes(draft.rawNotes ?? '');
-        setSelectedDetailLevel(draft.selectedDetailLevel ?? 'standard');
-        setLatestDslGeneration(draft.latestDslGeneration ?? null);
-        setLatestMindmapSnapshot(draft.mindmap);
-        setLatestMindmapSnapshotOutline(draft.outline);
-        setPreviewTransform(draft.previewTransform);
-        setDraftStatus({
-          tone: 'success',
-          message: 'Restored the saved draft and preview state.',
-        });
-      })
-      .catch((error) => {
-        if (cancelled) {
-          return;
-        }
-
+      } catch (error) {
+        if (cancelled) return;
         setDraftStatus({
           tone: 'error',
-          message: error instanceof Error ? error.message : 'Local draft restore failed.',
+          message: error instanceof Error ? error.message : 'Failed to load project.',
         });
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) {
           hasRestoredDraftRef.current = true;
         }
-      });
+      }
+    })();
 
     return () => {
       cancelled = true;
@@ -404,8 +439,8 @@ export default function StudyWorkspace() {
     }
 
     const timeoutId = window.setTimeout(() => {
-      void saveWorkspaceDraft({
-        version: 1,
+      const draft = {
+        version: 1 as const,
         updatedAt: new Date().toISOString(),
         outline,
         rawNotes,
@@ -413,7 +448,9 @@ export default function StudyWorkspace() {
         latestDslGeneration,
         mindmap: latestMindmapSnapshot,
         previewTransform,
-      })
+      };
+
+      void saveWorkspaceDraft(draft)
         .then((saved) => {
           if (!saved) {
             setDraftStatus({
@@ -425,7 +462,7 @@ export default function StudyWorkspace() {
 
           setDraftStatus({
             tone: 'success',
-            message: 'Draft and preview state saved locally.',
+            message: 'Draft and preview state saved.',
           });
         })
         .catch((error) => {
@@ -434,12 +471,16 @@ export default function StudyWorkspace() {
             message: error instanceof Error ? error.message : 'Local draft save failed.',
           });
         });
+
+      if (projectId) {
+        void saveCloudDraft(projectId, draft);
+      }
     }, 250);
 
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [latestDslGeneration, latestMindmapSnapshot, outline, previewTransform, rawNotes, selectedDetailLevel]);
+  }, [latestDslGeneration, latestMindmapSnapshot, outline, previewTransform, projectId, rawNotes, selectedDetailLevel]);
 
   useEffect(() => {
     return () => {
@@ -528,6 +569,16 @@ export default function StudyWorkspace() {
       setOutline(response.dsl);
       setDebouncedOutline(response.dsl);
       setLatestDslGeneration(response);
+
+      if (projectId) {
+        void recordGenerationHistory(projectId, {
+          detailLevel,
+          dsl: response.dsl,
+          densityStatus: response.quality.densityStatus,
+          nodeCount: response.metrics.generatedMeaningfulLineCount,
+          rawNotes: sourceText,
+        });
+      }
       setGenerationStatus({
         tone: 'success',
         message: response.quality.densityStatus === 'target-met'

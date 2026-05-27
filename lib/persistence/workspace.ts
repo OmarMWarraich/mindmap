@@ -86,3 +86,112 @@ async function getWorkspaceDb(): Promise<IDBPDatabase<MindmapWorkspaceDb> | null
 function isIndexedDbAvailable(): boolean {
   return typeof indexedDB !== 'undefined';
 }
+
+// ---------------------------------------------------------------------------
+// Cloud persistence (API-backed, per-project)
+// ---------------------------------------------------------------------------
+
+export interface CloudProject {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CloudDraft = {
+  id: string;
+  projectId: string;
+  outline: string;
+  rawNotes: string;
+  selectedDetailLevel: string;
+  mindmap: unknown;
+  previewTransform: unknown;
+  updatedAt: string;
+};
+
+export async function getOrCreateActiveProject(): Promise<CloudProject> {
+  const listRes = await fetch('/api/projects');
+
+  if (!listRes.ok) {
+    throw new Error(`Failed to load projects: ${listRes.status}`);
+  }
+
+  const projects = (await listRes.json()) as CloudProject[];
+
+  if (projects.length > 0) {
+    return projects[0];
+  }
+
+  const createRes = await fetch('/api/projects', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'My First Project' }),
+  });
+
+  if (!createRes.ok) {
+    throw new Error(`Failed to create project: ${createRes.status}`);
+  }
+
+  return (await createRes.json()) as CloudProject;
+}
+
+export async function loadCloudDraft(projectId: string): Promise<PersistedWorkspaceDraft | null> {
+  const res = await fetch(`/api/projects/${projectId}/draft`);
+
+  if (!res.ok) {
+    return null;
+  }
+
+  const raw = await res.json();
+
+  if (!raw) {
+    return null;
+  }
+
+  return parsePersistedWorkspaceDraft({
+    version: 1,
+    updatedAt: raw.updatedAt ?? new Date().toISOString(),
+    outline: raw.outline ?? '',
+    rawNotes: raw.rawNotes ?? '',
+    selectedDetailLevel: raw.selectedDetailLevel ?? 'standard',
+    latestDslGeneration: null,
+    mindmap: raw.mindmap ?? null,
+    previewTransform: raw.previewTransform ?? { scale: 1, translateX: 0, translateY: 0 },
+  });
+}
+
+export async function saveCloudDraft(
+  projectId: string,
+  draft: PersistedWorkspaceDraft,
+): Promise<boolean> {
+  const res = await fetch(`/api/projects/${projectId}/draft`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      outline: draft.outline,
+      rawNotes: draft.rawNotes ?? '',
+      selectedDetailLevel: draft.selectedDetailLevel ?? 'standard',
+      mindmap: draft.mindmap,
+      previewTransform: draft.previewTransform,
+    }),
+  });
+
+  return res.ok;
+}
+
+export async function recordGenerationHistory(
+  projectId: string,
+  entry: {
+    detailLevel: string;
+    dsl: string;
+    densityStatus: string;
+    nodeCount: number;
+    rawNotes: string;
+  },
+): Promise<void> {
+  await fetch(`/api/projects/${projectId}/history`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(entry),
+  });
+}
