@@ -56,6 +56,17 @@ type InlineSuggestionPreference = 'auto' | 'continuation' | 'enrichment';
 interface StudyWorkspaceProps {
   userId: string;
 }
+
+interface HistoryEntry {
+  id: string;
+  projectId: string;
+  createdAt: string;
+  detailLevel: string;
+  dsl: string;
+  densityStatus: string;
+  nodeCount: number;
+  rawNotes: string;
+}
 type SourceGenerationDetailLevel = 'standard' | 'detailed';
 
 interface ExportControlState {
@@ -144,6 +155,9 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
     useState<InlineSuggestionPreference>('auto');
   const [exportControls, setExportControls] = useState<ExportControlState>(defaultExportControlState);
   const [projectId, setProjectId] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -542,6 +556,39 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
     }
   }
 
+  async function handleToggleHistory(): Promise<void> {
+    if (historyOpen) {
+      setHistoryOpen(false);
+      return;
+    }
+
+    if (!projectId) return;
+
+    setHistoryOpen(true);
+    setHistoryLoading(true);
+
+    try {
+      const res = await fetch(`/api/projects/${projectId}/history`);
+      if (res.ok) {
+        setHistoryEntries((await res.json()) as HistoryEntry[]);
+      }
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  function handleRestoreFromHistory(entry: HistoryEntry): void {
+    editorRef.current?.setValue(entry.dsl);
+    editorRef.current?.focus();
+    editorRef.current?.setPosition({ lineNumber: 1, column: 1 });
+    setOutline(entry.dsl);
+    setDebouncedOutline(entry.dsl);
+    if (entry.rawNotes) {
+      setRawNotes(entry.rawNotes);
+    }
+    setHistoryOpen(false);
+  }
+
   async function handleGenerateDsl(detailLevel: SourceGenerationDetailLevel = selectedDetailLevel): Promise<void> {
     const sourceText = rawNotes.trim();
 
@@ -626,6 +673,17 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
           <span className="inline-flex items-center rounded-full bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700">
             {isParsing ? 'Parsing…' : `Parsed ${nodeCount} nodes`}
           </span>
+          {projectId ? (
+            <button
+              className="rounded-full border border-zinc-200 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+              onClick={() => {
+                void handleToggleHistory();
+              }}
+              type="button"
+            >
+              {historyOpen ? 'Close history' : 'Generation history'}
+            </button>
+          ) : null}
           <button
             className="rounded-full border border-zinc-200 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={!layoutResult || layoutStatus === 'loading'}
@@ -638,6 +696,50 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
           </button>
         </div>
       </div>
+
+      {historyOpen ? (
+        <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+          <h3 className="mb-3 text-sm font-semibold text-zinc-950">Generation history</h3>
+          {historyLoading ? (
+            <p className="text-sm text-zinc-500">Loading…</p>
+          ) : historyEntries.length === 0 ? (
+            <p className="text-sm text-zinc-500">No generations recorded yet.</p>
+          ) : (
+            <ul className="grid gap-2">
+              {historyEntries.map((entry) => (
+                <li
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3"
+                  key={entry.id}
+                >
+                  <div className="grid gap-1">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                      <span>{new Date(entry.createdAt).toLocaleString()}</span>
+                      <span className="rounded-full bg-zinc-100 px-2 py-0.5 font-medium text-zinc-700">{entry.detailLevel}</span>
+                      <span className={`rounded-full px-2 py-0.5 font-medium ${
+                        entry.densityStatus === 'target-met'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : entry.densityStatus === 'below-target'
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-sky-100 text-sky-700'
+                      }`}>{entry.densityStatus}</span>
+                      <span>{entry.nodeCount} nodes</span>
+                    </div>
+                  </div>
+                  <button
+                    className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 transition hover:bg-zinc-100"
+                    onClick={() => {
+                      handleRestoreFromHistory(entry);
+                    }}
+                    type="button"
+                  >
+                    Restore
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
 
       <div className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
         <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${

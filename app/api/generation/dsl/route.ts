@@ -1,5 +1,6 @@
 import { ZodError } from 'zod';
 
+import { auth } from '../../../../auth.ts';
 import {
   generateMindmapDslFromSource,
   sourceMindmapGenerationRequestSchema,
@@ -7,9 +8,13 @@ import {
 
 export const runtime = 'nodejs';
 
-export async function POST(request: Request) {
+export const POST = auth(async (req) => {
+  if (!req.auth?.user?.id) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
-    const payload = sourceMindmapGenerationRequestSchema.parse(await request.json());
+    const payload = sourceMindmapGenerationRequestSchema.parse(await req.json());
     const response = await generateMindmapDslFromSource(payload);
     return Response.json(response);
   } catch (error) {
@@ -18,4 +23,4 @@ export async function POST(request: Request) {
 
     return Response.json({ error: message }, { status });
   }
-}
+});

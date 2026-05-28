@@ -1,5 +1,6 @@
 import { ZodError } from 'zod';
 
+import { auth } from '../../../auth.ts';
 import {
   consumeInlineCompletionRateLimit,
   createInlineCompletionCacheKey,
@@ -11,10 +12,14 @@ import { inlineCompletionRequestSchema, generateInlineCompletion } from '../../.
 
 export const runtime = 'nodejs';
 
-export async function POST(request: Request) {
+export const POST = auth(async (req) => {
+  if (!req.auth?.user?.id) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
-    const payload = inlineCompletionRequestSchema.parse(await request.json());
-    const clientKey = getInlineCompletionClientKey(request);
+    const payload = inlineCompletionRequestSchema.parse(await req.json());
+    const clientKey = getInlineCompletionClientKey(req);
     const rateLimit = consumeInlineCompletionRateLimit(clientKey);
 
     if (!rateLimit.allowed) {
@@ -43,4 +48,4 @@ export async function POST(request: Request) {
 
     return Response.json({ error: message }, { status });
   }
-}
+});
