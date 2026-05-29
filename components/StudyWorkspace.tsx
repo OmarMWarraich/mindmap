@@ -1,27 +1,16 @@
 'use client';
 
-import Editor from '@monaco-editor/react';
 import { startTransition, useEffect, useMemo, useRef, useState } from 'react';
-import type { Monaco } from '@monaco-editor/react';
-import type { CancellationToken, editor, languages } from 'monaco-editor';
 
+import DslEditorPanel from './DslEditorPanel';
+import type { DslEditorPanelHandle } from './DslEditorPanel';
 import MindmapSvgPreview from './MindmapSvgPreview';
 import SourceNotesPanel from './SourceNotesPanel';
 import type { SourceGenerationDetailLevel } from './SourceNotesPanel';
 import { useWorkspace } from './WorkspaceContext';
 import type { MindmapSvgPreviewHandle } from './MindmapSvgPreview';
-import {
-  requestInlineCompletionFromApi,
-  trackInlineCompletionEvent,
-} from '../lib/completion/client';
 import { requestMindmapDslGenerationFromApi } from '../lib/generation/client';
 import type { SourceMindmapGenerationResponse } from '../lib/generation/source-schema';
-import { getMindmapSectionContext } from '../lib/dsl/editor-context';
-import {
-  createInlineSuggestionRange,
-  getStubInlineSuggestionSet,
-  pickPreferredStubSuggestion,
-} from '../lib/dsl/inline-completion';
 import { generateMindmapFromAst } from '../lib/mindmap/from-ast';
 import {
   createExportMindmapVariant,
@@ -48,13 +37,6 @@ import {
 import { parseMindmapDsl } from '../lib/dsl/parse';
 import { mindmapDslStarterOutline } from '../lib/dsl/mvp';
 import type { MindmapValidationIssue } from '../lib/dsl/validation';
-
-let mindmapDslInlineCompletionRegistered = false;
-const mindmapDslLanguageId = 'mindmap-dsl';
-const enableMonacoInlineCompletions = true;
-let mindmapDslInlineSuggestionPreference: InlineSuggestionPreference = 'auto';
-
-type InlineSuggestionPreference = 'auto' | 'continuation' | 'enrichment';
 
 interface StudyWorkspaceProps {
   userId: string;
@@ -103,20 +85,13 @@ function isIgnorableMonacoCancellation(reason: unknown): boolean {
 }
 
 export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps) {
-  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
-  const editorDisposablesRef = useRef<Array<{ dispose(): void }>>([]);
+  const dslEditorRef = useRef<DslEditorPanelHandle | null>(null);
   const previewRef = useRef<MindmapSvgPreviewHandle | null>(null);
   const hasRestoredDraftRef = useRef(false);
   const layoutRequestIdRef = useRef(0);
-  const ghostTextDecorationIdsRef = useRef<string[]>([]);
-  const ghostTextStateRef = useRef<{
-    position: { lineNumber: number; column: number };
-    suggestionText: string;
-  } | null>(null);
   const [outline, setOutline] = useState(mindmapDslStarterOutline);
   const [debouncedOutline, setDebouncedOutline] = useState(mindmapDslStarterOutline);
   const [rawNotes, setRawNotes] = useState('');
-  const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
   const [latestMindmapSnapshot, setLatestMindmapSnapshot] = useState<GeneratedMindmap | null>(null);
   const [latestMindmapSnapshotOutline, setLatestMindmapSnapshotOutline] = useState<string | null>(null);
   const [layoutResult, setLayoutResult] = useState<MindmapLayoutResult | null>(null);
@@ -152,8 +127,6 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
     phase: 'main-thread',
     summary: 'Using the in-page layout engine for beta preview rendering.',
   });
-  const [inlineSuggestionPreference, setInlineSuggestionPreference] =
-    useState<InlineSuggestionPreference>('auto');
   const [exportControls, setExportControls] = useState<ExportControlState>(defaultExportControlState);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
@@ -174,18 +147,6 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
   }, [outline]);
 
   const parseResult = useMemo(() => parseMindmapDsl(debouncedOutline), [debouncedOutline]);
-  const sectionContext = useMemo(
-    () => getMindmapSectionContext(outline, cursorPosition),
-    [cursorPosition, outline],
-  );
-  const stubSuggestionSet = useMemo(
-    () => getStubInlineSuggestionSet(sectionContext),
-    [sectionContext],
-  );
-  const preferredStubSuggestion = useMemo(
-    () => pickPreferredStubSuggestion(stubSuggestionSet, inlineSuggestionPreference),
-    [inlineSuggestionPreference, stubSuggestionSet],
-  );
   const isParsing = outline !== debouncedOutline;
   const generatedMindmap = useMemo(() => {
     if (!parseResult.ast) {
@@ -211,30 +172,6 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
 
     return count + 1 + countChildren(branch.children);
   }, 1);
-
-  useEffect(() => {
-    mindmapDslInlineSuggestionPreference = inlineSuggestionPreference;
-  }, [inlineSuggestionPreference]);
-
-  useEffect(() => {
-    if (process.env.NODE_ENV !== 'development') {
-      return;
-    }
-
-    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      if (!isIgnorableMonacoCancellation(event.reason)) {
-        return;
-      }
-
-      event.preventDefault();
-    };
-
-    window.addEventListener('unhandledrejection', handleUnhandledRejection);
-
-    return () => {
-      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
-    };
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -322,61 +259,6 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
     setLatestMindmapSnapshot(generatedMindmap);
     setLatestMindmapSnapshotOutline(outline);
   }, [generatedMindmap, outline]);
-
-  useEffect(() => {
-    if (enableMonacoInlineCompletions) {
-      const editor = editorRef.current;
-
-      if (editor) {
-        ghostTextDecorationIdsRef.current = editor.deltaDecorations(ghostTextDecorationIdsRef.current, []);
-      }
-
-      ghostTextStateRef.current = null;
-      return;
-    }
-
-    const editor = editorRef.current;
-
-    if (!editor) {
-      return;
-    }
-
-    const ghostTextPreview = getGhostTextPreview(preferredStubSuggestion?.insertText ?? '');
-
-    if (!ghostTextPreview) {
-      ghostTextStateRef.current = null;
-      ghostTextDecorationIdsRef.current = editor.deltaDecorations(ghostTextDecorationIdsRef.current, []);
-      return;
-    }
-
-    const position = editor.getPosition() ?? cursorPosition;
-    ghostTextStateRef.current = {
-      position: {
-        lineNumber: position.lineNumber,
-        column: position.column,
-      },
-      suggestionText: preferredStubSuggestion?.insertText ?? '',
-    };
-
-    ghostTextDecorationIdsRef.current = editor.deltaDecorations(
-      ghostTextDecorationIdsRef.current,
-      [
-        {
-          range: createInlineSuggestionRange(position),
-          options: {
-            after: {
-              content: ghostTextPreview,
-              cursorStops: monacoInjectedTextCursorStops.none,
-              inlineClassName: 'mindmap-editor-ghost-text',
-              inlineClassNameAffectsLetterSpacing: true,
-            },
-            showIfCollapsed: true,
-            stickiness: 1,
-          },
-        },
-      ],
-    );
-  }, [cursorPosition, preferredStubSuggestion]);
 
   useEffect(() => {
     if (!effectiveMindmap) {
@@ -499,15 +381,6 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
     };
   }, [latestDslGeneration, latestMindmapSnapshot, outline, previewTransform, projectId, rawNotes, selectedDetailLevel]);
 
-  useEffect(() => {
-    return () => {
-      editorDisposablesRef.current.forEach((disposable) => {
-        disposable.dispose();
-      });
-      editorDisposablesRef.current = [];
-    };
-  }, []);
-
   async function handleDownloadPng(): Promise<void> {
     if (!effectiveMindmap) {
       setExportStatus({
@@ -581,9 +454,9 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
   }
 
   function handleRestoreFromHistory(entry: HistoryEntry): void {
-    editorRef.current?.setValue(entry.dsl);
-    editorRef.current?.focus();
-    editorRef.current?.setPosition({ lineNumber: 1, column: 1 });
+    dslEditorRef.current?.setValue(entry.dsl);
+    dslEditorRef.current?.focus();
+    dslEditorRef.current?.setPosition({ lineNumber: 1, column: 1 });
     setOutline(entry.dsl);
     setDebouncedOutline(entry.dsl);
     if (entry.rawNotes) {
@@ -613,9 +486,9 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
     try {
       const response = await requestMindmapDslGenerationFromApi({ sourceText, detailLevel });
 
-      editorRef.current?.setValue(response.dsl);
-      editorRef.current?.focus();
-      editorRef.current?.setPosition({ lineNumber: 1, column: 1 });
+      dslEditorRef.current?.setValue(response.dsl);
+      dslEditorRef.current?.focus();
+      dslEditorRef.current?.setPosition({ lineNumber: 1, column: 1 });
       setOutline(response.dsl);
       setDebouncedOutline(response.dsl);
       setLatestDslGeneration(response);
@@ -647,10 +520,16 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
   }
 
   function handleGenerateMindmapFromDsl(): void {
-    const currentOutline = editorRef.current?.getValue() ?? outline;
+    const currentOutline = dslEditorRef.current?.getValue() ?? outline;
 
     setOutline(currentOutline);
     setDebouncedOutline(currentOutline);
+  }
+
+  function handleResetDsl(): void {
+    dslEditorRef.current?.setValue(mindmapDslStarterOutline);
+    setOutline(mindmapDslStarterOutline);
+    setDebouncedOutline(mindmapDslStarterOutline);
   }
 
   function handleClearNotes(): void {
@@ -786,16 +665,9 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
         <p className="text-xs text-zinc-500">Last generated from retry pass for higher detail coverage.</p>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-        <section className="grid gap-4 rounded-3xl border border-zinc-200 bg-zinc-50 p-4">
-          <div className="grid gap-1">
-            <h2 className="text-xl font-semibold text-zinc-950">Study editor</h2>
-            <p className="max-w-2xl text-sm leading-6 text-zinc-600">
-              Paste raw notes, generate compact mindmap DSL, then inspect or refine the
-              result in Monaco before exporting.
-            </p>
-          </div>
-
+      <div className="grid gap-6 xl:grid-cols-2">
+        {/* Left column: Source Notes + Validation */}
+        <div className="flex flex-col gap-4">
           <SourceNotesPanel
             generationStatus={generationStatus}
             latestDslGeneration={latestDslGeneration}
@@ -809,136 +681,6 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
             selectedDetailLevel={selectedDetailLevel}
           />
 
-          <div className="flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="grid gap-1">
-              <p className="text-sm font-medium text-emerald-900">DSL editor</p>
-              <p className="text-sm leading-6 text-emerald-800/80">
-                Generated DSL lands here automatically. Review or edit it, then generate the mindmap from this editor.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <button
-                className="rounded-full bg-emerald-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-800"
-                onClick={() => {
-                  handleGenerateMindmapFromDsl();
-                }}
-                type="button"
-              >
-                Generate mindmap
-              </button>
-              <button
-                className="rounded-full border border-emerald-300 bg-white px-4 py-2 text-sm font-medium text-emerald-900 transition hover:bg-emerald-100"
-                onClick={() => {
-                  editorRef.current?.setValue(mindmapDslStarterOutline);
-                  setOutline(mindmapDslStarterOutline);
-                  setDebouncedOutline(mindmapDslStarterOutline);
-                }}
-                type="button"
-              >
-                Reset DSL
-              </button>
-            </div>
-          </div>
-
-          <div className="h-[460px] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-            <Editor
-              beforeMount={configureMindmapDslMonaco}
-              defaultValue={mindmapDslStarterOutline}
-              defaultLanguage={mindmapDslLanguageId}
-              height="100%"
-              loading={editorLoadingFallback}
-              onChange={(value) => {
-                setOutline(value ?? '');
-              }}
-              onMount={(editor, monaco) => {
-                editorDisposablesRef.current.forEach((disposable) => {
-                  disposable.dispose();
-                });
-                editorDisposablesRef.current = [];
-                editorRef.current = editor;
-                const position = editor.getPosition();
-
-                if (position) {
-                  setCursorPosition(position);
-                }
-
-                editorDisposablesRef.current.push(
-                  editor.onDidChangeCursorPosition((event) => {
-                    setCursorPosition(event.position);
-                  }),
-                );
-                editorDisposablesRef.current.push(
-                  editor.onDidChangeModelContent(() => {
-                    const nextPosition = editor.getPosition();
-
-                    if (nextPosition) {
-                      setCursorPosition(nextPosition);
-                    }
-                  }),
-                );
-                editorDisposablesRef.current.push(
-                  editor.onKeyDown((event) => {
-                    if (enableMonacoInlineCompletions) {
-                      return;
-                    }
-
-                    if (event.browserEvent.key !== 'Tab') {
-                      return;
-                    }
-
-                    const ghostTextState = ghostTextStateRef.current;
-                    const currentPosition = editor.getPosition();
-                    const selection = editor.getSelection();
-
-                    if (!ghostTextState || !currentPosition || !selection || !selection.isEmpty()) {
-                      return;
-                    }
-
-                    if (
-                      currentPosition.lineNumber !== ghostTextState.position.lineNumber ||
-                      currentPosition.column !== ghostTextState.position.column
-                    ) {
-                      return;
-                    }
-
-                    event.preventDefault();
-                    event.stopPropagation();
-                    editor.executeEdits('mindmap-ghost-text', [
-                      {
-                        range: createInlineSuggestionRange(ghostTextState.position),
-                        text: ghostTextState.suggestionText,
-                        forceMoveMarkers: true,
-                      },
-                    ]);
-                    editor.pushUndoStop();
-                    ghostTextStateRef.current = null;
-                    ghostTextDecorationIdsRef.current = editor.deltaDecorations(
-                      ghostTextDecorationIdsRef.current,
-                      [],
-                    );
-                    const nextPosition = editor.getPosition();
-                    if (nextPosition) {
-                      setCursorPosition(nextPosition);
-                    }
-                  }),
-                );
-                monaco.editor.remeasureFonts();
-              }}
-              options={{
-                automaticLayout: true,
-                glyphMargin: false,
-                inlineSuggest: { enabled: enableMonacoInlineCompletions },
-                minimap: { enabled: false },
-                padding: { top: 16, bottom: 16 },
-                scrollBeyondLastLine: false,
-                wordWrap: 'on',
-              }}
-              path="mindmap://study-outline.dsl"
-              theme="light"
-            />
-          </div>
-
           <div className="grid gap-4 lg:grid-cols-2">
             <ValidationPanel
               issues={parseResult.errors}
@@ -951,9 +693,21 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
               title={`Warnings (${parseResult.warnings.length})`}
             />
           </div>
-        </section>
+        </div>
 
-        <aside className="grid gap-4 rounded-3xl border border-zinc-200 bg-zinc-50 p-5">
+        {/* Right column: DSL Editor (upper) + Preview/Export (lower) */}
+        <div className="flex flex-col gap-4">
+          <div className="h-[480px]">
+            <DslEditorPanel
+              ref={dslEditorRef}
+              defaultValue={mindmapDslStarterOutline}
+              onChange={setOutline}
+              onGenerateMindmap={handleGenerateMindmapFromDsl}
+              onResetDsl={handleResetDsl}
+            />
+          </div>
+
+          <aside className="grid gap-4 rounded-3xl border border-zinc-200 bg-zinc-50 p-5">
           <div className="grid gap-1">
             <h2 className="text-xl font-semibold text-zinc-950">Mindmap preview</h2>
             <p className="text-sm leading-6 text-zinc-600">
@@ -1096,6 +850,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
             transform={previewTransform}
           />
         </aside>
+        </div>
       </div>
     </section>
   );
@@ -1193,165 +948,4 @@ function formatIssueLocation(issue: MindmapValidationIssue): string {
   }
 
   return column == null ? `line ${line}` : `line ${line}, col ${column}`;
-}
-
-const monacoInjectedTextCursorStops = {
-  none: 3,
-} as const;
-
-function getGhostTextPreview(insertText: string): string {
-  if (!insertText) {
-    return '';
-  }
-
-  return insertText
-    .replace(/\r?\n/g, '  ↵  ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function linkAbortControllerToCancellationToken(token: CancellationToken): {
-  abortController: AbortController;
-  dispose(): void;
-} {
-  const abortController = new AbortController();
-  const listener = token.onCancellationRequested(() => {
-    abortController.abort();
-  });
-
-  return {
-    abortController,
-    dispose() {
-      listener.dispose();
-    },
-  };
-}
-
-function isAbortError(error: unknown): boolean {
-  return error instanceof Error && error.name === 'AbortError';
-}
-
-function createInlineCompletionCorrelationId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-
-  return `completion-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function mapInlineCompletionOutcome(
-  monaco: Monaco,
-  reasonKind: languages.InlineCompletionEndOfLifeReasonKind,
-): 'accepted' | 'dismissed' | 'ignored' {
-  if (reasonKind === monaco.languages.InlineCompletionEndOfLifeReasonKind.Accepted) {
-    return 'accepted';
-  }
-
-  if (reasonKind === monaco.languages.InlineCompletionEndOfLifeReasonKind.Rejected) {
-    return 'dismissed';
-  }
-
-  return 'ignored';
-}
-
-function configureMindmapDslMonaco(monaco: Monaco): void {
-  if (
-    !monaco.languages
-      .getLanguages()
-      .some((language: languages.ILanguageExtensionPoint) => language.id === mindmapDslLanguageId)
-  ) {
-    monaco.languages.register({ id: mindmapDslLanguageId });
-  }
-
-  if (mindmapDslInlineCompletionRegistered) {
-    return;
-  }
-
-  if (!enableMonacoInlineCompletions) {
-    return;
-  }
-
-  monaco.languages.registerInlineCompletionsProvider(mindmapDslLanguageId, {
-    async provideInlineCompletions(
-      model: editor.ITextModel,
-      position: { lineNumber: number; column: number },
-      _context: languages.InlineCompletionContext,
-      token: CancellationToken,
-    ) {
-      if (token.isCancellationRequested || model.isDisposed()) {
-        return { items: [] };
-      }
-
-      const requestVersionId = model.getVersionId();
-      const { abortController, dispose } = linkAbortControllerToCancellationToken(token);
-
-      try {
-        const correlationId = createInlineCompletionCorrelationId();
-        const response = await requestInlineCompletionFromApi(
-          {
-            outline: model.getValue(),
-            cursor: {
-              lineNumber: position.lineNumber,
-              column: position.column,
-            },
-          },
-          {
-            signal: abortController.signal,
-          },
-        );
-
-        if (
-          token.isCancellationRequested
-          || model.isDisposed()
-          || model.getVersionId() !== requestVersionId
-          || !response
-          || response.completionText.length === 0
-        ) {
-          return { items: [] };
-        }
-
-        return {
-          items: [
-            {
-              correlationId,
-              insertText: response.completionText,
-              range: createInlineSuggestionRange(position),
-            },
-          ],
-        };
-      } catch (error) {
-        if (isAbortError(error)) {
-          return { items: [] };
-        }
-
-        return { items: [] };
-      } finally {
-        dispose();
-      }
-    },
-    handleEndOfLifetime(
-      _completions: languages.InlineCompletions,
-      item: languages.InlineCompletion,
-      reason: languages.InlineCompletionEndOfLifeReason,
-      lifetimeSummary: languages.LifetimeSummary,
-    ) {
-      if (!item.correlationId || typeof item.insertText !== 'string') {
-        return;
-      }
-
-      void trackInlineCompletionEvent({
-        correlationId: item.correlationId,
-        outcome: mapInlineCompletionOutcome(monaco, reason.kind),
-        outlineLength: lifetimeSummary.characterCountOriginal ?? 0,
-        requestReason: lifetimeSummary.requestReason,
-        shownDurationMs: lifetimeSummary.shownDuration,
-        source: 'model',
-        suggestionText: item.insertText,
-      }).catch(() => undefined);
-    },
-    disposeInlineCompletions() {},
-    displayName: 'Mindmap study assistant',
-  });
-
-  mindmapDslInlineCompletionRegistered = true;
 }

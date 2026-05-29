@@ -357,15 +357,15 @@ The goal is to convert the current single-page layout into the multi-column SaaS
 
 ### Phase F — DSL Editor Panel
 
-- [ ] Extract the Monaco editor into `components/DslEditorPanel.tsx`
+- [x] Extract the Monaco editor into `components/DslEditorPanel.tsx`
   Move the Monaco `<Editor>` block, inline-completion registration, and the Generate mindmap / Reset DSL buttons out of `StudyWorkspace.tsx` into this component.
   Purpose: Gives the editor its own component boundary matching the "DSL Editor" panel in the mockup.
 
-- [ ] Add a panel header to `DslEditorPanel` matching the mockup
+- [x] Add a panel header to `DslEditorPanel` matching the mockup
   "DSL Editor" title on the left, icon buttons on the right (edit, expand/fullscreen placeholder, copy). Use `border-b` to visually separate the header from the editor surface.
   Purpose: Reproduces the panel chrome visible in the mockup.
 
-- [ ] Style the DSL editor panel as a dark-bordered card occupying the upper-right quadrant
+- [x] Style the DSL editor panel as a dark-bordered card occupying the upper-right quadrant
   The mockup shows the editor filling roughly the top two-thirds of the right column. Constrain height so the Expert Scaling panel fits below it.
   Purpose: Achieves the two-row right column layout.
 
