@@ -6,6 +6,7 @@ import type { Monaco } from '@monaco-editor/react';
 import type { CancellationToken, editor, languages } from 'monaco-editor';
 
 import MindmapSvgPreview from './MindmapSvgPreview';
+import { useWorkspace } from './WorkspaceContext';
 import type { MindmapSvgPreviewHandle } from './MindmapSvgPreview';
 import {
   requestInlineCompletionFromApi,
@@ -155,8 +156,9 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
     useState<InlineSuggestionPreference>('auto');
   const [exportControls, setExportControls] = useState<ExportControlState>(defaultExportControlState);
   const [projectId, setProjectId] = useState<string | null>(null);
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
+  const { activePanel, setActivePanel, setProjectName } = useWorkspace();
+  const historyOpen = activePanel === 'history';
   const [historyLoading, setHistoryLoading] = useState(false);
 
   useEffect(() => {
@@ -244,6 +246,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
 
         if (cancelled) return;
         setProjectId(project.id);
+        setProjectName(project.name);
 
         // 2. Try cloud draft first
         const cloudDraft = await loadCloudDraft(project.id);
@@ -558,13 +561,13 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
 
   async function handleToggleHistory(): Promise<void> {
     if (historyOpen) {
-      setHistoryOpen(false);
+      setActivePanel('notes');
       return;
     }
 
     if (!projectId) return;
 
-    setHistoryOpen(true);
+    setActivePanel('history');
     setHistoryLoading(true);
 
     try {
@@ -586,7 +589,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
     if (entry.rawNotes) {
       setRawNotes(entry.rawNotes);
     }
-    setHistoryOpen(false);
+    setActivePanel('notes');
   }
 
   async function handleGenerateDsl(detailLevel: SourceGenerationDetailLevel = selectedDetailLevel): Promise<void> {

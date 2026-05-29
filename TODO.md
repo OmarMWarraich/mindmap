@@ -329,15 +329,15 @@ The goal is to convert the current single-page layout into the multi-column SaaS
 
 ### Phase D — Left Sidebar
 
-- [ ] Create `components/Sidebar.tsx`
+- [x] Create `components/Sidebar.tsx`
   Top section: project name ("Project Alpha") + subtitle ("Strategy Map"), "Generate Branch" CTA button (accent blue, full width). Navigation list: Notes, Chat, Guides, History — each with an icon and active highlight. Bottom: Settings link and Support link with icons.
   Purpose: Builds the persistent left-panel navigation shown in the mockup.
 
-- [ ] Connect sidebar nav items to workspace panel state
+- [x] Connect sidebar nav items to workspace panel state
   Clicking Notes → show Source Notes panel. Clicking History → open generation history drawer. Chat and Guides can be placeholders for now.
   Purpose: Makes the sidebar functional so the core workflow is navigable.
 
-- [ ] Show active project name and subtitle in the sidebar header
+- [x] Show active project name and subtitle in the sidebar header
   Pull the project name from the existing `projectId` state. Use a placeholder name ("Untitled Project") until a rename feature exists.
   Purpose: Gives the sidebar its contextual header matching the mockup.
 
