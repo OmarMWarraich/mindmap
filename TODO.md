@@ -343,15 +343,15 @@ The goal is to convert the current single-page layout into the multi-column SaaS
 
 ### Phase E — Source Notes Panel
 
-- [ ] Extract source-notes UI into `components/SourceNotesPanel.tsx`
+- [x] Extract source-notes UI into `components/SourceNotesPanel.tsx`
   Pull the raw-notes textarea, detail-level toggle (Standard / Detailed), Generate DSL button, Clear button, and quality badges out of `StudyWorkspace.tsx` into a standalone component that accepts props and callbacks.
   Purpose: Isolates the notes panel into its own file so layout and state concerns separate cleanly.
 
-- [ ] Style `SourceNotesPanel` to match the mockup center column
+- [x] Style `SourceNotesPanel` to match the mockup center column
   White card background, "Source Notes" heading with action icons (search, add-user placeholder), full-height textarea with placeholder text, "Generate Branch" / "Clear" buttons at the bottom of the panel.
   Purpose: Makes the center panel look like the mockup rather than the current sky-blue card.
 
-- [ ] Show DSL generation quality feedback inside the panel
+- [x] Show DSL generation quality feedback inside the panel
   Keep the density status and quality badges but move them to a subtle footer row inside the panel rather than a separate card.
   Purpose: Reduces visual noise while keeping the status information accessible.
 

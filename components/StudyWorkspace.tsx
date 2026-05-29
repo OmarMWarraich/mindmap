@@ -6,6 +6,8 @@ import type { Monaco } from '@monaco-editor/react';
 import type { CancellationToken, editor, languages } from 'monaco-editor';
 
 import MindmapSvgPreview from './MindmapSvgPreview';
+import SourceNotesPanel from './SourceNotesPanel';
+import type { SourceGenerationDetailLevel } from './SourceNotesPanel';
 import { useWorkspace } from './WorkspaceContext';
 import type { MindmapSvgPreviewHandle } from './MindmapSvgPreview';
 import {
@@ -68,8 +70,6 @@ interface HistoryEntry {
   nodeCount: number;
   rawNotes: string;
 }
-type SourceGenerationDetailLevel = 'standard' | 'detailed';
-
 interface ExportControlState {
   nodeWidthScale: number;
   nodeHeightScale: number;
@@ -796,145 +796,18 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
             </p>
           </div>
 
-          <div className="grid gap-3 rounded-2xl border border-sky-200 bg-sky-50/70 p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="grid gap-1">
-                <p className="text-sm font-medium text-sky-950">Source notes</p>
-                <p className="text-sm leading-6 text-sky-900/80">
-                  Paste class notes, textbook bullets, or the old .txt source here. Generate will convert them into parser-ready DSL and load it into Monaco.
-                </p>
-              </div>
-
-              <div className="grid gap-3 justify-items-start sm:justify-items-end">
-                <div className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-white p-1 text-sm text-sky-950 shadow-sm">
-                  <span className="px-2 text-xs font-medium uppercase tracking-[0.12em] text-sky-700">Detail</span>
-                  <button
-                    aria-pressed={selectedDetailLevel === 'standard'}
-                    className={`rounded-full px-3 py-1.5 font-medium transition ${
-                      selectedDetailLevel === 'standard'
-                        ? 'bg-sky-950 text-white'
-                        : 'text-sky-900 hover:bg-sky-100'
-                    }`}
-                    disabled={generationStatus.tone === 'progress'}
-                    onClick={() => {
-                      setSelectedDetailLevel('standard');
-                    }}
-                    type="button"
-                  >
-                    Standard
-                  </button>
-                  <button
-                    aria-pressed={selectedDetailLevel === 'detailed'}
-                    className={`rounded-full px-3 py-1.5 font-medium transition ${
-                      selectedDetailLevel === 'detailed'
-                        ? 'bg-sky-950 text-white'
-                        : 'text-sky-900 hover:bg-sky-100'
-                    }`}
-                    disabled={generationStatus.tone === 'progress'}
-                    onClick={() => {
-                      setSelectedDetailLevel('detailed');
-                    }}
-                    type="button"
-                  >
-                    Detailed
-                  </button>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                <button
-                  className="rounded-full bg-sky-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-sky-300"
-                  disabled={generationStatus.tone === 'progress'}
-                  onClick={() => {
-                    void handleGenerateDsl();
-                  }}
-                  type="button"
-                >
-                  {generationStatus.tone === 'progress'
-                    ? 'Generating…'
-                    : `Generate ${selectedDetailLevel === 'detailed' ? 'detailed' : 'standard'} DSL`}
-                </button>
-                {latestDslGeneration?.quality.densityStatus === 'below-target' ? (
-                  <button
-                    className="rounded-full border border-sky-300 bg-white px-4 py-2 text-sm font-medium text-sky-950 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
-                    disabled={generationStatus.tone === 'progress'}
-                    onClick={() => {
-                      void handleGenerateDsl('detailed');
-                    }}
-                    type="button"
-                  >
-                    Regenerate DSL with more detail
-                  </button>
-                ) : null}
-                <button
-                  className="rounded-full border border-sky-300 bg-white px-4 py-2 text-sm font-medium text-sky-950 transition hover:bg-sky-100"
-                  onClick={() => {
-                    handleClearNotes();
-                  }}
-                  type="button"
-                >
-                  Clear notes
-                </button>
-                </div>
-              </div>
-            </div>
-
-            <textarea
-              className="min-h-[180px] rounded-2xl border border-sky-200 bg-white px-4 py-3 text-sm leading-6 text-zinc-800 shadow-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-200"
-              onChange={(event) => {
-                setRawNotes(event.target.value);
-              }}
-              placeholder="Paste raw notes here..."
-              value={rawNotes}
-            />
-
-            {latestDslGeneration ? (
-              <div className="flex flex-wrap items-center gap-2 text-xs text-sky-950">
-                <span className={`rounded-full px-3 py-1 font-medium ${
-                  latestDslGeneration.quality.mode === 'retry'
-                    ? 'bg-amber-100 text-amber-800'
-                    : 'bg-emerald-100 text-emerald-800'
-                }`}>
-                  Quality: {latestDslGeneration.quality.mode === 'retry' ? 'retry pass' : 'first pass'}
-                </span>
-                {latestDslGeneration.quality.mode === 'retry' ? (
-                  <span
-                    aria-label="Retry pass means the first DSL result was too sparse or underdeveloped, so the app asked the model for a denser revision."
-                    className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-amber-300 bg-white text-[11px] font-semibold text-amber-800"
-                    role="img"
-                    title="Retry pass means the first DSL result was too sparse or underdeveloped, so the app asked the model for a denser revision."
-                  >
-                    i
-                  </span>
-                ) : null}
-                <span className={`rounded-full px-3 py-1 font-medium ${
-                  latestDslGeneration.quality.densityStatus === 'target-met'
-                    ? 'bg-emerald-100 text-emerald-800'
-                    : latestDslGeneration.quality.densityStatus === 'below-target'
-                      ? 'bg-amber-100 text-amber-800'
-                      : 'bg-sky-100 text-sky-800'
-                }`}>
-                  Density: {latestDslGeneration.quality.densityStatus === 'target-met'
-                    ? 'target met'
-                    : latestDslGeneration.quality.densityStatus === 'below-target'
-                      ? 'below target'
-                      : 'over target'}
-                </span>
-                {latestDslGeneration.quality.densityStatus === 'below-target' ? (
-                  <span
-                    aria-label="Below target means the DSL is still lighter than the preferred detail level, so you can regenerate with more detail."
-                    className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-amber-300 bg-white text-[11px] font-semibold text-amber-800"
-                    role="img"
-                    title="Below target means the DSL is still lighter than the preferred detail level, so you can regenerate with more detail."
-                  >
-                    i
-                  </span>
-                ) : null}
-                <span>
-                  {latestDslGeneration.metrics.generatedMeaningfulLineCount} lines, ratio {latestDslGeneration.metrics.expansionRatio.toFixed(2)}x
-                </span>
-              </div>
-            ) : null}
-          </div>
+          <SourceNotesPanel
+            generationStatus={generationStatus}
+            latestDslGeneration={latestDslGeneration}
+            onClearNotes={handleClearNotes}
+            onDetailLevelChange={setSelectedDetailLevel}
+            onGenerateDsl={(detailLevel) => {
+              void handleGenerateDsl(detailLevel);
+            }}
+            onRawNotesChange={setRawNotes}
+            rawNotes={rawNotes}
+            selectedDetailLevel={selectedDetailLevel}
+          />
 
           <div className="flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="grid gap-1">
