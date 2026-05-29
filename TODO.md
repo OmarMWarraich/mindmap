@@ -305,12 +305,12 @@ The goal is to convert the current single-page layout into the multi-column SaaS
 
 ### Phase B — App Shell Layout
 
-- [ ] Create `components/AppShell.tsx` — the fixed full-viewport wrapper
-  Three-zone layout: top nav bar (fixed height ~56px), left sidebar (fixed width ~240px), main content area (flex-fill). Use CSS grid or flex with `h-screen overflow-hidden`.
+- [x] Create `components/AppShell.tsx` — the fixed full-viewport wrapper
+  Three-zone layout via `flex flex-col`: `<header>` (`h-14 shrink-0`), then a `flex min-h-0 flex-1` row with `<aside>` (`w-60 shrink-0`) and `<main>` (`flex-1 overflow-y-auto`). Accepts `nav`, `sidebar`, and `children` props so Phases C and D can slot components in without touching the layout.
   Purpose: Replaces the current `<main className="min-h-screen px-6 py-12">` wrapper with the shell all other panels plug into.
 
-- [ ] Replace `app/page.tsx` layout with `AppShell`
-  Remove the existing hero section header and description text. Render `<AppShell>` as the only top-level element, passing `userId` and `modelProviderEnv` as props.
+- [x] Replace `app/page.tsx` layout with `AppShell`
+  Removed the hero section (title, description, MVP badge). Sign-out form and model provider badge live in a temporary `nav` placeholder (will be replaced by `<NavBar>` in Phase C). Sidebar is `null` until Phase D. `<StudyWorkspace>` renders in the `children` slot.
   Purpose: Wires the new shell into the Next.js page so the layout change is visible.
 
 ### Phase C — Top Navigation Bar
