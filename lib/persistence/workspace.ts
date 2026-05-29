@@ -139,7 +139,7 @@ export async function loadCloudDraft(projectId: string): Promise<PersistedWorksp
   const res = await fetch(`/api/projects/${projectId}/draft`);
 
   if (!res.ok) {
-    return null;
+    throw new Error(`Failed to load cloud draft: ${res.status}`);
   }
 
   const raw = await res.json();

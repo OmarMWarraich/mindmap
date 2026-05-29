@@ -1,8 +1,8 @@
 import { and, eq } from 'drizzle-orm';
 
-import { auth } from '@/auth';
-import { db } from '@/lib/db/index';
-import { projectDrafts, projects } from '@/lib/db/schema';
+import { auth } from '../../../../../auth.ts';
+import { db } from '../../../../../lib/db/index.ts';
+import { projectDrafts, projects } from '../../../../../lib/db/schema.ts';
 
 export const runtime = 'nodejs';
 
@@ -52,52 +52,28 @@ export const PUT = auth(async (req, ctx: RouteContext) => {
 
   const body = (await req.json()) as Record<string, unknown>;
 
-  const [existing] = await db
-    .select()
-    .from(projectDrafts)
-    .where(eq(projectDrafts.projectId, projectId));
+  const draftValues = {
+    outline: typeof body.outline === 'string' ? body.outline : '',
+    rawNotes: typeof body.rawNotes === 'string' ? body.rawNotes : '',
+    selectedDetailLevel:
+      typeof body.selectedDetailLevel === 'string' ? body.selectedDetailLevel : 'standard',
+    mindmap: body.mindmap !== undefined ? (body.mindmap as unknown) : null,
+    previewTransform:
+      body.previewTransform !== undefined ? (body.previewTransform as unknown) : null,
+  };
 
   const now = new Date();
 
-  if (existing) {
-    const [updated] = await db
-      .update(projectDrafts)
-      .set({
-        outline: typeof body.outline === 'string' ? body.outline : existing.outline,
-        rawNotes: typeof body.rawNotes === 'string' ? body.rawNotes : existing.rawNotes,
-        selectedDetailLevel:
-          typeof body.selectedDetailLevel === 'string'
-            ? body.selectedDetailLevel
-            : existing.selectedDetailLevel,
-        mindmap: body.mindmap !== undefined ? body.mindmap : existing.mindmap,
-        previewTransform:
-          body.previewTransform !== undefined
-            ? body.previewTransform
-            : existing.previewTransform,
-        updatedAt: now,
-      })
-      .where(eq(projectDrafts.id, existing.id))
-      .returning();
-
-    await db.update(projects).set({ updatedAt: now }).where(eq(projects.id, projectId));
-
-    return Response.json(updated);
-  }
-
-  const [created] = await db
+  const [upserted] = await db
     .insert(projectDrafts)
-    .values({
-      projectId,
-      outline: typeof body.outline === 'string' ? body.outline : '',
-      rawNotes: typeof body.rawNotes === 'string' ? body.rawNotes : '',
-      selectedDetailLevel:
-        typeof body.selectedDetailLevel === 'string' ? body.selectedDetailLevel : 'standard',
-      mindmap: body.mindmap ?? null,
-      previewTransform: body.previewTransform ?? null,
+    .values({ projectId, ...draftValues })
+    .onConflictDoUpdate({
+      target: projectDrafts.projectId,
+      set: { ...draftValues, updatedAt: now },
     })
     .returning();
 
   await db.update(projects).set({ updatedAt: now }).where(eq(projects.id, projectId));
 
-  return Response.json(created, { status: 201 });
+  return Response.json(upserted);
 });
