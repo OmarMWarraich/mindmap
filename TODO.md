@@ -371,15 +371,15 @@ The goal is to convert the current single-page layout into the multi-column SaaS
 
 ### Phase G — Expert Scaling Panel
 
-- [ ] Extract export controls into `components/ExpertScalingPanel.tsx`
+- [x] Extract export controls into `components/ExpertScalingPanel.tsx`
   Move the six scale sliders (`nodeWidthScale`, `nodeHeightScale`, `nodePaddingScale`, `siblingGapScale`, `levelGapScale`, `fontScale`) and the Reset Scaling button out of `StudyWorkspace.tsx` into this component.
   Purpose: Gives the scaling UI its own panel with the "Expert Scaling" header shown in the mockup.
 
-- [ ] Style `ExpertScalingPanel` to match the mockup
+- [x] Style `ExpertScalingPanel` to match the mockup
   Right-aligned value labels next to each slider, thin separator lines between rows, "Reset Scaling" button at the bottom, panel header "Expert Scaling" with a collapse icon.
   Purpose: Makes the scaling panel visually match the mockup.
 
-- [ ] Add a bottom action row: Generate DSL | Clear | Quick Export
+- [x] Add a bottom action row: Generate DSL | Clear | Quick Export
   Add a sticky footer row inside the right column containing the three action buttons as shown at the bottom of the mockup's right panel.
   Purpose: Puts the primary CTA buttons at the bottom of the panel rather than scattered across multiple cards.
 
