@@ -7,6 +7,8 @@ import type { DslEditorPanelHandle } from './DslEditorPanel';
 import ExpertScalingPanel from './ExpertScalingPanel';
 import type { ScalingValues } from './ExpertScalingPanel';
 import { defaultScalingValues } from './ExpertScalingPanel';
+import GenerationHistoryPanel from './GenerationHistoryPanel';
+import type { HistoryEntry } from './GenerationHistoryPanel';
 import MindmapPreviewDrawer from './MindmapPreviewDrawer';
 import SourceNotesPanel from './SourceNotesPanel';
 import type { SourceGenerationDetailLevel } from './SourceNotesPanel';
@@ -45,16 +47,6 @@ interface StudyWorkspaceProps {
   userId: string;
 }
 
-interface HistoryEntry {
-  id: string;
-  projectId: string;
-  createdAt: string;
-  detailLevel: string;
-  dsl: string;
-  densityStatus: string;
-  nodeCount: number;
-  rawNotes: string;
-}
 export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps) {
   const dslEditorRef = useRef<DslEditorPanelHandle | null>(null);
   const previewRef = useRef<MindmapSvgPreviewHandle | null>(null);
@@ -101,9 +93,25 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
   const [exportControls, setExportControls] = useState<ScalingValues>(defaultScalingValues);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
-  const { activePanel, setActivePanel, setProjectName, previewOpen, setPreviewOpen } = useWorkspace();
-  const historyOpen = activePanel === 'history';
   const [historyLoading, setHistoryLoading] = useState(false);
+  const { activePanel, setActivePanel, setProjectName, previewOpen, setPreviewOpen } = useWorkspace();
+
+  // Fetch history when the user switches to the history panel.
+  useEffect(() => {
+    if (activePanel !== 'history' || !projectId) return;
+
+    setHistoryLoading(true);
+    void (async () => {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/history`);
+        if (res.ok) {
+          setHistoryEntries((await res.json()) as HistoryEntry[]);
+        }
+      } finally {
+        setHistoryLoading(false);
+      }
+    })();
+  }, [activePanel, projectId]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -403,27 +411,6 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
     }
   }
 
-  async function handleToggleHistory(): Promise<void> {
-    if (historyOpen) {
-      setActivePanel('notes');
-      return;
-    }
-
-    if (!projectId) return;
-
-    setActivePanel('history');
-    setHistoryLoading(true);
-
-    try {
-      const res = await fetch(`/api/projects/${projectId}/history`);
-      if (res.ok) {
-        setHistoryEntries((await res.json()) as HistoryEntry[]);
-      }
-    } finally {
-      setHistoryLoading(false);
-    }
-  }
-
   function handleRestoreFromHistory(entry: HistoryEntry): void {
     dslEditorRef.current?.setValue(entry.dsl);
     dslEditorRef.current?.focus();
@@ -526,17 +513,6 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
           <span className="inline-flex items-center rounded-full bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700">
             {isParsing ? 'Parsing…' : `Parsed ${nodeCount} nodes`}
           </span>
-          {projectId ? (
-            <button
-              className="rounded-full border border-zinc-200 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
-              onClick={() => {
-                void handleToggleHistory();
-              }}
-              type="button"
-            >
-              {historyOpen ? 'Close history' : 'Generation history'}
-            </button>
-          ) : null}
           <button
             className="rounded-full border border-zinc-200 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={!layoutResult || layoutStatus === 'loading'}
@@ -550,120 +526,47 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
         </div>
       </div>
 
-      {historyOpen ? (
-        <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-          <h3 className="mb-3 text-sm font-semibold text-zinc-950">Generation history</h3>
-          {historyLoading ? (
-            <p className="text-sm text-zinc-500">Loading…</p>
-          ) : historyEntries.length === 0 ? (
-            <p className="text-sm text-zinc-500">No generations recorded yet.</p>
-          ) : (
-            <ul className="grid gap-2">
-              {historyEntries.map((entry) => (
-                <li
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3"
-                  key={entry.id}
-                >
-                  <div className="grid gap-1">
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-                      <span>{new Date(entry.createdAt).toLocaleString()}</span>
-                      <span className="rounded-full bg-zinc-100 px-2 py-0.5 font-medium text-zinc-700">{entry.detailLevel}</span>
-                      <span className={`rounded-full px-2 py-0.5 font-medium ${
-                        entry.densityStatus === 'target-met'
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : entry.densityStatus === 'below-target'
-                            ? 'bg-amber-100 text-amber-700'
-                            : 'bg-sky-100 text-sky-700'
-                      }`}>{entry.densityStatus}</span>
-                      <span>{entry.nodeCount} nodes</span>
-                    </div>
-                  </div>
-                  <button
-                    className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 transition hover:bg-zinc-100"
-                    onClick={() => {
-                      handleRestoreFromHistory(entry);
-                    }}
-                    type="button"
-                  >
-                    Restore
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      ) : null}
-
-      <div className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
-        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
-          generationStatus.tone === 'success'
-            ? 'bg-emerald-100 text-emerald-700'
-            : generationStatus.tone === 'error'
-              ? 'bg-rose-100 text-rose-700'
-              : generationStatus.tone === 'progress'
-                ? 'bg-sky-100 text-sky-700'
-                : 'bg-zinc-100 text-zinc-700'
-        }`}>
-          DSL
-        </span>
-        <span className="ml-3">{generationStatus.message}</span>
-        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
-          exportStatus.tone === 'success'
-            ? 'bg-emerald-100 text-emerald-700'
-            : exportStatus.tone === 'error'
-              ? 'bg-rose-100 text-rose-700'
-              : exportStatus.tone === 'progress'
-                ? 'bg-sky-100 text-sky-700'
-                : 'bg-zinc-100 text-zinc-700'
-        }`}>
-          Export
-        </span>
-        <span className="ml-3">{exportStatus.message}</span>
-        <span className={`ml-4 inline-flex rounded-full px-3 py-1 text-xs font-medium ${
-          draftStatus.tone === 'success'
-            ? 'bg-emerald-100 text-emerald-700'
-            : draftStatus.tone === 'error'
-              ? 'bg-rose-100 text-rose-700'
-              : draftStatus.tone === 'progress'
-                ? 'bg-sky-100 text-sky-700'
-                : 'bg-zinc-100 text-zinc-700'
-        }`}>
-          Draft
-        </span>
-        <span className="ml-3">{draftStatus.message}</span>
-      </div>
-      {latestDslGeneration?.quality.mode === 'retry' ? (
-        <p className="text-xs text-zinc-500">Last generated from retry pass for higher detail coverage.</p>
-      ) : null}
-
       <div className="grid gap-6 xl:grid-cols-2">
-        {/* Left column: Source Notes + Validation */}
+        {/* Left column: Source Notes + Validation (or History panel) */}
         <div className="flex flex-col gap-4">
-          <SourceNotesPanel
-            generationStatus={generationStatus}
-            latestDslGeneration={latestDslGeneration}
-            onClearNotes={handleClearNotes}
-            onDetailLevelChange={setSelectedDetailLevel}
-            onGenerateDsl={(detailLevel) => {
-              void handleGenerateDsl(detailLevel);
-            }}
-            onRawNotesChange={setRawNotes}
-            rawNotes={rawNotes}
-            selectedDetailLevel={selectedDetailLevel}
-          />
+          {activePanel === 'history' ? (
+            <GenerationHistoryPanel
+              entries={historyEntries}
+              loading={historyLoading}
+              onBack={() => {
+                setActivePanel('notes');
+              }}
+              onRestore={handleRestoreFromHistory}
+            />
+          ) : (
+            <>
+              <SourceNotesPanel
+                generationStatus={generationStatus}
+                latestDslGeneration={latestDslGeneration}
+                onClearNotes={handleClearNotes}
+                onDetailLevelChange={setSelectedDetailLevel}
+                onGenerateDsl={(detailLevel) => {
+                  void handleGenerateDsl(detailLevel);
+                }}
+                onRawNotesChange={setRawNotes}
+                rawNotes={rawNotes}
+                selectedDetailLevel={selectedDetailLevel}
+              />
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <ValidationPanel
-              issues={parseResult.errors}
-              tone="error"
-              title={`Errors (${parseResult.errors.length})`}
-            />
-            <ValidationPanel
-              issues={parseResult.warnings}
-              tone="warning"
-              title={`Warnings (${parseResult.warnings.length})`}
-            />
-          </div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <ValidationPanel
+                  issues={parseResult.errors}
+                  tone="error"
+                  title={`Errors (${parseResult.errors.length})`}
+                />
+                <ValidationPanel
+                  issues={parseResult.warnings}
+                  tone="warning"
+                  title={`Warnings (${parseResult.warnings.length})`}
+                />
+              </div>
+            </>
+          )}
         </div>
 
         {/* Right column: DSL Editor (upper) + Preview/Export (lower) */}

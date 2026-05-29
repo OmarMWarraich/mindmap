@@ -395,11 +395,11 @@ The goal is to convert the current single-page layout into the multi-column SaaS
 
 ### Phase I — Generation History Panel
 
-- [ ] Convert history from an inline drawer to a sidebar panel
+- [x] Convert history from an inline drawer to a sidebar panel
   When the user clicks History in the sidebar nav, replace the Source Notes panel with a history list panel showing the existing `historyEntries` data.
   Purpose: Matches the mockup which shows history as a first-class navigation destination.
 
-- [ ] Style history entries to match the mockup list style
+- [x] Style history entries to match the mockup list style
   Each entry: timestamp, detail level badge, density status badge, node count, Restore button. Use the same card style as the rest of the app.
   Purpose: Gives the history panel a consistent look.
 
