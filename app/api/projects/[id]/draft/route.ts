@@ -1,8 +1,8 @@
 import { and, eq } from 'drizzle-orm';
 
-import { auth } from '@/auth';
-import { db } from '@/lib/db/index';
-import { projectDrafts, projects } from '@/lib/db/schema';
+import { auth } from '../../../../../auth.ts';
+import { db } from '../../../../../lib/db/index.ts';
+import { projectDrafts, projects } from '../../../../../lib/db/schema.ts';
 
 export const runtime = 'nodejs';
 
