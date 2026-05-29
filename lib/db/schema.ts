@@ -6,7 +6,6 @@ import {
   primaryKey,
   text,
   timestamp,
-  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import type { AdapterAccountType } from '@auth/core/adapters';
 
@@ -80,9 +79,7 @@ export const projects = pgTable('project', {
   name: text('name').notNull().default('Untitled Project'),
   createdAt: timestamp('createdAt', { mode: 'date' }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { mode: 'date' }).notNull().defaultNow(),
-}, (project) => ({
-  userUpdatedAtIdx: index('project_userId_updatedAt_idx').on(project.userId, project.updatedAt),
-}));
+});
 
 export const projectDrafts = pgTable('project_draft', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -95,9 +92,7 @@ export const projectDrafts = pgTable('project_draft', {
   mindmap: jsonb('mindmap'),
   previewTransform: jsonb('previewTransform'),
   updatedAt: timestamp('updatedAt', { mode: 'date' }).notNull().defaultNow(),
-}, (draft) => ({
-  projectIdUniqueIdx: uniqueIndex('project_draft_projectId_unique_idx').on(draft.projectId),
-}));
+});
 
 export const generationHistory = pgTable('generation_history', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),

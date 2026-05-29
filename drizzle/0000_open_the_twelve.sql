@@ -70,6 +70,4 @@ ALTER TABLE "generation_history" ADD CONSTRAINT "generation_history_projectId_pr
 ALTER TABLE "project_draft" ADD CONSTRAINT "project_draft_projectId_project_id_fk" FOREIGN KEY ("projectId") REFERENCES "public"."project"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "project" ADD CONSTRAINT "project_userId_user_id_fk" FOREIGN KEY ("userId") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "session" ADD CONSTRAINT "session_userId_user_id_fk" FOREIGN KEY ("userId") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE UNIQUE INDEX "project_draft_projectId_unique_idx" ON "project_draft" ("projectId");--> statement-breakpoint
-CREATE INDEX "project_userId_updatedAt_idx" ON "project" ("userId","updatedAt");--> statement-breakpoint
 CREATE INDEX "generation_history_projectId_createdAt_idx" ON "generation_history" ("projectId","createdAt");

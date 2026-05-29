@@ -161,30 +161,28 @@
         }
       },
       "indexes": {
-        "generation_history_projectId_createdAt_idx": {
-          "name": "generation_history_projectId_createdAt_idx",
-          "columns": [
-            {
-              "expression": "projectId",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last",
-              "opclass": null
-            },
-            {
-              "expression": "createdAt",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last",
-              "opclass": null
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+          "generation_history_projectId_createdAt_idx": {
+            "name": "generation_history_projectId_createdAt_idx",
+            "columns": [
+              {
+                "expression": "projectId",
+                "isExpression": false,
+                "asc": true,
+                "nulls": "last"
+              },
+              {
+                "expression": "createdAt",
+                "isExpression": false,
+                "asc": true,
+                "nulls": "last"
+              }
+            ],
+            "isUnique": false,
+            "concurrently": false,
+            "method": "btree",
+            "with": {}
+          }
+        },
       "foreignKeys": {
         "generation_history_projectId_project_id_fk": {
           "name": "generation_history_projectId_project_id_fk",
@@ -263,24 +261,7 @@
           "default": "now()"
         }
       },
-      "indexes": {
-        "project_draft_projectId_unique_idx": {
-          "name": "project_draft_projectId_unique_idx",
-          "columns": [
-            {
-              "expression": "projectId",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last",
-              "opclass": null
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
         "project_draft_projectId_project_id_fk": {
           "name": "project_draft_projectId_project_id_fk",
@@ -340,31 +321,7 @@
           "default": "now()"
         }
       },
-      "indexes": {
-        "project_userId_updatedAt_idx": {
-          "name": "project_userId_updatedAt_idx",
-          "columns": [
-            {
-              "expression": "userId",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last",
-              "opclass": null
-            },
-            {
-              "expression": "updatedAt",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last",
-              "opclass": null
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
         "project_userId_user_id_fk": {
           "name": "project_userId_user_id_fk",
