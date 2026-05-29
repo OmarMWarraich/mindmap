@@ -1,8 +1,23 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import test, { mock } from 'node:test';
 
 import { resetInlineCompletionRuntimeControlsForTests } from '../../../lib/completion/runtime-controls.ts';
-import { POST } from './route.ts';
+
+process.env.DATABASE_URL = 'postgresql://test:test@localhost/test';
+
+mock.module('../../../auth.ts', {
+  namedExports: {
+    auth: (handler: Function) => (req: Request) => {
+      const userId = req.headers.get('x-test-user-id');
+      if (userId) {
+        (req as any).auth = { user: { id: userId } };
+      }
+      return handler(req);
+    },
+  },
+});
+
+const { POST } = await import('./route.ts') as unknown as { POST: (req: Request) => Promise<Response> };
 
 test('completion route returns model output for a valid request', async () => {
   const originalEnv = {
@@ -28,7 +43,10 @@ test('completion route returns model output for a valid request', async () => {
   try {
     const response = await POST(new Request('http://localhost/api/completion', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-test-user-id': 'test-user-id',
+      },
       body: JSON.stringify({
         outline: '@root: Photosynthesis\n- @branch: Light reactions\n  - ATP synth',
         cursor: { lineNumber: 3, column: 10 },
@@ -70,7 +88,10 @@ test('completion route drops off-topic model output after relevance filtering', 
   try {
     const response = await POST(new Request('http://localhost/api/completion', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-test-user-id': 'test-user-id',
+      },
       body: JSON.stringify({
         outline: '@root: Photosynthesis\n- @branch: Light reactions\n  - ATP synth',
         cursor: { lineNumber: 3, column: 10 },
@@ -112,7 +133,10 @@ test('completion route drops duplicate nearby sibling suggestions', async () => 
   try {
     const response = await POST(new Request('http://localhost/api/completion', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-test-user-id': 'test-user-id',
+      },
       body: JSON.stringify({
         outline: '@root: Photosynthesis\n- @branch: Light reactions\n  - ATP synth\n  - proton gradient\n  - NADPH output',
         cursor: { lineNumber: 3, column: 10 },
@@ -135,7 +159,10 @@ test('completion route rejects invalid request payloads', async () => {
 
   const response = await POST(new Request('http://localhost/api/completion', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-test-user-id': 'test-user-id',
+    },
     body: JSON.stringify({ outline: 12 }),
   }));
 
@@ -172,6 +199,7 @@ test('completion route serves identical requests from cache before calling fetch
     headers: {
       'Content-Type': 'application/json',
       'x-forwarded-for': '203.0.113.8',
+      'x-test-user-id': 'test-user-id',
     },
     body: JSON.stringify({
       outline: '@root: Photosynthesis\n- @branch: Light reactions\n  - ATP synth',
@@ -221,6 +249,7 @@ test('completion route returns 429 after repeated burst requests from the same c
         headers: {
           'Content-Type': 'application/json',
           'x-forwarded-for': '203.0.113.9',
+          'x-test-user-id': 'test-user-id',
         },
         body: JSON.stringify({
           outline: `@root: Photosynthesis\n- @branch: Light reactions\n  - ATP synth ${attempt}`,
@@ -236,4 +265,19 @@ test('completion route returns 429 after repeated burst requests from the same c
     process.env = originalEnv;
     globalThis.fetch = originalFetch;
   }
+});
+
+test('completion route rejects unauthenticated requests', async () => {
+  resetInlineCompletionRuntimeControlsForTests();
+
+  const response = await POST(new Request('http://localhost/api/completion', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      outline: '@root: Test',
+      cursor: { lineNumber: 1, column: 5 },
+    }),
+  }));
+
+  assert.equal(response.status, 401);
 });

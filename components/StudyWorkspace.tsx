@@ -35,7 +35,11 @@ import type { GeneratedMindmap } from '../lib/mindmap/schema';
 import type { LayoutWorkerDiagnostics } from '../lib/mindmap/worker-diagnostics';
 import { downloadNodeAsPng } from '../lib/export/png';
 import {
+  getOrCreateActiveProject,
+  loadCloudDraft,
   loadWorkspaceDraft,
+  recordGenerationHistory,
+  saveCloudDraft,
   saveWorkspaceDraft,
 } from '../lib/persistence/workspace';
 import { parseMindmapDsl } from '../lib/dsl/parse';
@@ -48,6 +52,21 @@ const enableMonacoInlineCompletions = true;
 let mindmapDslInlineSuggestionPreference: InlineSuggestionPreference = 'auto';
 
 type InlineSuggestionPreference = 'auto' | 'continuation' | 'enrichment';
+
+interface StudyWorkspaceProps {
+  userId: string;
+}
+
+interface HistoryEntry {
+  id: string;
+  projectId: string;
+  createdAt: string;
+  detailLevel: string;
+  dsl: string;
+  densityStatus: string;
+  nodeCount: number;
+  rawNotes: string;
+}
 type SourceGenerationDetailLevel = 'standard' | 'detailed';
 
 interface ExportControlState {
@@ -82,7 +101,7 @@ function isIgnorableMonacoCancellation(reason: unknown): boolean {
   return typeof reason.stack === 'string' && reason.stack.includes('monaco-editor');
 }
 
-export default function StudyWorkspace() {
+export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const editorDisposablesRef = useRef<Array<{ dispose(): void }>>([]);
   const previewRef = useRef<MindmapSvgPreviewHandle | null>(null);
@@ -135,6 +154,10 @@ export default function StudyWorkspace() {
   const [inlineSuggestionPreference, setInlineSuggestionPreference] =
     useState<InlineSuggestionPreference>('auto');
   const [exportControls, setExportControls] = useState<ExportControlState>(defaultExportControlState);
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -214,48 +237,74 @@ export default function StudyWorkspace() {
   useEffect(() => {
     let cancelled = false;
 
-    void loadWorkspaceDraft()
-      .then((draft) => {
-        if (cancelled) {
+    void (async () => {
+      try {
+        // 1. Get or create the user's active project
+        const project = await getOrCreateActiveProject();
+
+        if (cancelled) return;
+        setProjectId(project.id);
+
+        // 2. Try cloud draft first
+        const cloudDraft = await loadCloudDraft(project.id);
+
+        if (cancelled) return;
+
+        if (cloudDraft) {
+          setOutline(cloudDraft.outline);
+          setDebouncedOutline(cloudDraft.outline);
+          setRawNotes(cloudDraft.rawNotes ?? '');
+          setSelectedDetailLevel(cloudDraft.selectedDetailLevel ?? 'standard');
+          setLatestDslGeneration(cloudDraft.latestDslGeneration ?? null);
+          setLatestMindmapSnapshot(cloudDraft.mindmap);
+          setLatestMindmapSnapshotOutline(cloudDraft.outline);
+          setPreviewTransform(cloudDraft.previewTransform);
+          setDraftStatus({
+            tone: 'success',
+            message: 'Restored saved project from the cloud.',
+          });
+          hasRestoredDraftRef.current = true;
           return;
         }
 
-        if (!draft) {
+        // 3. Fall back to IndexedDB local draft
+        const localDraft = await loadWorkspaceDraft();
+
+        if (cancelled) return;
+
+        if (localDraft) {
+          setOutline(localDraft.outline);
+          setDebouncedOutline(localDraft.outline);
+          setRawNotes(localDraft.rawNotes ?? '');
+          setSelectedDetailLevel(localDraft.selectedDetailLevel ?? 'standard');
+          setLatestDslGeneration(localDraft.latestDslGeneration ?? null);
+          setLatestMindmapSnapshot(localDraft.mindmap);
+          setLatestMindmapSnapshotOutline(localDraft.outline);
+          setPreviewTransform(localDraft.previewTransform);
+          setDraftStatus({
+            tone: 'success',
+            message: 'Restored the saved draft and preview state.',
+          });
+          // Migrate local draft to cloud
+          void saveCloudDraft(project.id, localDraft);
+        } else {
           setDraftStatus({
             tone: 'idle',
-            message: 'Local draft storage is ready for this workspace.',
+            message: 'Project ready. Paste notes to begin.',
           });
-          return;
         }
-
-        setOutline(draft.outline);
-        setDebouncedOutline(draft.outline);
-        setRawNotes(draft.rawNotes ?? '');
-        setSelectedDetailLevel(draft.selectedDetailLevel ?? 'standard');
-        setLatestDslGeneration(draft.latestDslGeneration ?? null);
-        setLatestMindmapSnapshot(draft.mindmap);
-        setLatestMindmapSnapshotOutline(draft.outline);
-        setPreviewTransform(draft.previewTransform);
-        setDraftStatus({
-          tone: 'success',
-          message: 'Restored the saved draft and preview state.',
-        });
-      })
-      .catch((error) => {
-        if (cancelled) {
-          return;
-        }
-
+      } catch (error) {
+        if (cancelled) return;
         setDraftStatus({
           tone: 'error',
-          message: error instanceof Error ? error.message : 'Local draft restore failed.',
+          message: error instanceof Error ? error.message : 'Failed to load project.',
         });
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) {
           hasRestoredDraftRef.current = true;
         }
-      });
+      }
+    })();
 
     return () => {
       cancelled = true;
@@ -404,8 +453,8 @@ export default function StudyWorkspace() {
     }
 
     const timeoutId = window.setTimeout(() => {
-      void saveWorkspaceDraft({
-        version: 1,
+      const draft = {
+        version: 1 as const,
         updatedAt: new Date().toISOString(),
         outline,
         rawNotes,
@@ -413,7 +462,9 @@ export default function StudyWorkspace() {
         latestDslGeneration,
         mindmap: latestMindmapSnapshot,
         previewTransform,
-      })
+      };
+
+      void saveWorkspaceDraft(draft)
         .then((saved) => {
           if (!saved) {
             setDraftStatus({
@@ -425,7 +476,7 @@ export default function StudyWorkspace() {
 
           setDraftStatus({
             tone: 'success',
-            message: 'Draft and preview state saved locally.',
+            message: 'Draft and preview state saved.',
           });
         })
         .catch((error) => {
@@ -434,12 +485,16 @@ export default function StudyWorkspace() {
             message: error instanceof Error ? error.message : 'Local draft save failed.',
           });
         });
+
+      if (projectId) {
+        void saveCloudDraft(projectId, draft);
+      }
     }, 250);
 
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [latestDslGeneration, latestMindmapSnapshot, outline, previewTransform, rawNotes, selectedDetailLevel]);
+  }, [latestDslGeneration, latestMindmapSnapshot, outline, previewTransform, projectId, rawNotes, selectedDetailLevel]);
 
   useEffect(() => {
     return () => {
@@ -501,6 +556,39 @@ export default function StudyWorkspace() {
     }
   }
 
+  async function handleToggleHistory(): Promise<void> {
+    if (historyOpen) {
+      setHistoryOpen(false);
+      return;
+    }
+
+    if (!projectId) return;
+
+    setHistoryOpen(true);
+    setHistoryLoading(true);
+
+    try {
+      const res = await fetch(`/api/projects/${projectId}/history`);
+      if (res.ok) {
+        setHistoryEntries((await res.json()) as HistoryEntry[]);
+      }
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  function handleRestoreFromHistory(entry: HistoryEntry): void {
+    editorRef.current?.setValue(entry.dsl);
+    editorRef.current?.focus();
+    editorRef.current?.setPosition({ lineNumber: 1, column: 1 });
+    setOutline(entry.dsl);
+    setDebouncedOutline(entry.dsl);
+    if (entry.rawNotes) {
+      setRawNotes(entry.rawNotes);
+    }
+    setHistoryOpen(false);
+  }
+
   async function handleGenerateDsl(detailLevel: SourceGenerationDetailLevel = selectedDetailLevel): Promise<void> {
     const sourceText = rawNotes.trim();
 
@@ -528,6 +616,16 @@ export default function StudyWorkspace() {
       setOutline(response.dsl);
       setDebouncedOutline(response.dsl);
       setLatestDslGeneration(response);
+
+      if (projectId) {
+        void recordGenerationHistory(projectId, {
+          detailLevel,
+          dsl: response.dsl,
+          densityStatus: response.quality.densityStatus,
+          nodeCount: response.metrics.generatedMeaningfulLineCount,
+          rawNotes: sourceText,
+        });
+      }
       setGenerationStatus({
         tone: 'success',
         message: response.quality.densityStatus === 'target-met'
@@ -575,6 +673,17 @@ export default function StudyWorkspace() {
           <span className="inline-flex items-center rounded-full bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700">
             {isParsing ? 'Parsing…' : `Parsed ${nodeCount} nodes`}
           </span>
+          {projectId ? (
+            <button
+              className="rounded-full border border-zinc-200 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+              onClick={() => {
+                void handleToggleHistory();
+              }}
+              type="button"
+            >
+              {historyOpen ? 'Close history' : 'Generation history'}
+            </button>
+          ) : null}
           <button
             className="rounded-full border border-zinc-200 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={!layoutResult || layoutStatus === 'loading'}
@@ -587,6 +696,50 @@ export default function StudyWorkspace() {
           </button>
         </div>
       </div>
+
+      {historyOpen ? (
+        <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+          <h3 className="mb-3 text-sm font-semibold text-zinc-950">Generation history</h3>
+          {historyLoading ? (
+            <p className="text-sm text-zinc-500">Loading…</p>
+          ) : historyEntries.length === 0 ? (
+            <p className="text-sm text-zinc-500">No generations recorded yet.</p>
+          ) : (
+            <ul className="grid gap-2">
+              {historyEntries.map((entry) => (
+                <li
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3"
+                  key={entry.id}
+                >
+                  <div className="grid gap-1">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                      <span>{new Date(entry.createdAt).toLocaleString()}</span>
+                      <span className="rounded-full bg-zinc-100 px-2 py-0.5 font-medium text-zinc-700">{entry.detailLevel}</span>
+                      <span className={`rounded-full px-2 py-0.5 font-medium ${
+                        entry.densityStatus === 'target-met'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : entry.densityStatus === 'below-target'
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-sky-100 text-sky-700'
+                      }`}>{entry.densityStatus}</span>
+                      <span>{entry.nodeCount} nodes</span>
+                    </div>
+                  </div>
+                  <button
+                    className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 transition hover:bg-zinc-100"
+                    onClick={() => {
+                      handleRestoreFromHistory(entry);
+                    }}
+                    type="button"
+                  >
+                    Restore
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
 
       <div className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
         <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${

@@ -1,7 +1,15 @@
-import StudyWorkspace from "../components/StudyWorkspace";
-import { getModelProviderEnv } from "../lib/config/env";
+import { redirect } from 'next/navigation';
+import { auth, signOut } from '@/auth';
+import StudyWorkspace from '../components/StudyWorkspace';
+import { getModelProviderEnv } from '../lib/config/env';
 
-export default function Home() {
+export default async function Home() {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    redirect('/login');
+  }
+
   const modelProviderEnv = getModelProviderEnv();
 
   return (
@@ -15,6 +23,20 @@ export default function Home() {
             <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
               {`Model provider ready: ${modelProviderEnv.MODEL_PROVIDER}`}
             </span>
+            <form
+              className="ml-auto"
+              action={async () => {
+                'use server';
+                await signOut({ redirectTo: '/login' });
+              }}
+            >
+              <button
+                type="submit"
+                className="text-sm text-zinc-400 hover:text-zinc-700 transition-colors"
+              >
+                Sign out
+              </button>
+            </form>
           </div>
           <div className="grid gap-3">
             <h1 className="max-w-3xl text-4xl font-semibold tracking-tight text-zinc-950">
@@ -31,7 +53,7 @@ export default function Home() {
             </p>
           </div>
         </section>
-        <StudyWorkspace />
+        <StudyWorkspace userId={session.user.id} />
       </div>
     </main>
   );

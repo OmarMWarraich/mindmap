@@ -1,7 +1,21 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import test, { mock } from 'node:test';
 
-import { POST } from './route.ts';
+process.env.DATABASE_URL = 'postgresql://test:test@localhost/test';
+
+mock.module('../../../../auth.ts', {
+  namedExports: {
+    auth: (handler: Function) => (req: Request) => {
+      const userId = req.headers.get('x-test-user-id');
+      if (userId) {
+        (req as any).auth = { user: { id: userId } };
+      }
+      return handler(req);
+    },
+  },
+});
+
+const { POST } = await import('./route.ts') as unknown as { POST: (req: Request) => Promise<Response> };
 
 test('dsl generation route returns validated DSL output for a valid request', async () => {
   const originalEnv = { ...process.env };
@@ -38,7 +52,10 @@ test('dsl generation route returns validated DSL output for a valid request', as
   try {
     const response = await POST(new Request('http://localhost/api/generation/dsl', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-test-user-id': 'test-user-id',
+      },
       body: JSON.stringify({
         sourceText: 'Photosynthesis\nLight reactions\nCalvin cycle\nInputs and outputs\nImportance',
       }),
@@ -62,7 +79,10 @@ test('dsl generation route returns validated DSL output for a valid request', as
 test('dsl generation route rejects invalid request payloads', async () => {
   const response = await POST(new Request('http://localhost/api/generation/dsl', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-test-user-id': 'test-user-id',
+    },
     body: JSON.stringify({ sourceText: 12 }),
   }));
 
@@ -91,7 +111,10 @@ test('dsl generation route surfaces model output validation failures', async () 
   try {
     const response = await POST(new Request('http://localhost/api/generation/dsl', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-test-user-id': 'test-user-id',
+      },
       body: JSON.stringify({
         sourceText: 'Topic A\nTopic B',
       }),
@@ -104,4 +127,14 @@ test('dsl generation route surfaces model output validation failures', async () 
     process.env = originalEnv;
     globalThis.fetch = originalFetch;
   }
+});
+
+test('dsl generation route rejects unauthenticated requests', async () => {
+  const response = await POST(new Request('http://localhost/api/generation/dsl', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sourceText: 'Topic A' }),
+  }));
+
+  assert.equal(response.status, 401);
 });
