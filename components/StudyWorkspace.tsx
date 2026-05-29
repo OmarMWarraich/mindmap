@@ -7,7 +7,7 @@ import type { DslEditorPanelHandle } from './DslEditorPanel';
 import ExpertScalingPanel from './ExpertScalingPanel';
 import type { ScalingValues } from './ExpertScalingPanel';
 import { defaultScalingValues } from './ExpertScalingPanel';
-import MindmapSvgPreview from './MindmapSvgPreview';
+import MindmapPreviewDrawer from './MindmapPreviewDrawer';
 import SourceNotesPanel from './SourceNotesPanel';
 import type { SourceGenerationDetailLevel } from './SourceNotesPanel';
 import { useWorkspace } from './WorkspaceContext';
@@ -101,7 +101,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
   const [exportControls, setExportControls] = useState<ScalingValues>(defaultScalingValues);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
-  const { activePanel, setActivePanel, setProjectName } = useWorkspace();
+  const { activePanel, setActivePanel, setProjectName, previewOpen, setPreviewOpen } = useWorkspace();
   const historyOpen = activePanel === 'history';
   const [historyLoading, setHistoryLoading] = useState(false);
 
@@ -688,24 +688,19 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
             }}
           />
 
-          {/* Preview section — will be repositioned in Phase H */}
-          <aside className="grid gap-4 rounded-3xl border border-zinc-200 bg-zinc-50 p-5">
-            <div className="grid gap-1">
-              <h2 className="text-xl font-semibold text-zinc-950">Mindmap preview</h2>
-              <p className="text-sm leading-6 text-zinc-600">
-                Layout output renders as a radial SVG with branch-aware colour styling.
-              </p>
-            </div>
-            <MindmapSvgPreview
-              ref={previewRef}
-              layoutError={effectiveLayoutError}
-              layoutResult={layoutResult}
-              layoutStatus={effectiveLayoutStatus}
-              mindmap={effectiveMindmap}
-              onTransformChange={setPreviewTransform}
-              transform={previewTransform}
-            />
-          </aside>
+          <MindmapPreviewDrawer
+            ref={previewRef}
+            layoutError={effectiveLayoutError}
+            layoutResult={layoutResult}
+            layoutStatus={effectiveLayoutStatus}
+            mindmap={effectiveMindmap}
+            onClose={() => {
+              setPreviewOpen(false);
+            }}
+            onTransformChange={setPreviewTransform}
+            open={previewOpen}
+            transform={previewTransform}
+          />
 
           {/* Bottom action row */}
           <div className="flex shrink-0 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">

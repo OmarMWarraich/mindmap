@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useRef, useState } from 'react';
 
+import { useWorkspace } from './WorkspaceContext';
+
 export interface NavBarProps {
   modelProvider: string;
   userEmail?: string | null;
@@ -68,6 +70,7 @@ export default function NavBar({ modelProvider, userEmail, userName, signOutActi
   const pathname = usePathname();
   const [avatarOpen, setAvatarOpen] = useState(false);
   const avatarRef = useRef<HTMLDivElement>(null);
+  const { setPreviewOpen } = useWorkspace();
 
   const initials = getUserInitials(userName, userEmail);
 
@@ -104,11 +107,17 @@ export default function NavBar({ modelProvider, userEmail, userName, signOutActi
 
       {/* ── Right cluster ──────────────────────────────────────────── */}
       <div className="flex shrink-0 items-center gap-2">
-        {/* Model Preview pill */}
-        <span className="hidden items-center gap-1 rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700 sm:inline-flex">
+        {/* Model Preview pill — opens the preview drawer */}
+        <button
+          className="hidden items-center gap-1 rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700 transition hover:bg-primary-100 sm:inline-flex"
+          onClick={() => {
+            setPreviewOpen(true);
+          }}
+          type="button"
+        >
           Model Preview:
           <span className="font-semibold">{modelProvider}</span>
-        </span>
+        </button>
 
         {/* Trained Notes badge */}
         <span className="hidden rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-500 lg:inline-flex">

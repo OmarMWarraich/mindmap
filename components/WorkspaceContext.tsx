@@ -10,6 +10,8 @@ interface WorkspaceContextValue {
   setActivePanel: (panel: ActivePanel) => void;
   projectName: string;
   setProjectName: (name: string) => void;
+  previewOpen: boolean;
+  setPreviewOpen: (open: boolean) => void;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue>({
@@ -17,6 +19,8 @@ const WorkspaceContext = createContext<WorkspaceContextValue>({
   setActivePanel: () => {},
   projectName: 'Untitled Project',
   setProjectName: () => {},
+  previewOpen: false,
+  setPreviewOpen: () => {},
 });
 
 export function useWorkspace() {
@@ -26,10 +30,11 @@ export function useWorkspace() {
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [activePanel, setActivePanel] = useState<ActivePanel>('notes');
   const [projectName, setProjectName] = useState('Untitled Project');
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   return (
     <WorkspaceContext.Provider
-      value={{ activePanel, setActivePanel, projectName, setProjectName }}
+      value={{ activePanel, setActivePanel, projectName, setProjectName, previewOpen, setPreviewOpen }}
     >
       {children}
     </WorkspaceContext.Provider>

@@ -385,11 +385,11 @@ The goal is to convert the current single-page layout into the multi-column SaaS
 
 ### Phase H — Mindmap Preview Integration
 
-- [ ] Decide where the mindmap preview lives in the new layout
+- [x] Decide where the mindmap preview lives in the new layout
   The mockup does not show a preview panel in the main workspace view — it appears to be behind the "Model Preview: Flexible" toggle in the top nav. Add a toggleable preview drawer or a `/preview` sub-route that slides in over the right panels.
   Purpose: Resolves the layout question before implementing the container.
 
-- [ ] Integrate `MindmapSvgPreview` into the chosen preview surface
+- [x] Integrate `MindmapSvgPreview` into the chosen preview surface
   Move the existing `<MindmapSvgPreview>` usage from the current StudyWorkspace render into the new preview panel. Keep pan/zoom and loading/error states.
   Purpose: Preserves all existing preview functionality in the new UI location.
 
