@@ -315,16 +315,16 @@ The goal is to convert the current single-page layout into the multi-column SaaS
 
 ### Phase C — Top Navigation Bar
 
-- [ ] Create `components/NavBar.tsx`
-  Left: "MindFlow" wordmark with a small icon. Center: tab row — Workspace, Library, Helpdesk, History (router-driven active state). Right: "Model Preview" pill showing the active provider, a "Trained Notes" badge, user avatar, Download icon button, settings dots menu. Use `h-14 border-b` styling.
+- [x] Create `components/NavBar.tsx`
+  Left: MindFlow SVG icon + wordmark. Center: Workspace / Library / Helpdesk / History `<Link>` tabs with `usePathname` active state. Right: "Model Preview" pill, "Trained Notes" badge, disabled Download icon button, user avatar with initials.
   Purpose: Establishes the global navigation visible in the mockup header.
 
-- [ ] Add active-tab routing in `NavBar`
-  Use `usePathname` to highlight the active tab. For now only Workspace (`/`) is a real route; the others can be inert or link to `#` placeholders.
+- [x] Add active-tab routing in `NavBar`
+  `usePathname()` drives the active highlight. Workspace (`/`) exact-matches; others use `startsWith`. `href: '#'` tabs are never marked active. Library, Helpdesk, History link to `#` placeholders.
   Purpose: Makes the nav feel interactive without requiring full route build-out.
 
-- [ ] Move the sign-out action into the NavBar user-avatar dropdown
-  Remove the sign-out form from `app/page.tsx` and add it to the avatar menu in `NavBar`.
+- [x] Move the sign-out action into the NavBar user-avatar dropdown
+  Removed the sign-out form from `app/page.tsx`. A `handleSignOut` Server Action is defined in page.tsx and passed as `signOutAction` prop to `<NavBar>`. Avatar button opens a dropdown with the user's email and a Sign out `<form>`.
   Purpose: Keeps the header clean and places auth actions where the mockup shows them.
 
 ### Phase D — Left Sidebar
