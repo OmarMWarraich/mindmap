@@ -2,6 +2,7 @@
 
 import { startTransition, useEffect, useMemo, useRef, useState } from 'react';
 
+import ChatPanel from './ChatPanel';
 import DslEditorPanel from './DslEditorPanel';
 import type { DslEditorPanelHandle } from './DslEditorPanel';
 import ExpertScalingPanel from './ExpertScalingPanel';
@@ -538,6 +539,8 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
               }}
               onRestore={handleRestoreFromHistory}
             />
+          ) : activePanel === 'chat' ? (
+            <ChatPanel />
           ) : (
             <>
               <SourceNotesPanel

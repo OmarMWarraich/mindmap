@@ -405,11 +405,11 @@ The goal is to convert the current single-page layout into the multi-column SaaS
 
 ### Phase J — Chat / Feedback Section
 
-- [ ] Create `components/ChatPanel.tsx` as a placeholder
+- [x] Create `components/ChatPanel.tsx` as a placeholder
   A minimal panel with a message list and a text input at the bottom. This matches the bottom section of the right panel in the mockup. Wire no AI calls yet — just local message state.
   Purpose: Puts the chat surface in the layout so the full mockup shape is present.
 
-- [ ] Integrate the chat panel into the bottom of the right column
+- [x] Integrate the chat panel into the bottom of the right column
   Show it below the Expert Scaling panel or toggle it from the sidebar Chat nav item.
   Purpose: Completes the right-column layout.
 
