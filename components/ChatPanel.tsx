@@ -2,6 +2,8 @@
 
 import { useId, useRef, useState } from 'react';
 
+import type React from 'react';
+
 // ── Icons ──────────────────────────────────────────────────────────────────
 
 function SendIcon() {
@@ -39,9 +41,14 @@ export default function ChatPanel() {
     const text = draft.trim();
     if (!text) return;
 
+    const id =
+       typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+         ? crypto.randomUUID()
+         : `msg-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
     setMessages((prev) => [
       ...prev,
-      { id: crypto.randomUUID(), role: 'user', text, timestamp: new Date() },
+      { id, role: 'user', text, timestamp: new Date() },
     ]);
     setDraft('');
     // AI calls will be wired in a future phase

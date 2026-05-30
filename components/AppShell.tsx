@@ -1,3 +1,5 @@
+import React from "react";
+
 interface AppShellProps {
   nav: React.ReactNode;
   sidebar: React.ReactNode;

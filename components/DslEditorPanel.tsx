@@ -10,7 +10,6 @@ import {
   trackInlineCompletionEvent,
 } from '../lib/completion/client';
 import { createInlineSuggestionRange } from '../lib/dsl/inline-completion';
-import { mindmapDslStarterOutline } from '../lib/dsl/mvp';
 
 // ── Module-level Monaco state ──────────────────────────────────────────────
 
@@ -66,16 +65,6 @@ function CopyIcon() {
 }
 
 // ── Monaco helpers ─────────────────────────────────────────────────────────
-
-const monacoInjectedTextCursorStops = { none: 3 } as const;
-
-function getGhostTextPreview(insertText: string): string {
-  if (!insertText) return '';
-  return insertText
-    .replace(/\r?\n/g, '  ↵  ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
 
 function linkAbortControllerToCancellationToken(token: CancellationToken): {
   abortController: AbortController;

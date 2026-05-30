@@ -45,7 +45,7 @@ function UserPlusIcon() {
 
 function statusBadgeClass(tone: StatusTone): string {
   if (tone === 'success') return 'bg-tertiary-100 text-tertiary-700';
-  if (tone === 'error') return 'bg-rose-100 text-rose-700';
+  if (tone === 'error') return 'bg-accent2-100 text-accent2-700';
   if (tone === 'progress') return 'bg-accent-100 text-accent-700';
   return 'bg-zinc-100 text-zinc-600';
 }

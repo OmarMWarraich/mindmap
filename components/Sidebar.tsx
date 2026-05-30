@@ -1,5 +1,7 @@
 'use client';
 
+import type React from 'react';
+
 import { useWorkspace } from './WorkspaceContext';
 import type { ActivePanel } from './WorkspaceContext';
 
