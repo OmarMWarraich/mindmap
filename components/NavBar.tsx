@@ -13,12 +13,12 @@ export interface NavBarProps {
   signOutAction: () => Promise<void>;
 }
 
-const NAV_TABS = [
+const NAV_TABS: ReadonlyArray<{ label: string; href: string }> = [
   { label: 'Workspace', href: '/' },
   { label: 'Library',   href: '#' },
   { label: 'Helpdesk',  href: '#' },
   { label: 'History',   href: '#' },
-] as const;
+];
 
 function MindFlowIcon() {
   return (

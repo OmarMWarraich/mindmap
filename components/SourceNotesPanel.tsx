@@ -44,7 +44,7 @@ function UserPlusIcon() {
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 function statusBadgeClass(tone: StatusTone): string {
-  if (tone === 'success') return 'bg-emerald-100 text-emerald-700';
+  if (tone === 'success') return 'bg-tertiary-100 text-tertiary-700';
   if (tone === 'error') return 'bg-rose-100 text-rose-700';
   if (tone === 'progress') return 'bg-accent-100 text-accent-700';
   return 'bg-zinc-100 text-zinc-600';
@@ -144,7 +144,7 @@ export default function SourceNotesPanel({
             className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
               latestDslGeneration.quality.mode === 'retry'
                 ? 'bg-amber-100 text-amber-700'
-                : 'bg-emerald-100 text-emerald-700'
+                : 'bg-tertiary-100 text-tertiary-700'
             }`}
           >
             {latestDslGeneration.quality.mode === 'retry' ? 'retry pass' : 'first pass'}
@@ -162,7 +162,7 @@ export default function SourceNotesPanel({
           <span
             className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
               latestDslGeneration.quality.densityStatus === 'target-met'
-                ? 'bg-emerald-100 text-emerald-700'
+                ? 'bg-tertiary-100 text-tertiary-700'
                 : latestDslGeneration.quality.densityStatus === 'below-target'
                   ? 'bg-amber-100 text-amber-700'
                   : 'bg-accent-100 text-accent-700'

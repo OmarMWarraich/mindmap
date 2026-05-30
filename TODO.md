@@ -415,16 +415,16 @@ The goal is to convert the current single-page layout into the multi-column SaaS
 
 ### Phase K — Cleanup and Consistency
 
-- [ ] Remove old layout wrappers from `StudyWorkspace.tsx`
+- [x] Remove old layout wrappers from `StudyWorkspace.tsx`
   After all sub-panels are extracted, `StudyWorkspace.tsx` becomes a thin coordinator that holds state and passes props. Remove any remaining container markup that belongs to the extracted components.
   Purpose: Eliminates duplicated layout logic.
 
-- [ ] Audit all Tailwind classes for zinc/sky/emerald overrides
+- [x] Audit all Tailwind classes for zinc/sky/emerald overrides
   Replace lingering `bg-sky-*`, `border-sky-*`, `bg-emerald-*` classes with the new design-token utilities defined in Phase A.
   Purpose: Makes the color system consistent across all panels.
 
-- [ ] Run `npm run typecheck` and `npm run lint` to confirm no regressions
+- [x] Run `npm run typecheck` and `npm run lint` to confirm no regressions
   Purpose: Validates that the component refactoring did not introduce type errors or lint violations.
 
-- [ ] Run existing tests to confirm generation, parsing, and persistence logic is unchanged
+- [x] Run existing tests to confirm generation, parsing, and persistence logic is unchanged
   Purpose: Confirms that extracting UI components did not accidentally break any logic that moved with the JSX.

@@ -127,7 +127,6 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
   }, [outline]);
 
   const parseResult = useMemo(() => parseMindmapDsl(debouncedOutline), [debouncedOutline]);
-  const isParsing = outline !== debouncedOutline;
   const generatedMindmap = useMemo(() => {
     if (!parseResult.ast) {
       return null;
@@ -144,14 +143,6 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
   const effectiveLayoutStatus = layoutStatus;
   const effectiveLayoutError = layoutError;
   const effectiveLayoutDiagnostics = layoutDiagnostics;
-  const branchCount = parseResult.ast?.root.branches.length ?? 0;
-  const nodeCount = (parseResult.ast?.root.branches ?? []).reduce((count, branch) => {
-    const countChildren = (children: typeof branch.children): number => {
-      return children.reduce((total, child) => total + 1 + countChildren(child.children), 0);
-    };
-
-    return count + 1 + countChildren(branch.children);
-  }, 1);
 
   useEffect(() => {
     let cancelled = false;
@@ -501,33 +492,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
   }
 
   return (
-    <section className="grid gap-4 rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="grid gap-1">
-          <h2 className="text-lg font-semibold text-zinc-950">Workspace</h2>
-          <p className="text-sm leading-6 text-zinc-600">
-            Generate DSL from source notes, then generate the mindmap from the DSL editor and export it from here.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-3">
-          <span className="inline-flex items-center rounded-full bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700">
-            {isParsing ? 'Parsing…' : `Parsed ${nodeCount} nodes`}
-          </span>
-          <button
-            className="rounded-full border border-zinc-200 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={!layoutResult || layoutStatus === 'loading'}
-            onClick={() => {
-              void handleDownloadPng();
-            }}
-            type="button"
-          >
-            Download PNG
-          </button>
-        </div>
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-2">
+    <div className="grid gap-6 p-5 xl:grid-cols-2">
         {/* Left column: Source Notes + Validation (or History panel) */}
         <div className="flex flex-col gap-4">
           {activePanel === 'history' ? (
@@ -638,8 +603,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
             </button>
           </div>
         </div>
-      </div>
-    </section>
+    </div>
   );
 
 }
