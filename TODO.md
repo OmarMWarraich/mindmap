@@ -282,3 +282,149 @@ Purpose: Makes the project easier to run, review, and hand off to other engineer
 
 - [ ] Run a final manual QA pass across typing, generation, layout, export, and persistence
 Purpose: Confirms the major user journey works end to end before the MVP is shared or demoed.
+
+---
+
+## UI Redesign — MindFlow AI Workspace
+
+The goal is to convert the current single-page layout into the multi-column SaaS shell shown in the mockup. Work through the phases in order; each phase ships a self-contained, visible improvement.
+
+### Phase A — Design Tokens and Tailwind Theme
+
+- [x] Define the "Cognitive Flow" color palette in `app/globals.css` (`@theme` block — Tailwind v4 CSS-first config)
+  Added `primary` (dark blue-grey), `accent` (bright blue), `tertiary` (dark teal), `accent2` (red) as 11-step scales. Neutral uses the built-in zinc scale.
+  Purpose: Gives every future component a consistent color vocabulary so the app matches the design system.
+
+- [x] Add Inter as the primary font via `next/font`
+  Replaced Geist Sans with Inter in `app/layout.tsx`. `--font-inter` CSS variable wired into the `@theme` `--font-sans` slot. Geist Mono kept for code blocks.
+  Purpose: Establishes the typographic tone shown in the mockup.
+
+- [x] Add global CSS resets and base styles matching the mockup
+  `html` and `body` set to `height: 100%`; `body` gets `overflow: hidden` and `background-color: #f8fafc`. Updated `app/globals.css`.
+  Purpose: Required baseline for a fixed full-viewport layout.
+
+### Phase B — App Shell Layout
+
+- [x] Create `components/AppShell.tsx` — the fixed full-viewport wrapper
+  Three-zone layout via `flex flex-col`: `<header>` (`h-14 shrink-0`), then a `flex min-h-0 flex-1` row with `<aside>` (`w-60 shrink-0`) and `<main>` (`flex-1 overflow-y-auto`). Accepts `nav`, `sidebar`, and `children` props so Phases C and D can slot components in without touching the layout.
+  Purpose: Replaces the current `<main className="min-h-screen px-6 py-12">` wrapper with the shell all other panels plug into.
+
+- [x] Replace `app/page.tsx` layout with `AppShell`
+  Removed the hero section (title, description, MVP badge). Sign-out form and model provider badge live in a temporary `nav` placeholder (will be replaced by `<NavBar>` in Phase C). Sidebar is `null` until Phase D. `<StudyWorkspace>` renders in the `children` slot.
+  Purpose: Wires the new shell into the Next.js page so the layout change is visible.
+
+### Phase C — Top Navigation Bar
+
+- [x] Create `components/NavBar.tsx`
+  Left: MindFlow SVG icon + wordmark. Center: Workspace / Library / Helpdesk / History `<Link>` tabs with `usePathname` active state. Right: "Model Preview" pill, "Trained Notes" badge, disabled Download icon button, user avatar with initials.
+  Purpose: Establishes the global navigation visible in the mockup header.
+
+- [x] Add active-tab routing in `NavBar`
+  `usePathname()` drives the active highlight. Workspace (`/`) exact-matches; others use `startsWith`. `href: '#'` tabs are never marked active. Library, Helpdesk, History link to `#` placeholders.
+  Purpose: Makes the nav feel interactive without requiring full route build-out.
+
+- [x] Move the sign-out action into the NavBar user-avatar dropdown
+  Removed the sign-out form from `app/page.tsx`. A `handleSignOut` Server Action is defined in page.tsx and passed as `signOutAction` prop to `<NavBar>`. Avatar button opens a dropdown with the user's email and a Sign out `<form>`.
+  Purpose: Keeps the header clean and places auth actions where the mockup shows them.
+
+### Phase D — Left Sidebar
+
+- [x] Create `components/Sidebar.tsx`
+  Top section: project name ("Project Alpha") + subtitle ("Strategy Map"), "Generate Branch" CTA button (accent blue, full width). Navigation list: Notes, Chat, Guides, History — each with an icon and active highlight. Bottom: Settings link and Support link with icons.
+  Purpose: Builds the persistent left-panel navigation shown in the mockup.
+
+- [x] Connect sidebar nav items to workspace panel state
+  Clicking Notes → show Source Notes panel. Clicking History → open generation history drawer. Chat and Guides can be placeholders for now.
+  Purpose: Makes the sidebar functional so the core workflow is navigable.
+
+- [x] Show active project name and subtitle in the sidebar header
+  Pull the project name from the existing `projectId` state. Use a placeholder name ("Untitled Project") until a rename feature exists.
+  Purpose: Gives the sidebar its contextual header matching the mockup.
+
+### Phase E — Source Notes Panel
+
+- [x] Extract source-notes UI into `components/SourceNotesPanel.tsx`
+  Pull the raw-notes textarea, detail-level toggle (Standard / Detailed), Generate DSL button, Clear button, and quality badges out of `StudyWorkspace.tsx` into a standalone component that accepts props and callbacks.
+  Purpose: Isolates the notes panel into its own file so layout and state concerns separate cleanly.
+
+- [x] Style `SourceNotesPanel` to match the mockup center column
+  White card background, "Source Notes" heading with action icons (search, add-user placeholder), full-height textarea with placeholder text, "Generate Branch" / "Clear" buttons at the bottom of the panel.
+  Purpose: Makes the center panel look like the mockup rather than the current sky-blue card.
+
+- [x] Show DSL generation quality feedback inside the panel
+  Keep the density status and quality badges but move them to a subtle footer row inside the panel rather than a separate card.
+  Purpose: Reduces visual noise while keeping the status information accessible.
+
+### Phase F — DSL Editor Panel
+
+- [x] Extract the Monaco editor into `components/DslEditorPanel.tsx`
+  Move the Monaco `<Editor>` block, inline-completion registration, and the Generate mindmap / Reset DSL buttons out of `StudyWorkspace.tsx` into this component.
+  Purpose: Gives the editor its own component boundary matching the "DSL Editor" panel in the mockup.
+
+- [x] Add a panel header to `DslEditorPanel` matching the mockup
+  "DSL Editor" title on the left, icon buttons on the right (edit, expand/fullscreen placeholder, copy). Use `border-b` to visually separate the header from the editor surface.
+  Purpose: Reproduces the panel chrome visible in the mockup.
+
+- [x] Style the DSL editor panel as a dark-bordered card occupying the upper-right quadrant
+  The mockup shows the editor filling roughly the top two-thirds of the right column. Constrain height so the Expert Scaling panel fits below it.
+  Purpose: Achieves the two-row right column layout.
+
+### Phase G — Expert Scaling Panel
+
+- [x] Extract export controls into `components/ExpertScalingPanel.tsx`
+  Move the six scale sliders (`nodeWidthScale`, `nodeHeightScale`, `nodePaddingScale`, `siblingGapScale`, `levelGapScale`, `fontScale`) and the Reset Scaling button out of `StudyWorkspace.tsx` into this component.
+  Purpose: Gives the scaling UI its own panel with the "Expert Scaling" header shown in the mockup.
+
+- [x] Style `ExpertScalingPanel` to match the mockup
+  Right-aligned value labels next to each slider, thin separator lines between rows, "Reset Scaling" button at the bottom, panel header "Expert Scaling" with a collapse icon.
+  Purpose: Makes the scaling panel visually match the mockup.
+
+- [x] Add a bottom action row: Generate DSL | Clear | Quick Export
+  Add a sticky footer row inside the right column containing the three action buttons as shown at the bottom of the mockup's right panel.
+  Purpose: Puts the primary CTA buttons at the bottom of the panel rather than scattered across multiple cards.
+
+### Phase H — Mindmap Preview Integration
+
+- [x] Decide where the mindmap preview lives in the new layout
+  The mockup does not show a preview panel in the main workspace view — it appears to be behind the "Model Preview: Flexible" toggle in the top nav. Add a toggleable preview drawer or a `/preview` sub-route that slides in over the right panels.
+  Purpose: Resolves the layout question before implementing the container.
+
+- [x] Integrate `MindmapSvgPreview` into the chosen preview surface
+  Move the existing `<MindmapSvgPreview>` usage from the current StudyWorkspace render into the new preview panel. Keep pan/zoom and loading/error states.
+  Purpose: Preserves all existing preview functionality in the new UI location.
+
+### Phase I — Generation History Panel
+
+- [x] Convert history from an inline drawer to a sidebar panel
+  When the user clicks History in the sidebar nav, replace the Source Notes panel with a history list panel showing the existing `historyEntries` data.
+  Purpose: Matches the mockup which shows history as a first-class navigation destination.
+
+- [x] Style history entries to match the mockup list style
+  Each entry: timestamp, detail level badge, density status badge, node count, Restore button. Use the same card style as the rest of the app.
+  Purpose: Gives the history panel a consistent look.
+
+### Phase J — Chat / Feedback Section
+
+- [x] Create `components/ChatPanel.tsx` as a placeholder
+  A minimal panel with a message list and a text input at the bottom. This matches the bottom section of the right panel in the mockup. Wire no AI calls yet — just local message state.
+  Purpose: Puts the chat surface in the layout so the full mockup shape is present.
+
+- [x] Integrate the chat panel into the bottom of the right column
+  Show it below the Expert Scaling panel or toggle it from the sidebar Chat nav item.
+  Purpose: Completes the right-column layout.
+
+### Phase K — Cleanup and Consistency
+
+- [x] Remove old layout wrappers from `StudyWorkspace.tsx`
+  After all sub-panels are extracted, `StudyWorkspace.tsx` becomes a thin coordinator that holds state and passes props. Remove any remaining container markup that belongs to the extracted components.
+  Purpose: Eliminates duplicated layout logic.
+
+- [x] Audit all Tailwind classes for zinc/sky/emerald overrides
+  Replace lingering `bg-sky-*`, `border-sky-*`, `bg-emerald-*` classes with the new design-token utilities defined in Phase A.
+  Purpose: Makes the color system consistent across all panels.
+
+- [x] Run `npm run typecheck` and `npm run lint` to confirm no regressions
+  Purpose: Validates that the component refactoring did not introduce type errors or lint violations.
+
+- [x] Run existing tests to confirm generation, parsing, and persistence logic is unchanged
+  Purpose: Confirms that extracting UI components did not accidentally break any logic that moved with the JSX.

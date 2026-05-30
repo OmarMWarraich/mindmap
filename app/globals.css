@@ -1,30 +1,98 @@
 @import "tailwindcss";
 
+/* ── Cognitive Flow — design tokens ─────────────────────────────────
+   Primary    dark blue-grey scale  (sidebar, surfaces, text)
+   Accent     bright blue           (CTAs, active states, links)
+   Tertiary   dark teal             (secondary actions, badges)
+   Accent2    red                   (errors, critical states)
+   Neutral    built-in zinc scale   (borders, muted text)
+──────────────────────────────────────────────────────────────────── */
+@theme {
+  /* Primary — dark blue-grey */
+  --color-primary-50:  #f1f5f9;
+  --color-primary-100: #e2e8f0;
+  --color-primary-200: #cbd5e1;
+  --color-primary-300: #94a3b8;
+  --color-primary-400: #64748b;
+  --color-primary-500: #475569;
+  --color-primary-600: #334155;
+  --color-primary-700: #1e293b;
+  --color-primary-800: #0f172a;
+  --color-primary-900: #0a1120;
+  --color-primary-950: #060b16;
+
+  /* Accent — bright blue */
+  --color-accent-50:  #eff6ff;
+  --color-accent-100: #dbeafe;
+  --color-accent-200: #bfdbfe;
+  --color-accent-300: #93c5fd;
+  --color-accent-400: #60a5fa;
+  --color-accent-500: #3b82f6;
+  --color-accent-600: #2563eb;
+  --color-accent-700: #1d4ed8;
+  --color-accent-800: #1e40af;
+  --color-accent-900: #1e3a8a;
+  --color-accent-950: #172554;
+
+  /* Tertiary — dark teal */
+  --color-tertiary-50:  #f0fdfa;
+  --color-tertiary-100: #ccfbf1;
+  --color-tertiary-200: #99f6e4;
+  --color-tertiary-300: #5eead4;
+  --color-tertiary-400: #2dd4bf;
+  --color-tertiary-500: #14b8a6;
+  --color-tertiary-600: #0d9488;
+  --color-tertiary-700: #0f766e;
+  --color-tertiary-800: #115e59;
+  --color-tertiary-900: #134e4a;
+  --color-tertiary-950: #042f2e;
+
+  /* Accent2 — red */
+  --color-accent2-50:  #fef2f2;
+  --color-accent2-100: #fee2e2;
+  --color-accent2-200: #fecaca;
+  --color-accent2-300: #fca5a5;
+  --color-accent2-400: #f87171;
+  --color-accent2-500: #ef4444;
+  --color-accent2-600: #dc2626;
+  --color-accent2-700: #b91c1c;
+  --color-accent2-800: #991b1b;
+  --color-accent2-900: #7f1d1d;
+  --color-accent2-950: #450a0a;
+
+  /* Typography */
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* ── CSS custom properties (inline — used directly by utilities) ──── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #0f172a;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ── Base resets ─────────────────────────────────────────────────────
+   html + body fill the viewport; overflow-hidden prevents a shell-
+   level scrollbar — individual panels scroll within themselves.
+──────────────────────────────────────────────────────────────────── */
+html,
+body {
+  height: 100%;
 }
 
 body {
-  background: var(--background);
+  overflow: hidden;
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), system-ui, sans-serif;
 }
 
+/* ── Monaco ghost text ───────────────────────────────────────────── */
 .mindmap-editor-ghost-text {
   color: color-mix(in srgb, var(--foreground) 38%, transparent);
   font-style: italic;
