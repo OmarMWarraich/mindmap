@@ -11,6 +11,7 @@ import { defaultScalingValues } from './ExpertScalingPanel';
 import GenerationHistoryPanel from './GenerationHistoryPanel';
 import type { HistoryEntry } from './GenerationHistoryPanel';
 import MindmapPreviewDrawer from './MindmapPreviewDrawer';
+import MindmapSvgPreview from './MindmapSvgPreview';
 import SourceNotesPanel from './SourceNotesPanel';
 import type { SourceGenerationDetailLevel } from './SourceNotesPanel';
 import { useWorkspace } from './WorkspaceContext';
@@ -548,6 +549,16 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
               onResetDsl={handleResetDsl}
             />
           </div>
+
+          <MindmapSvgPreview
+            ref={previewRef}
+            layoutError={effectiveLayoutError}
+            layoutResult={layoutResult}
+            layoutStatus={effectiveLayoutStatus}
+            mindmap={effectiveMindmap}
+            onTransformChange={setPreviewTransform}
+            transform={previewTransform}
+          />
 
           <ExpertScalingPanel
             values={exportControls}
