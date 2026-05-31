@@ -21,7 +21,7 @@ export default function CtaBanner() {
             </Link>
             <a
               className="rounded-xl border border-white/20 bg-white/5 px-7 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-white/10"
-              href="mailto:team@mindflow.ai"
+              href="#features"
             >
               Schedule Team Demo
             </a>
