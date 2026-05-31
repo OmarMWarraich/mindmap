@@ -77,10 +77,10 @@ export default function NavBar({ modelProvider, userEmail, userName, signOutActi
   return (
     <nav className="flex h-full items-center px-4">
       {/* ── Brand ──────────────────────────────────────────────────── */}
-      <div className="mr-5 flex shrink-0 items-center gap-1.5 text-primary-800">
+      <Link className="mr-5 flex shrink-0 items-center gap-1.5 text-primary-800 transition-colors hover:text-accent-700" href="/workspace">
         <MindFlowIcon />
         <span className="text-sm font-semibold tracking-tight">MindFlow</span>
-      </div>
+      </Link>
 
       {/* ── Tab row ────────────────────────────────────────────────── */}
       <div className="flex flex-1 items-center justify-center gap-0.5">
