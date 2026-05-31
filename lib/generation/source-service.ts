@@ -15,6 +15,7 @@ import {
 
 const minimumExpansionRatio = 2.3;
 const maximumExpansionRatio = 2.7;
+const detailedMaximumExpansionRatio = 3.2;
 const maxWordsPerLine = 15;
 
 type DensityStatus = 'below-target' | 'target-met' | 'over-target';
@@ -32,49 +33,65 @@ export async function generateMindmapDslFromSource(
   const detailLevel = validatedRequest.detailLevel ?? 'standard';
   const env = options.env ?? getModelProviderEnv();
   const sourceMeaningfulLineCount = countMeaningfulNonEmptyLines(validatedRequest.sourceText);
-  const targetMinLineCount = Math.max(1, Math.ceil(sourceMeaningfulLineCount * minimumExpansionRatio));
-  const targetMaxLineCount = Math.max(targetMinLineCount, Math.floor(sourceMeaningfulLineCount * maximumExpansionRatio));
+  const baseTargetMinLineCount = Math.max(1, Math.ceil(sourceMeaningfulLineCount * minimumExpansionRatio));
+  const baseTargetMaxLineCount = Math.max(
+    baseTargetMinLineCount,
+    Math.floor(sourceMeaningfulLineCount * maximumExpansionRatio),
+  );
+  const minimumChildrenPerBranch = getMinimumChildrenPerBranch(detailLevel);
+  const effectiveTargetMaxLineCount = getEffectiveTargetMaxLineCount(
+    detailLevel,
+    sourceMeaningfulLineCount,
+    baseTargetMaxLineCount,
+  );
+  const effectiveTargetMinLineCount = getEffectiveTargetMinLineCount(
+    detailLevel,
+    baseTargetMinLineCount,
+    effectiveTargetMaxLineCount,
+  );
   const prompt = createSourceMindmapGenerationPrompt({
     sourceText: validatedRequest.sourceText,
     sourceMeaningfulLineCount,
-    targetMinLineCount,
-    targetMaxLineCount,
+    targetMinLineCount: effectiveTargetMinLineCount,
+    targetMaxLineCount: effectiveTargetMaxLineCount,
     detailLevel,
+    minimumChildrenPerBranch,
   });
   let attemptCount = 1;
   let attempt = await generateDslAttempt(
     validatedRequest.sourceText,
     sourceMeaningfulLineCount,
-    targetMinLineCount,
-    targetMaxLineCount,
+    effectiveTargetMinLineCount,
+    effectiveTargetMaxLineCount,
     detailLevel,
+    minimumChildrenPerBranch,
     prompt,
     env,
     options.fetchImpl,
   );
 
-  if (
-    attempt.validation.densityStatus === 'below-target'
-    || attempt.validation.underdevelopedBranches.length > 0
-    || attempt.validation.overlyExtractive
-  ) {
+  if (shouldRetryGeneration(detailLevel, attempt.validation)) {
+    const retryFeedback = describeRetryNeeds(attempt.validation);
     const retryPrompt = createSourceMindmapGenerationPrompt({
       sourceText: validatedRequest.sourceText,
       sourceMeaningfulLineCount,
-      targetMinLineCount,
-      targetMaxLineCount,
+      targetMinLineCount: effectiveTargetMinLineCount,
+      targetMaxLineCount: effectiveTargetMaxLineCount,
       detailLevel,
+      minimumChildrenPerBranch,
       previousDslAttempt: attempt.dsl,
-      retryReason: summarizeRetryReason(attempt.validation),
+      retryReason: retryFeedback.reason,
+      retryGuidance: retryFeedback.guidance,
     });
 
     attemptCount += 1;
     attempt = await generateDslAttempt(
       validatedRequest.sourceText,
       sourceMeaningfulLineCount,
-      targetMinLineCount,
-      targetMaxLineCount,
+      effectiveTargetMinLineCount,
+      effectiveTargetMaxLineCount,
       detailLevel,
+      minimumChildrenPerBranch,
       retryPrompt,
       env,
       options.fetchImpl,
@@ -93,8 +110,8 @@ export async function generateMindmapDslFromSource(
       sourceMeaningfulLineCount,
       generatedMeaningfulLineCount,
       expansionRatio,
-      targetMinLineCount,
-      targetMaxLineCount,
+      targetMinLineCount: effectiveTargetMinLineCount,
+      targetMaxLineCount: effectiveTargetMaxLineCount,
       maxWordsPerLine,
     },
     validation: {
@@ -112,20 +129,72 @@ export async function generateMindmapDslFromSource(
   });
 }
 
-function summarizeRetryReason(validation: DslAttemptResult['validation']): string {
+function shouldRetryGeneration(
+  detailLevel: SourceMindmapGenerationRequest['detailLevel'],
+  validation: DslAttemptResult['validation'],
+): boolean {
+  return validation.densityStatus === 'below-target'
+    || validation.underdevelopedBranches.length > 0
+    || validation.overlyExtractive
+    || (detailLevel === 'standard' && validation.densityStatus === 'over-target');
+}
+
+function describeRetryNeeds(validation: DslAttemptResult['validation']): {
+  reason: string;
+  guidance: string;
+} {
   if (validation.overlyExtractive) {
-    return 'The outline copies source labels too literally instead of rewriting them into explanatory child lines.';
+    return {
+      reason: 'The outline copies source labels too literally instead of rewriting them into explanatory child lines.',
+      guidance: [
+        'Keep the same topic coverage, but rewrite copied headings into short explanations.',
+        'Replace mirrored note labels with explanatory child lines wherever possible.',
+        'Prefer concrete clarifications and examples over repeated labels.',
+      ].join('\n'),
+    };
   }
 
   if (validation.densityStatus === 'below-target' && validation.underdevelopedBranches.length > 0) {
-    return `The outline is too sparse and these branches need child lines: ${validation.underdevelopedBranches.join(', ')}.`;
+    return {
+      reason: `The outline is too sparse and these branches need child lines: ${validation.underdevelopedBranches.join(', ')}.`,
+      guidance: [
+        'Keep the same topic coverage, but add concise explanatory child lines.',
+        'Develop the listed branches before adding new top-level branches.',
+        'Prefer one more valid child line over an underdeveloped branch.',
+      ].join('\n'),
+    };
   }
 
   if (validation.densityStatus === 'below-target') {
-    return 'The outline is too sparse for the target line-count range.';
+    return {
+      reason: 'The outline is too sparse for the target line-count range.',
+      guidance: [
+        'Keep the same topic coverage, but add concise explanatory child lines.',
+        'Expand branches with clarifications, mechanisms, examples, or outcomes.',
+        'Approach the requested line-count range without padding individual lines.',
+      ].join('\n'),
+    };
   }
 
-  return `These branches need more child lines: ${validation.underdevelopedBranches.join(', ')}.`;
+  if (validation.densityStatus === 'over-target') {
+    return {
+      reason: 'The outline is too dense for the target line-count range.',
+      guidance: [
+        'Keep the same topic coverage, but condense overlapping child lines.',
+        'Trim padding and near-duplicate details so the outline lands closer to the target range.',
+        'Prefer fewer stronger child lines over repetitive bullets.',
+      ].join('\n'),
+    };
+  }
+
+  return {
+    reason: `These branches need more child lines: ${validation.underdevelopedBranches.join(', ')}.`,
+    guidance: [
+      'Keep the same topic coverage, but add concise explanatory child lines.',
+      'Develop the listed branches before broadening other sections.',
+      'Replace mirrored note labels with short explanatory rewrites wherever possible.',
+    ].join('\n'),
+  };
 }
 
 interface DslAttemptResult {
@@ -166,6 +235,7 @@ async function generateDslAttempt(
   targetMinLineCount: number,
   targetMaxLineCount: number,
   detailLevel: SourceMindmapGenerationRequest['detailLevel'],
+  minimumChildrenPerBranch: number,
   prompt: ReturnType<typeof createSourceMindmapGenerationPrompt>,
   env: ModelProviderEnv,
   fetchImpl?: typeof fetch,
@@ -174,7 +244,7 @@ async function generateDslAttempt(
     env,
     fetchImpl,
     model: env.MODEL_GENERATION_MODEL,
-    maxCompletionTokens: 2200,
+    maxCompletionTokens: detailLevel === 'detailed' ? 3200 : 2200,
     temperature: 0.2,
     responseFormat: {
       type: 'json_schema',
@@ -221,10 +291,38 @@ async function generateDslAttempt(
       lineWordLimitSatisfied,
       expansionTargetSatisfied: densityStatus === 'target-met',
       densityStatus,
-      underdevelopedBranches: findUnderdevelopedBranches(resolvedDsl.dsl),
+      underdevelopedBranches: findUnderdevelopedBranches(resolvedDsl.dsl, minimumChildrenPerBranch),
       overlyExtractive,
     },
   };
+}
+
+function getMinimumChildrenPerBranch(detailLevel: SourceMindmapGenerationRequest['detailLevel']): number {
+  return detailLevel === 'detailed' ? 3 : 2;
+}
+
+function getEffectiveTargetMinLineCount(
+  detailLevel: SourceMindmapGenerationRequest['detailLevel'],
+  targetMinLineCount: number,
+  targetMaxLineCount: number,
+): number {
+  if (detailLevel !== 'detailed') {
+    return targetMinLineCount;
+  }
+
+  return Math.max(targetMinLineCount, Math.ceil((targetMinLineCount + targetMaxLineCount) / 2));
+}
+
+function getEffectiveTargetMaxLineCount(
+  detailLevel: SourceMindmapGenerationRequest['detailLevel'],
+  sourceMeaningfulLineCount: number,
+  targetMaxLineCount: number,
+): number {
+  if (detailLevel !== 'detailed') {
+    return targetMaxLineCount;
+  }
+
+  return Math.max(targetMaxLineCount, Math.ceil(sourceMeaningfulLineCount * detailedMaximumExpansionRatio));
 }
 
 export function countMeaningfulNonEmptyLines(input: string): number {
@@ -487,7 +585,7 @@ function getMaxWordCountPerLine(input: string): number {
     .reduce((max, line) => Math.max(max, countWordsInLine(line)), 0);
 }
 
-function findUnderdevelopedBranches(input: string): string[] {
+function findUnderdevelopedBranches(input: string, minimumChildrenPerBranch = 2): string[] {
   const lines = input.split(/\r?\n/);
   const underdevelopedBranches: string[] = [];
   let currentBranchLabel: string | null = null;
@@ -497,7 +595,7 @@ function findUnderdevelopedBranches(input: string): string[] {
     const branchMatch = line.match(/^-\s@branch:\s(.+)$/u);
 
     if (branchMatch) {
-      if (currentBranchLabel && currentBranchChildCount < 2) {
+      if (currentBranchLabel && currentBranchChildCount < minimumChildrenPerBranch) {
         underdevelopedBranches.push(currentBranchLabel);
       }
 
@@ -511,7 +609,7 @@ function findUnderdevelopedBranches(input: string): string[] {
     }
   }
 
-  if (currentBranchLabel && currentBranchChildCount < 2) {
+  if (currentBranchLabel && currentBranchChildCount < minimumChildrenPerBranch) {
     underdevelopedBranches.push(currentBranchLabel);
   }
 
