@@ -15,24 +15,27 @@ This project is being built MVP-first. Deterministic structure, readability, and
 
 ## Current Status
 
-The repository is currently bootstrapped with Next.js, React, and TypeScript.
+The app is no longer just a scaffold. The current build includes a public marketing site, OAuth sign-in, an authenticated study workspace, deterministic DSL parsing, AI-assisted source-to-DSL generation, mindmap preview rendering, export, and draft persistence.
 
 Implemented now:
 
-- Next.js App Router project scaffold
-- React 19 + TypeScript setup
-- ESLint configuration
-- Monaco dependency setup and smoke-test mount
-- Core runtime dependencies for layout, schema validation, export, and persistence
-- Initial project planning in [TODO.md](TODO.md)
+- Public landing page at `/`
+- Custom login page at `/login`
+- Protected workspace at `/workspace`
+- Google and GitHub OAuth via Auth.js
+- Deterministic DSL parser, validation, and AST pipeline
+- Monaco-based DSL editor and source-notes input workflow
+- AI-assisted inline completion and source-notes-to-DSL generation
+- Mindmap generation, layout, SVG preview, and PNG export
+- Local and cloud-backed draft restoration
+- Generation history and project persistence
+- Source-level smoke tests plus Node.js unit coverage across the core slices
 
 Planned next:
 
-- Study editor with Monaco
-- Deterministic DSL parser and validation
-- Inline learning-focused completions
-- Mindmap generation, layout, and SVG rendering
-- PNG export and local draft persistence
+- Stronger real-browser end-to-end coverage
+- More production hardening around auth, provider failures, and persistence edges
+- Continued iteration on generation quality and study-workflow polish
 
 ## MVP DSL Rules
 
@@ -103,20 +106,38 @@ Each document has exactly one root line, followed by one or more top-level branc
 - TypeScript 5
 - ESLint 9
 - Tailwind CSS 4
+- Auth.js 5 beta with Google and GitHub OAuth
+- Drizzle ORM with the Auth.js Drizzle adapter
+- Neon serverless Postgres driver
 - Monaco Editor via `@monaco-editor/react`
 - ELK via `elkjs`
 - Runtime schema validation via `zod`
 - PNG export via `html-to-image`
 - IndexedDB persistence via `idb`
 
-These dependencies are installed, but most of their feature-specific integration work is still ahead.
+The product mixes deterministic parsing and rendering with model-backed assistance, while keeping the DSL parser as the structural source of truth.
+
+## What The App Does
+
+- The public landing page explains the product and routes sign-in traffic to the custom login flow.
+- Signed-in users work inside a multi-panel study workspace with notes, DSL editing, preview, chat, scaling, and generation history surfaces.
+- Raw source notes can be expanded into parser-ready DSL in `standard` or `detailed` mode.
+- The DSL is parsed into a deterministic AST, then rendered into a visual mindmap preview.
+- Drafts are restored from cloud persistence when available and fall back to local IndexedDB state.
+- The current preview can be exported as PNG.
 
 ## Getting Started
 
-Install dependencies if needed:
+Install dependencies:
 
 ```bash
 npm install
+```
+
+Create a local environment file:
+
+```bash
+cp .env.example .env.local
 ```
 
 Run the development server:
@@ -127,19 +148,27 @@ npm run dev
 
 Open `http://localhost:3000` in your browser.
 
+Primary routes:
+
+- `/` public landing page
+- `/login` OAuth sign-in
+- `/workspace` authenticated study workspace
+
 ## Environment Variables
 
-Next.js loads `.env*` files automatically for server-side code. Model provider settings are now defined and validated through [lib/config/env.ts](lib/config/env.ts).
+Next.js loads `.env*` files automatically for server-side code. Model provider settings are defined and validated through [lib/config/env.ts](lib/config/env.ts).
 
 Use [.env.example](.env.example) as the template for local configuration.
 
-Required variables:
+Required model provider variables:
 
 - `MODEL_PROVIDER` — one of `openai`, `azure-openai`, or `openrouter`
 - `MODEL_API_KEY` — secret key for the chosen provider
 - `MODEL_BASE_URL` — optional override for provider-compatible endpoints
 - `MODEL_COMPLETION_MODEL` — model used for low-latency inline completions
 - `MODEL_GENERATION_MODEL` — model used for on-demand mindmap generation
+
+OAuth variables are also required for local sign-in flows when using Google and GitHub providers. Configure the standard Auth.js provider credentials in your local environment before testing authentication.
 
 ## Available Scripts
 
@@ -152,8 +181,15 @@ Required variables:
 
 ## Project Structure
 
-- [app](app) contains the Next.js App Router entrypoints.
-- [public](public) contains static assets.
+- [app](app) contains App Router routes, including landing, login, workspace, and API endpoints.
+- [components](components) contains the workspace UI, preview surfaces, and marketing sections.
+- [lib/dsl](lib/dsl) contains the deterministic parser, validation, and editor-context logic.
+- [lib/generation](lib/generation) contains AI-assisted generation and overlay services.
+- [lib/completion](lib/completion) contains inline completion prompting, normalization, and relevance logic.
+- [lib/mindmap](lib/mindmap) contains schema, AST conversion, layout, and preview generation.
+- [lib/persistence](lib/persistence) contains project, draft, and history persistence logic.
+- [workers](workers) contains the mindmap layout worker.
+- [drizzle](drizzle) contains database migrations and metadata.
 - [TODO.md](TODO.md) tracks the phased implementation plan.
 
 ## Development Direction
@@ -167,17 +203,12 @@ This app is intentionally not a generic note editor. The completion system is me
 
 The parser will remain the source of truth for structure. AI should enrich the writing experience, not invent the hierarchy.
 
+## Testing
+
+- `npm run test` runs the Node.js test suite for parsing, generation, completion, layout, export, persistence, and app-risk smoke coverage.
+- `npm run lint` runs ESLint.
+- `npm run typecheck` runs TypeScript in no-emit mode.
+
 ## Roadmap
 
-The execution plan is tracked in [TODO.md](TODO.md). The current build order is:
-
-1. Foundation and app shell
-2. DSL and shared data contracts
-3. Deterministic parsing and validation
-4. Editor workflow
-5. Deterministic mindmap generation
-6. Layout and rendering
-7. Inline completion service
-8. AI-assisted mindmap generation
-9. Export and persistence
-10. Hardening and release readiness
+The execution plan remains tracked in [TODO.md](TODO.md), but the current emphasis is no longer foundational scaffolding. The remaining work is mostly hardening, deeper test coverage, and continued quality improvements to the study workflow and generation behavior.
