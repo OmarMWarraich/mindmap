@@ -176,6 +176,17 @@ function describeRetryNeeds(validation: DslAttemptResult['validation']): {
     };
   }
 
+   if (validation.densityStatus === 'over-target' && validation.underdevelopedBranches.length > 0) {
+     return {
+       reason: `The outline is too dense for the target line-count range, but these branches still need child lines: ${validation.underdevelopedBranches.join(', ')}.`,
+       guidance: [
+         'Keep the same topic coverage while condensing overlapping or repetitive child lines.',
+         'Develop the listed branches to the required child-line minimum before trimming elsewhere.',
+         'Reduce denser branches first so branch coverage stays balanced.',
+       ].join('\n'),
+     };
+   }
+
   if (validation.densityStatus === 'over-target') {
     return {
       reason: 'The outline is too dense for the target line-count range.',
