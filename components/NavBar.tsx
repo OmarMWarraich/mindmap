@@ -14,7 +14,7 @@ export interface NavBarProps {
 }
 
 const NAV_TABS: ReadonlyArray<{ label: string; href: string }> = [
-  { label: 'Workspace', href: '/' },
+  { label: 'Workspace', href: '/workspace' },
   { label: 'Library',   href: '#' },
   { label: 'Helpdesk',  href: '#' },
   { label: 'History',   href: '#' },
@@ -87,7 +87,7 @@ export default function NavBar({ modelProvider, userEmail, userName, signOutActi
         {NAV_TABS.map((tab) => {
           const isActive =
             tab.href !== '#' &&
-            (tab.href === '/' ? pathname === '/' : pathname.startsWith(tab.href));
+            (tab.href === '/workspace' ? pathname === '/workspace' : pathname.startsWith(tab.href));
           return (
             <Link
               className={[
