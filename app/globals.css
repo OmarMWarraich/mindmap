@@ -2,7 +2,7 @@
 
 /* ── Cognitive Flow — design tokens ─────────────────────────────────
    Primary    dark blue-grey scale  (sidebar, surfaces, text)
-   Accent     bright blue           (CTAs, active states, links)
+  Accent     cyan-blue             (CTAs, active states, links)
    Tertiary   dark teal             (secondary actions, badges)
    Accent2    red                   (errors, critical states)
    Neutral    built-in zinc scale   (borders, muted text)
@@ -21,18 +21,18 @@
   --color-primary-900: #0a1120;
   --color-primary-950: #060b16;
 
-  /* Accent — bright blue */
-  --color-accent-50:  #eff6ff;
-  --color-accent-100: #dbeafe;
-  --color-accent-200: #bfdbfe;
-  --color-accent-300: #93c5fd;
-  --color-accent-400: #60a5fa;
-  --color-accent-500: #3b82f6;
-  --color-accent-600: #2563eb;
-  --color-accent-700: #1d4ed8;
-  --color-accent-800: #1e40af;
-  --color-accent-900: #1e3a8a;
-  --color-accent-950: #172554;
+  /* Accent — cyan-blue */
+  --color-accent-50:  #ecfeff;
+  --color-accent-100: #cffafe;
+  --color-accent-200: #a5f3fc;
+  --color-accent-300: #67e8f9;
+  --color-accent-400: #22d3ee;
+  --color-accent-500: #06b6d4;
+  --color-accent-600: #0891b2;
+  --color-accent-700: #0e7490;
+  --color-accent-800: #155e75;
+  --color-accent-900: #164e63;
+  --color-accent-950: #083344;
 
   /* Tertiary — dark teal */
   --color-tertiary-50:  #f0fdfa;
@@ -77,19 +77,19 @@
 }
 
 /* ── Base resets ─────────────────────────────────────────────────────
-   html + body fill the viewport; overflow-hidden prevents a shell-
-   level scrollbar — individual panels scroll within themselves.
+   overflow-hidden and h-screen are scoped to .workspace-shell so the
+   public landing page can scroll naturally.
 ──────────────────────────────────────────────────────────────────── */
-html,
 body {
-  height: 100%;
-}
-
-body {
-  overflow: hidden;
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-inter), system-ui, sans-serif;
+}
+
+/* Applied by app/workspace/layout.tsx to lock the app shell */
+.workspace-shell {
+  height: 100dvh;
+  overflow: hidden;
 }
 
 /* ── Monaco ghost text ───────────────────────────────────────────── */

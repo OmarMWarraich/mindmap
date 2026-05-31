@@ -13,11 +13,16 @@ export interface NavBarProps {
   signOutAction: () => Promise<void>;
 }
 
-const NAV_TABS: ReadonlyArray<{ label: string; href: string }> = [
-  { label: 'Workspace', href: '/' },
-  { label: 'Library',   href: '#' },
-  { label: 'Helpdesk',  href: '#' },
-  { label: 'History',   href: '#' },
+type NavTab = {
+  label: string;
+  href?: string;
+};
+
+const NAV_TABS: ReadonlyArray<NavTab> = [
+  { label: 'Workspace', href: '/workspace' },
+  { label: 'Library' },
+  { label: 'Helpdesk' },
+  { label: 'History' },
 ];
 
 function MindFlowIcon() {
@@ -77,23 +82,37 @@ export default function NavBar({ modelProvider, userEmail, userName, signOutActi
   return (
     <nav className="flex h-full items-center px-4">
       {/* ── Brand ──────────────────────────────────────────────────── */}
-      <div className="flex shrink-0 items-center gap-1.5 text-primary-800 mr-5">
+      <Link className="mr-5 flex shrink-0 items-center gap-1.5 text-primary-800 transition-colors hover:text-accent-700" href="/workspace">
         <MindFlowIcon />
         <span className="text-sm font-semibold tracking-tight">MindFlow</span>
-      </div>
+      </Link>
 
       {/* ── Tab row ────────────────────────────────────────────────── */}
       <div className="flex flex-1 items-center justify-center gap-0.5">
         {NAV_TABS.map((tab) => {
           const isActive =
-            tab.href !== '#' &&
-            (tab.href === '/' ? pathname === '/' : pathname.startsWith(tab.href));
+            !!tab.href &&
+            (tab.href === '/workspace' ? pathname === '/workspace' : pathname.startsWith(tab.href));
+
+          if (!tab.href) {
+            return (
+              <button
+                className="rounded-md px-3 py-1.5 text-sm font-medium text-zinc-300"
+                disabled
+                key={tab.label}
+                type="button"
+              >
+                {tab.label}
+              </button>
+            );
+          }
+
           return (
             <Link
               className={[
                 'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-primary-50 text-primary-800'
+                  ? 'bg-accent-50 text-accent-800'
                   : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800',
               ].join(' ')}
               href={tab.href}
@@ -109,7 +128,7 @@ export default function NavBar({ modelProvider, userEmail, userName, signOutActi
       <div className="flex shrink-0 items-center gap-2">
         {/* Model Preview pill — opens the preview drawer */}
         <button
-          className="hidden items-center gap-1 rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700 transition hover:bg-primary-100 sm:inline-flex"
+          className="hidden items-center gap-1 rounded-full border border-accent-200 bg-accent-50 px-2.5 py-1 text-xs font-medium text-accent-800 transition hover:bg-accent-100 sm:inline-flex"
           onClick={() => {
             setPreviewOpen(true);
           }}
@@ -120,7 +139,7 @@ export default function NavBar({ modelProvider, userEmail, userName, signOutActi
         </button>
 
         {/* Trained Notes badge */}
-        <span className="hidden rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-500 lg:inline-flex">
+        <span className="hidden rounded-full bg-accent-50 px-2.5 py-1 text-xs font-medium text-accent-800 lg:inline-flex">
           Trained Notes
         </span>
 

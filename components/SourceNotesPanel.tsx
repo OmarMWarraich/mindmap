@@ -46,7 +46,7 @@ function UserPlusIcon() {
 function statusBadgeClass(tone: StatusTone): string {
   if (tone === 'success') return 'bg-tertiary-100 text-tertiary-700';
   if (tone === 'error') return 'bg-accent2-100 text-accent2-700';
-  if (tone === 'progress') return 'bg-accent-100 text-accent-700';
+  if (tone === 'progress') return 'bg-accent-100 text-accent-800';
   return 'bg-zinc-100 text-zinc-600';
 }
 
@@ -98,7 +98,7 @@ export default function SourceNotesPanel({
           className={[
             'rounded-full px-3 py-1 text-xs font-medium transition',
             selectedDetailLevel === 'standard'
-              ? 'bg-primary-800 text-white'
+              ? 'bg-accent-600 text-white'
               : 'text-zinc-600 hover:bg-zinc-100',
           ].join(' ')}
           disabled={isGenerating}
@@ -114,7 +114,7 @@ export default function SourceNotesPanel({
           className={[
             'rounded-full px-3 py-1 text-xs font-medium transition',
             selectedDetailLevel === 'detailed'
-              ? 'bg-primary-800 text-white'
+              ? 'bg-accent-600 text-white'
               : 'text-zinc-600 hover:bg-zinc-100',
           ].join(' ')}
           disabled={isGenerating}
@@ -165,7 +165,7 @@ export default function SourceNotesPanel({
                 ? 'bg-tertiary-100 text-tertiary-700'
                 : latestDslGeneration.quality.densityStatus === 'below-target'
                   ? 'bg-amber-100 text-amber-700'
-                  : 'bg-accent-100 text-accent-700'
+                  : 'bg-accent-100 text-accent-800'
             }`}
           >
             {latestDslGeneration.quality.densityStatus === 'target-met'

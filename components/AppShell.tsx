@@ -15,7 +15,7 @@ interface AppShellProps {
  *   │  (w-60)   │  (flex-1, overflow-y)   │
  *   └───────────┴─────────────────────────┘
  *
- * Body/html are already `h-full overflow-hidden` (Phase A globals.css).
+ * The parent `.workspace-shell` div supplies the constrained viewport height.
  * Individual panels scroll within themselves; nothing scrolls at shell level.
  */
 export default function AppShell({ nav, sidebar, children }: AppShellProps) {

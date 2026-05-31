@@ -213,7 +213,7 @@ test("generateMindmapFromAst cleans labels and groups overloaded branches", () =
   assert.equal(groupedChildren.length, 2);
   assert.equal(groupedChildren.every((node) => node.label.startsWith("More:")), true);
   assert.equal(
-    generated.nodes.some((node) => node.label.endsWith("...")),
+    groupedChildren.some((node) => node.label.includes(" - ")),
     true,
   );
 });

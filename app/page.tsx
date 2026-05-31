@@ -1,41 +1,21 @@
-import { redirect } from 'next/navigation';
-import { auth, signOut } from '@/auth';
-import AppShell from '../components/AppShell';
-import NavBar from '../components/NavBar';
-import Sidebar from '../components/Sidebar';
-import StudyWorkspace from '../components/StudyWorkspace';
-import { WorkspaceProvider } from '../components/WorkspaceContext';
-import { getModelProviderEnv } from '../lib/config/env';
+import CtaBanner from '../components/marketing/CtaBanner';
+import FeaturesGrid from '../components/marketing/FeaturesGrid';
+import HeroSection from '../components/marketing/HeroSection';
+import LandingFooter from '../components/marketing/LandingFooter';
+import LandingNav from '../components/marketing/LandingNav';
+import PricingSection from '../components/marketing/PricingSection';
+import ThreeSteps from '../components/marketing/ThreeSteps';
 
-export default async function Home() {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    redirect('/login');
-  }
-
-  const modelProviderEnv = getModelProviderEnv();
-
-  async function handleSignOut() {
-    'use server';
-    await signOut({ redirectTo: '/login' });
-  }
-
+export default function LandingPage() {
   return (
-    <WorkspaceProvider>
-      <AppShell
-        nav={
-          <NavBar
-            modelProvider={modelProviderEnv.MODEL_PROVIDER}
-            signOutAction={handleSignOut}
-            userEmail={session.user.email}
-            userName={session.user.name}
-          />
-        }
-        sidebar={<Sidebar />}
-      >
-        <StudyWorkspace userId={session.user.id} />
-      </AppShell>
-    </WorkspaceProvider>
+    <>
+      <LandingNav />
+      <HeroSection />
+      <ThreeSteps />
+      <FeaturesGrid />
+      <PricingSection />
+      <CtaBanner />
+      <LandingFooter />
+    </>
   );
 }
