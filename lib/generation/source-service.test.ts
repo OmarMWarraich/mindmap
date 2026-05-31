@@ -353,3 +353,188 @@ test('generateMindmapDslFromSource retries detailed generation when the first re
   assert.equal(response.quality.mode, 'retry');
   assert.match(response.dsl, /converts light energy into ATP and NADPH/i);
 });
+
+test('generateMindmapDslFromSource retries detailed generation when branches only reach standard-level depth', async () => {
+  let requestCount = 0;
+
+  const response = await generateMindmapDslFromSource(
+    {
+      sourceText: [
+        'Photosynthesis',
+        'Light reactions',
+        'Calvin cycle',
+      ].join('\n'),
+      detailLevel: 'detailed',
+    },
+    {
+      env: testEnv,
+      fetchImpl: async () => {
+        requestCount += 1;
+
+        if (requestCount === 1) {
+          return new Response(JSON.stringify({
+            choices: [{ message: { content: JSON.stringify({
+              dsl: [
+                '@root: Photosynthesis',
+                '- @branch: Light reactions',
+                '  - captures light energy in chloroplast membranes',
+                '  - releases oxygen from water splitting',
+                '- @branch: Calvin cycle',
+                '  - fixes carbon dioxide into sugars',
+                '  - uses ATP and NADPH from light reactions',
+              ].join('\n'),
+            }) } }],
+          }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        return new Response(JSON.stringify({
+          choices: [{ message: { content: JSON.stringify({
+            dsl: [
+              '@root: Photosynthesis',
+              '- @branch: Light reactions',
+              '  - captures light energy in chloroplast membranes',
+              '  - releases oxygen from water splitting',
+              '  - produces ATP and NADPH for carbon fixation',
+              '- @branch: Calvin cycle',
+              '  - fixes carbon dioxide into sugars',
+              '  - uses ATP and NADPH from light reactions',
+              '  - regenerates RuBP to continue carbon assimilation',
+            ].join('\n'),
+          }) } }],
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      },
+    },
+  );
+
+  assert.equal(requestCount, 2);
+  assert.equal(response.quality.mode, 'retry');
+  assert.match(response.dsl, /produces ATP and NADPH for carbon fixation/i);
+  assert.equal(response.quality.underdevelopedBranchCount, 0);
+});
+
+test('generateMindmapDslFromSource gives detailed mode a wider target line band than standard mode', async () => {
+  const sourceText = Array.from({ length: 16 }, (_, index) => `Topic ${index + 1}`).join('\n');
+  const denseDsl = [
+    '@root: Topic overview',
+    ...['A', 'B', 'C', 'D'].flatMap((label, branchIndex) => [
+      `- @branch: Topic cluster ${label}`,
+      ...Array.from({ length: 11 }, (_, childIndex) => `  - branch ${branchIndex + 1} detail ${childIndex + 1} explains one linked study point`),
+    ]),
+  ].join('\n');
+
+  const standardResponse = await generateMindmapDslFromSource(
+    {
+      sourceText,
+      detailLevel: 'standard',
+    },
+    {
+      env: testEnv,
+      fetchImpl: async () => new Response(JSON.stringify({
+        choices: [{ message: { content: JSON.stringify({ dsl: denseDsl }) } }],
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    },
+  );
+
+  const detailedResponse = await generateMindmapDslFromSource(
+    {
+      sourceText,
+      detailLevel: 'detailed',
+    },
+    {
+      env: testEnv,
+      fetchImpl: async () => new Response(JSON.stringify({
+        choices: [{ message: { content: JSON.stringify({ dsl: denseDsl }) } }],
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    },
+  );
+
+  assert.equal(standardResponse.metrics.generatedMeaningfulLineCount, 49);
+  assert.equal(standardResponse.quality.densityStatus, 'over-target');
+  assert.equal(detailedResponse.quality.densityStatus, 'target-met');
+  assert.ok(detailedResponse.metrics.targetMaxLineCount > standardResponse.metrics.targetMaxLineCount);
+  assert.ok(detailedResponse.metrics.targetMinLineCount > standardResponse.metrics.targetMinLineCount);
+});
+
+test('generateMindmapDslFromSource retries standard over-target output that detailed mode can keep', async () => {
+  const sourceText = Array.from({ length: 10 }, (_, index) => `Topic ${index + 1}`).join('\n');
+  const borderlineDenseDsl = [
+    '@root: Topic overview',
+    ...['A', 'B', 'C', 'D'].flatMap((label, branchIndex) => [
+      `- @branch: Topic cluster ${label}`,
+      ...Array.from({ length: 6 }, (_, childIndex) => `  - branch ${branchIndex + 1} detail ${childIndex + 1} explains one linked study point`),
+    ]),
+    '  - concluding comparison ties the clusters into one revision frame',
+  ].join('\n');
+  const compactRetryDsl = [
+    '@root: Topic overview',
+    ...['A', 'B', 'C', 'D'].flatMap((label, branchIndex) => [
+      `- @branch: Topic cluster ${label}`,
+      ...Array.from({ length: 5 }, (_, childIndex) => `  - branch ${branchIndex + 1} detail ${childIndex + 1} explains one linked study point`),
+    ]),
+  ].join('\n');
+
+  let standardRequestCount = 0;
+  const standardResponse = await generateMindmapDslFromSource(
+    {
+      sourceText,
+      detailLevel: 'standard',
+    },
+    {
+      env: testEnv,
+      fetchImpl: async () => {
+        standardRequestCount += 1;
+
+        return new Response(JSON.stringify({
+          choices: [{ message: { content: JSON.stringify({
+            dsl: standardRequestCount === 1 ? borderlineDenseDsl : compactRetryDsl,
+          }) } }],
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      },
+    },
+  );
+
+  let detailedRequestCount = 0;
+  const detailedResponse = await generateMindmapDslFromSource(
+    {
+      sourceText,
+      detailLevel: 'detailed',
+    },
+    {
+      env: testEnv,
+      fetchImpl: async () => {
+        detailedRequestCount += 1;
+
+        return new Response(JSON.stringify({
+          choices: [{ message: { content: JSON.stringify({ dsl: borderlineDenseDsl }) } }],
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      },
+    },
+  );
+
+  assert.equal(standardRequestCount, 2);
+  assert.equal(standardResponse.quality.mode, 'retry');
+  assert.equal(standardResponse.quality.densityStatus, 'target-met');
+  assert.equal(standardResponse.metrics.generatedMeaningfulLineCount, 25);
+  assert.equal(detailedRequestCount, 1);
+  assert.equal(detailedResponse.quality.mode, 'first-pass');
+  assert.equal(detailedResponse.quality.densityStatus, 'target-met');
+  assert.equal(detailedResponse.metrics.generatedMeaningfulLineCount, 30);
+});

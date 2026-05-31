@@ -4,8 +4,10 @@ export interface SourceMindmapGenerationPromptInput {
   targetMinLineCount: number;
   targetMaxLineCount: number;
   detailLevel?: 'standard' | 'detailed';
+  minimumChildrenPerBranch?: number;
   previousDslAttempt?: string;
   retryReason?: string;
+  retryGuidance?: string;
 }
 
 export interface SourceMindmapGenerationPrompt {
@@ -48,11 +50,12 @@ Content goals:
 - Expand the outline through additional valid child lines, not longer lines.
 
 Minimum density rules:
-- Every branch should normally contain at least 2 child lines when the source supports it.
+- Every branch should normally contain at least {{MIN_CHILDREN_PER_BRANCH}} child lines when the source supports it.
 - If a branch has no explicit sub-sub-topic, add compact explanation lines instead of leaving it empty.
 - Do not stop at bare topic labels.
 - If the source is a list of aspects or branches, explain what each aspect studies or why it matters.
 - Prefer one more valid child line over an underdeveloped branch.
+- In detailed mode, treat bare branch lists and copied headings as invalid unless they are rewritten into explanations.
 
 Density target:
 - Source meaningful non-empty line count: {{SOURCE_LINE_COUNT}}
@@ -84,16 +87,27 @@ ${sourceMindmapGenerationOutputContract}`;
 export function createSourceMindmapGenerationPrompt(
   input: SourceMindmapGenerationPromptInput,
 ): SourceMindmapGenerationPrompt {
+  const minimumChildrenPerBranch = input.minimumChildrenPerBranch
+    ?? (input.detailLevel === 'detailed' ? 3 : 2);
   const detailPreference = input.detailLevel === 'detailed'
-    ? 'detailed: prefer the upper half of the target range and develop thin branches further'
+    ? 'detailed: prefer the upper half of the target range, rewrite source headings into explanations, and push branches beyond minimal coverage'
     : 'standard: meet the target range without padding';
+  const retryGuidance = input.retryGuidance
+    ?? [
+      'Keep the same topic coverage while fixing the density problem.',
+      'Add concise explanatory child lines only when the outline is too sparse.',
+      'Condense overlapping points when the outline is too dense.',
+      'Replace mirrored note labels with short explanatory rewrites wherever possible.',
+    ].join('\n');
   const retryBlock = input.previousDslAttempt && input.retryReason
     ? `REVISION REQUIRED:
 - Previous DSL attempt was too weak.
 - Reason: ${input.retryReason}
 - Fix the density and branch development problems.
-  - Keep the same topic coverage, but add concise explanatory child lines.
-  - Replace mirrored note labels with short explanatory rewrites wherever possible.
+${retryGuidance
+  .split('\n')
+  .map((line) => `  - ${line}`)
+  .join('\n')}
 
 PREVIOUS DSL ATTEMPT:
 ${input.previousDslAttempt}
@@ -106,6 +120,7 @@ ${input.previousDslAttempt}
       .replace('{{SOURCE_LINE_COUNT}}', String(input.sourceMeaningfulLineCount))
       .replace('{{TARGET_MIN_LINE_COUNT}}', String(input.targetMinLineCount))
       .replace('{{TARGET_MAX_LINE_COUNT}}', String(input.targetMaxLineCount))
+      .replace('{{MIN_CHILDREN_PER_BRANCH}}', String(minimumChildrenPerBranch))
       .replace('{{DETAIL_PREFERENCE}}', detailPreference)
       .replace('{{RETRY_BLOCK}}', retryBlock)
       .replace('{{SOURCE_TEXT}}', input.sourceText),

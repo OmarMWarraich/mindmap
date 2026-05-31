@@ -44,11 +44,17 @@ test('createSourceMindmapGenerationPrompt includes retry guidance when revising 
     detailLevel: 'detailed',
     previousDslAttempt: '@root: Aspects\n- @branch: Political Theory',
     retryReason: 'The outline is too sparse for the target line-count range.',
+    retryGuidance: [
+      'Keep the same topic coverage, but add concise explanatory child lines.',
+      'Expand branches with clarifications, mechanisms, examples, or outcomes.',
+    ].join('\n'),
   });
 
   assert.match(prompt.user, /REVISION REQUIRED:/);
   assert.match(prompt.user, /Previous DSL attempt was too weak/i);
   assert.match(prompt.user, /Detail preference: detailed/i);
-  assert.match(prompt.user, /Replace mirrored note labels with short explanatory rewrites/i);
+  assert.match(prompt.user, /at least 3 child lines/i);
+  assert.match(prompt.user, /copied headings as invalid/i);
+  assert.match(prompt.user, /Expand branches with clarifications, mechanisms, examples, or outcomes/i);
   assert.match(prompt.user, /@root: Aspects/);
 });
