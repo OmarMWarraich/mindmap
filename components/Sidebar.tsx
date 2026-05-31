@@ -145,7 +145,8 @@ export default function Sidebar() {
         <ul className="grid gap-0.5">
           <li>
             <button
-              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800"
+              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled
               type="button"
             >
               <span className="text-zinc-400"><SettingsIcon /></span>
@@ -154,7 +155,8 @@ export default function Sidebar() {
           </li>
           <li>
             <button
-              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800"
+              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled
               type="button"
             >
               <span className="text-zinc-400"><SupportIcon /></span>

@@ -140,7 +140,8 @@ export default function NavBar({ modelProvider, userEmail, userName, signOutActi
             aria-expanded={avatarOpen}
             aria-haspopup="menu"
             aria-label="User menu"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-800 text-xs font-semibold text-white transition-opacity hover:opacity-80"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-opacity hover:opacity-80"
+            style={{ backgroundColor: '#0f172a', color: '#ffffff' }}
             onClick={() => {
               setAvatarOpen((prev) => !prev);
             }}

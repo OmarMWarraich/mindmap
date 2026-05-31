@@ -586,7 +586,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
 
           {/* Bottom action row */}
           <div className="flex shrink-0 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
-            <button
+            {/* <button
               className="flex-1 rounded-lg bg-accent-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-accent-500"
               onClick={() => {
                 void handleGenerateDsl();
@@ -601,7 +601,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
               type="button"
             >
               Clear
-            </button>
+            </button> */}
             <button
               className="flex-1 rounded-lg border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={!layoutResult || layoutStatus === 'loading'}
