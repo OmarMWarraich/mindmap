@@ -1,6 +1,7 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
-import { signIn } from '@/auth';
+import { auth, signIn } from '@/auth';
 
 export const metadata = {
   title: 'Sign in — MindFlow AI',
@@ -22,7 +23,13 @@ function MindFlowIcon() {
   );
 }
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  const session = await auth();
+
+  if (session?.user?.id) {
+    redirect('/workspace');
+  }
+
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-white px-6 py-12">
       <div aria-hidden="true" className="absolute inset-x-0 top-0 h-72 bg-linear-to-b from-accent-50 via-white to-white" />
