@@ -22,7 +22,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     sessionsTable: sessions,
     verificationTokensTable: verificationTokens,
   }),
-  providers: [GitHub, Google],
+  providers: [
+    GitHub({
+      allowDangerousEmailAccountLinking: true,
+    }),
+    Google({
+      allowDangerousEmailAccountLinking: true,
+    }),
+  ],
   callbacks: {
     session: ({ session, user }) => ({
       ...session,

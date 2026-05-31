@@ -43,7 +43,7 @@ function HistoryEmptyIcon() {
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 function densityBadgeClass(status: string): string {
-  if (status === 'target-met') return 'bg-accent-50 text-accent-700';
+  if (status === 'target-met') return 'bg-accent-50 text-accent-800';
   if (status === 'below-target') return 'bg-amber-100 text-amber-700';
   return 'bg-zinc-100 text-zinc-600';
 }

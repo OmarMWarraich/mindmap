@@ -37,7 +37,7 @@ export default function LandingNav() {
         <nav aria-label="Marketing navigation" className="hidden items-center gap-6 md:flex">
           {NAV_LINKS.map((link) => (
             <a
-              className="text-sm text-zinc-500 transition-colors hover:text-zinc-900"
+              className="text-sm text-zinc-500 transition-colors hover:text-accent-700"
               href={link.href}
               key={link.label}
             >
@@ -49,7 +49,7 @@ export default function LandingNav() {
         {/* Auth CTAs */}
         <div className="flex items-center gap-3">
           <Link
-            className="hidden text-sm font-medium text-zinc-600 transition-colors hover:text-zinc-900 md:block"
+            className="hidden text-sm font-medium text-zinc-600 transition-colors hover:text-accent-700 md:block"
             href="/login"
           >
             Login
