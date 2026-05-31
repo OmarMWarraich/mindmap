@@ -77,19 +77,19 @@
 }
 
 /* ── Base resets ─────────────────────────────────────────────────────
-   html + body fill the viewport; overflow-hidden prevents a shell-
-   level scrollbar — individual panels scroll within themselves.
+   overflow-hidden and h-screen are scoped to .workspace-shell so the
+   public landing page can scroll naturally.
 ──────────────────────────────────────────────────────────────────── */
-html,
 body {
-  height: 100%;
-}
-
-body {
-  overflow: hidden;
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-inter), system-ui, sans-serif;
+}
+
+/* Applied by app/workspace/layout.tsx to lock the app shell */
+.workspace-shell {
+  height: 100dvh;
+  overflow: hidden;
 }
 
 /* ── Monaco ghost text ───────────────────────────────────────────── */
