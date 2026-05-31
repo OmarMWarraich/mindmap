@@ -14,35 +14,79 @@ function GitHubIcon() {
   );
 }
 
+type FooterLink = {
+  label: string;
+  href?: string;
+};
+
+type SocialLink = {
+  label: string;
+  href?: string;
+  icon: React.ReactNode;
+};
+
+const SOCIAL_LINKS: SocialLink[] = [
+  { label: 'Twitter', icon: <TwitterIcon /> },
+  { label: 'GitHub', icon: <GitHubIcon /> },
+];
+
 const FOOTER_COLS = [
   {
     title: 'Product',
     links: [
-      { label: 'Changelog',          href: '#' },
-      { label: 'Documentation',      href: '#' },
-      { label: 'API Reference',      href: '#' },
-      { label: 'Browser Extension',  href: '#' },
-    ],
+      { label: 'Changelog' },
+      { label: 'Documentation' },
+      { label: 'API Reference' },
+      { label: 'Browser Extension' },
+    ] satisfies FooterLink[],
   },
   {
     title: 'Resources',
     links: [
-      { label: 'Templates',        href: '#' },
-      { label: 'Tutorials',        href: '#' },
-      { label: 'Community Forum',  href: '#' },
-      { label: 'Use Cases',        href: '#' },
-    ],
+      { label: 'Templates' },
+      { label: 'Tutorials' },
+      { label: 'Community Forum' },
+      { label: 'Use Cases' },
+    ] satisfies FooterLink[],
   },
   {
     title: 'Legal',
     links: [
-      { label: 'Privacy Policy',    href: '#' },
-      { label: 'Terms of Service',  href: '#' },
-      { label: 'Security',          href: '#' },
-      { label: 'Cookies',           href: '#' },
-    ],
+      { label: 'Privacy Policy' },
+      { label: 'Terms of Service' },
+      { label: 'Security' },
+      { label: 'Cookies' },
+    ] satisfies FooterLink[],
   },
 ];
+
+function renderFooterLink(link: FooterLink) {
+  if (link.href) {
+    return (
+      <a className="text-sm text-zinc-500 transition-colors hover:text-zinc-800" href={link.href}>
+        {link.label}
+      </a>
+    );
+  }
+
+  return <span className="text-sm text-zinc-400">{link.label}</span>;
+}
+
+function renderSocialLink(link: SocialLink) {
+  if (link.href) {
+    return (
+      <a aria-label={link.label} className="transition-colors hover:text-zinc-700" href={link.href}>
+        {link.icon}
+      </a>
+    );
+  }
+
+  return (
+    <span aria-label={`${link.label} coming soon`} className="cursor-default text-zinc-300" role="img">
+      {link.icon}
+    </span>
+  );
+}
 
 export default function LandingFooter() {
   return (
@@ -56,12 +100,9 @@ export default function LandingFooter() {
               The systematic workspace for high-productivity thinkers and technical creators.
             </p>
             <div className="flex gap-3 text-zinc-400">
-              <a aria-label="Twitter" className="transition-colors hover:text-zinc-700" href="#">
-                <TwitterIcon />
-              </a>
-              <a aria-label="GitHub" className="transition-colors hover:text-zinc-700" href="#">
-                <GitHubIcon />
-              </a>
+              {SOCIAL_LINKS.map((link) => (
+                <span key={link.label}>{renderSocialLink(link)}</span>
+              ))}
             </div>
           </div>
 
@@ -74,12 +115,7 @@ export default function LandingFooter() {
               <ul className="grid gap-2.5">
                 {col.links.map((link) => (
                   <li key={link.label}>
-                    <a
-                      className="text-sm text-zinc-500 transition-colors hover:text-zinc-800"
-                      href={link.href}
-                    >
-                      {link.label}
-                    </a>
+                    {renderFooterLink(link)}
                   </li>
                 ))}
               </ul>

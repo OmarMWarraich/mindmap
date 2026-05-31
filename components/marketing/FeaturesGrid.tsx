@@ -56,12 +56,6 @@ export default function FeaturesGrid() {
               technical depth and architectural clarity.
             </p>
           </div>
-          <a
-            className="shrink-0 text-sm font-medium text-accent-600 hover:text-accent-700"
-            href="#features"
-          >
-            View All Features →
-          </a>
         </div>
 
         {/* Grid */}

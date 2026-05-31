@@ -13,11 +13,16 @@ export interface NavBarProps {
   signOutAction: () => Promise<void>;
 }
 
-const NAV_TABS: ReadonlyArray<{ label: string; href: string }> = [
+type NavTab = {
+  label: string;
+  href?: string;
+};
+
+const NAV_TABS: ReadonlyArray<NavTab> = [
   { label: 'Workspace', href: '/workspace' },
-  { label: 'Library',   href: '#' },
-  { label: 'Helpdesk',  href: '#' },
-  { label: 'History',   href: '#' },
+  { label: 'Library' },
+  { label: 'Helpdesk' },
+  { label: 'History' },
 ];
 
 function MindFlowIcon() {
@@ -86,8 +91,22 @@ export default function NavBar({ modelProvider, userEmail, userName, signOutActi
       <div className="flex flex-1 items-center justify-center gap-0.5">
         {NAV_TABS.map((tab) => {
           const isActive =
-            tab.href !== '#' &&
+            !!tab.href &&
             (tab.href === '/workspace' ? pathname === '/workspace' : pathname.startsWith(tab.href));
+
+          if (!tab.href) {
+            return (
+              <button
+                className="rounded-md px-3 py-1.5 text-sm font-medium text-zinc-300"
+                disabled
+                key={tab.label}
+                type="button"
+              >
+                {tab.label}
+              </button>
+            );
+          }
+
           return (
             <Link
               className={[
