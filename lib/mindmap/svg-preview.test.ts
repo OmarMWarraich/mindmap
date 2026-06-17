@@ -335,6 +335,53 @@ test('buildSvgPreviewModel keeps branch export text larger than tighter leaf exp
   assert.equal(model.nodes[0]!.fontSize > model.nodes[1]!.fontSize, true);
 });
 
+test('buildSvgPreviewModel keeps short export leaf labels readable even with a cramped sibling leaf', () => {
+  const leafNodes = validGeneratedMindmapFixture.nodes.filter((node) => node.kind === 'leaf');
+  const metrics = getSvgPreviewRenderMetrics('export', { scale: 1.4 });
+  const model = buildSvgPreviewModel(
+    {
+      ...validGeneratedMindmapFixture,
+      nodes: [
+        { ...leafNodes[0]!, label: 'Duties owed generally' },
+        {
+          ...leafNodes[1]!,
+          label: 'Extensive explanation of overlapping liability standards, procedural posture, and multiple factual contingencies across institutional settings',
+        },
+      ],
+      edges: [],
+    },
+    {
+      width: 560,
+      height: 260,
+      nodes: [
+        {
+          id: leafNodes[0]!.id,
+          x: 40,
+          y: 40,
+          width: 220,
+          height: 180,
+        },
+        {
+          id: leafNodes[1]!.id,
+          x: 300,
+          y: 40,
+          width: 220,
+          height: 180,
+        },
+      ],
+      edges: [],
+    },
+    {
+      profile: 'export',
+      renderScale: 1.4,
+    },
+  );
+
+  assert.deepEqual(model.nodes[0]!.lines, ['Duties owed', 'generally']);
+  assert.equal(model.nodes[0]!.fontSize >= metrics.nodeFontSize * 0.84, true);
+  assert.equal(model.nodes[0]!.fontSize > model.nodes[1]!.fontSize, true);
+});
+
 test('buildSvgPreviewModel reduces export root font size when long words would overflow horizontally', () => {
   const metrics = getSvgPreviewRenderMetrics('export', { scale: 1.4 });
   const node = validGeneratedMindmapFixture.nodes[0]!;

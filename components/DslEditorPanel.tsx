@@ -6,6 +6,12 @@ import type { Monaco } from '@monaco-editor/react';
 import type { CancellationToken, editor, languages } from 'monaco-editor';
 
 import {
+  isIgnorableMonacoCancellation,
+} from '../lib/completion/monaco-cancellation';
+import {
+  createMindmapDslInlineCompletionsProvider,
+} from '../lib/completion/monaco-inline-provider';
+import {
   requestInlineCompletionFromApi,
   trackInlineCompletionEvent,
 } from '../lib/completion/client';
@@ -66,53 +72,6 @@ function CopyIcon() {
 
 // ── Monaco helpers ─────────────────────────────────────────────────────────
 
-function linkAbortControllerToCancellationToken(token: CancellationToken): {
-  abortController: AbortController;
-  dispose(): void;
-} {
-  const abortController = new AbortController();
-  const listener = token.onCancellationRequested(() => {
-    abortController.abort();
-  });
-  return {
-    abortController,
-    dispose() {
-      listener.dispose();
-    },
-  };
-}
-
-function isAbortError(error: unknown): boolean {
-  return error instanceof Error && error.name === 'AbortError';
-}
-
-function createInlineCompletionCorrelationId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return `completion-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function mapInlineCompletionOutcome(
-  monaco: Monaco,
-  reasonKind: languages.InlineCompletionEndOfLifeReasonKind,
-): 'accepted' | 'dismissed' | 'ignored' {
-  if (reasonKind === monaco.languages.InlineCompletionEndOfLifeReasonKind.Accepted) {
-    return 'accepted';
-  }
-  if (reasonKind === monaco.languages.InlineCompletionEndOfLifeReasonKind.Rejected) {
-    return 'dismissed';
-  }
-  return 'ignored';
-}
-
-function isIgnorableMonacoCancellation(reason: unknown): boolean {
-  if (!(reason instanceof Error) || reason.message !== 'Canceled') {
-    return false;
-  }
-  return typeof reason.stack === 'string' && reason.stack.includes('monaco-editor');
-}
-
 function configureMindmapDslMonaco(monaco: Monaco): void {
   if (
     !monaco.languages
@@ -125,74 +84,14 @@ function configureMindmapDslMonaco(monaco: Monaco): void {
   if (mindmapDslInlineCompletionRegistered) return;
   if (!enableMonacoInlineCompletions) return;
 
-  monaco.languages.registerInlineCompletionsProvider(mindmapDslLanguageId, {
-    async provideInlineCompletions(
-      model: editor.ITextModel,
-      position: { lineNumber: number; column: number },
-      _context: languages.InlineCompletionContext,
-      token: CancellationToken,
-    ) {
-      if (token.isCancellationRequested || model.isDisposed()) {
-        return { items: [] };
-      }
-
-      const requestVersionId = model.getVersionId();
-      const { abortController, dispose } = linkAbortControllerToCancellationToken(token);
-
-      try {
-        const correlationId = createInlineCompletionCorrelationId();
-        const response = await requestInlineCompletionFromApi(
-          {
-            outline: model.getValue(),
-            cursor: { lineNumber: position.lineNumber, column: position.column },
-          },
-          { signal: abortController.signal },
-        );
-
-        if (
-          token.isCancellationRequested ||
-          model.isDisposed() ||
-          model.getVersionId() !== requestVersionId ||
-          !response ||
-          response.completionText.length === 0
-        ) {
-          return { items: [] };
-        }
-
-        return {
-          items: [
-            {
-              correlationId,
-              insertText: response.completionText,
-              range: createInlineSuggestionRange(position),
-            },
-          ],
-        };
-      } catch (error) {
-        if (isAbortError(error)) return { items: [] };
-        return { items: [] };
-      } finally {
-        dispose();
-      }
-    },
-    handleEndOfLifetime(
-      _completions: languages.InlineCompletions,
-      item: languages.InlineCompletion,
-      reason: languages.InlineCompletionEndOfLifeReason,
-      lifetimeSummary: languages.LifetimeSummary,
-    ) {
-      if (!item.correlationId || typeof item.insertText !== 'string') return;
-      void trackInlineCompletionEvent({
-        correlationId: item.correlationId,
-        outcome: mapInlineCompletionOutcome(monaco, reason.kind),
-        outlineLength: lifetimeSummary.characterCountOriginal ?? 0,
-        requestReason: lifetimeSummary.requestReason,
-        shownDurationMs: lifetimeSummary.shownDuration,
-        source: 'model',
-        suggestionText: item.insertText,
-      }).catch(() => undefined);
-    },
-  });
+  monaco.languages.registerInlineCompletionsProvider(
+    mindmapDslLanguageId,
+    createMindmapDslInlineCompletionsProvider(
+      monaco,
+      requestInlineCompletionFromApi,
+      trackInlineCompletionEvent,
+    ),
+  );
 
   mindmapDslInlineCompletionRegistered = true;
 }

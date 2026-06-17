@@ -128,6 +128,56 @@ test('layoutMindmapWithElk avoids node overlap in dense radial layouts', async (
   assert.deepEqual(findOverlappingNodePairs(result.nodes), []);
 });
 
+test('createMindmapRadialLayoutOptions expands radius for crowded exported levels', () => {
+  const crowdedMindmap = generateMindmapFromAst({
+    root: {
+      id: 'root-law',
+      kind: 'root',
+      label: 'Introduction to Law of Torts',
+      source: {
+        line: 1,
+        column: 1,
+        indentLevel: 0,
+        raw: '@root: Introduction to Law of Torts',
+      },
+      branches: Array.from({ length: 12 }, (_, branchIndex) => ({
+        id: `branch-${branchIndex + 1}`,
+        kind: 'branch',
+        label: `Branch ${branchIndex + 1} covering constitutional interpretation, institutional design, and remedial structure`,
+        source: {
+          line: branchIndex + 2,
+          column: 1,
+          indentLevel: 0,
+          raw: `- @branch: Branch ${branchIndex + 1}`,
+        },
+        children: Array.from({ length: 6 }, (_, childIndex) => ({
+          id: `leaf-${branchIndex + 1}-${childIndex + 1}`,
+          kind: 'leaf',
+          label: `Leaf ${childIndex + 1} with a long explanatory sentence about balancing tests, policy choices, and fact-sensitive standards`,
+          source: {
+            line: 100 + branchIndex * 10 + childIndex,
+            column: 3,
+            indentLevel: 1,
+            raw: `  - Leaf ${childIndex + 1}`,
+          },
+          children: [],
+        })),
+      })),
+    },
+  });
+  const exportMindmap = createExportMindmapVariant(crowdedMindmap, {
+    nodeWidthScale: 1.45,
+    nodeHeightScale: 1.6,
+    nodePaddingScale: 1.25,
+    siblingGapScale: 1,
+    levelGapScale: 1,
+    textScale: 1.7,
+  });
+  const options = createMindmapRadialLayoutOptions(exportMindmap);
+
+  assert.equal(Number(options['org.eclipse.elk.radial.radius']) > exportMindmap.metadata.layout.levelGap, true);
+});
+
 function findOverlappingNodePairs(
   nodes: Array<{ id: string; x: number; y: number; width: number; height: number }>,
 ): string[] {

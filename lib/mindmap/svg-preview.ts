@@ -78,6 +78,10 @@ interface SvgPreviewRenderMetrics {
   accentInsetY: number;
 }
 
+const exportSharedRootFontScaleFloor = 0.82;
+const exportSharedNodeFontScaleFloor = 0.84;
+const exportSharedFontSizePercentile = 0.35;
+
 const rootNodeStyle: SvgPreviewNodeStyle = {
   fill: '#fff7ed',
   stroke: '#f97316',
@@ -566,9 +570,9 @@ function createExportTypographyTargets(
   layoutNodeMap: Map<string, MindmapLayoutResult['nodes'][number]>,
   metrics: SvgPreviewRenderMetrics,
 ): ExportTypographyTargets {
-  let rootFontSize = metrics.rootFontSize;
-  let branchFontSize = metrics.nodeFontSize;
-  let leafFontSize = metrics.nodeFontSize;
+  const rootFontSizes: number[] = [];
+  const branchFontSizes: number[] = [];
+  const leafFontSizes: number[] = [];
 
   for (const node of mindmap.nodes) {
     const layoutNode = layoutNodeMap.get(node.id);
@@ -580,23 +584,54 @@ function createExportTypographyTargets(
     const fittedFontSize = findFittingExportFontSize(node, layoutNode, metrics);
 
     if (node.kind === 'root') {
-      rootFontSize = Math.min(rootFontSize, fittedFontSize);
+      rootFontSizes.push(fittedFontSize);
       continue;
     }
 
     if (node.kind === 'branch') {
-      branchFontSize = Math.min(branchFontSize, fittedFontSize);
+      branchFontSizes.push(fittedFontSize);
       continue;
     }
 
-    leafFontSize = Math.min(leafFontSize, fittedFontSize);
+    leafFontSizes.push(fittedFontSize);
   }
 
   return {
-    rootFontSize,
-    branchFontSize,
-    leafFontSize,
+    rootFontSize: resolveSharedExportFontSize(
+      rootFontSizes,
+      metrics.rootFontSize,
+      exportSharedRootFontScaleFloor,
+    ),
+    branchFontSize: resolveSharedExportFontSize(
+      branchFontSizes,
+      metrics.nodeFontSize,
+      exportSharedNodeFontScaleFloor,
+    ),
+    leafFontSize: resolveSharedExportFontSize(
+      leafFontSizes,
+      metrics.nodeFontSize,
+      exportSharedNodeFontScaleFloor,
+    ),
   };
+}
+
+function resolveSharedExportFontSize(
+  fittedFontSizes: number[],
+  baseFontSize: number,
+  readableScaleFloor: number,
+): number {
+  if (fittedFontSizes.length === 0) {
+    return baseFontSize;
+  }
+
+  const sortedFontSizes = [...fittedFontSizes].sort((left, right) => left - right);
+  const percentileIndex = Math.min(
+    sortedFontSizes.length - 1,
+    Math.max(0, Math.floor((sortedFontSizes.length - 1) * exportSharedFontSizePercentile)),
+  );
+  const percentileFontSize = sortedFontSizes[percentileIndex] ?? baseFontSize;
+
+  return Math.max(baseFontSize * readableScaleFloor, percentileFontSize);
 }
 
 function findFittingExportFontSize(

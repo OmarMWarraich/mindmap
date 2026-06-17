@@ -16,7 +16,7 @@ import {
 const minimumExpansionRatio = 2.3;
 const maximumExpansionRatio = 2.7;
 const detailedMaximumExpansionRatio = 3.2;
-const maxWordsPerLine = 15;
+const maxWordsPerLine = 35;
 
 type DensityStatus = 'below-target' | 'target-met' | 'over-target';
 
