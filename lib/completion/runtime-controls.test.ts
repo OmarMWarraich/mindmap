@@ -23,6 +23,24 @@ test('createInlineCompletionCacheKey is stable for identical requests', () => {
   );
 });
 
+test('createInlineCompletionCacheKey differs across models for identical context', () => {
+  const base = { outline: '@root: Topic', cursor: { lineNumber: 1, column: 5 } } as const;
+
+  assert.notEqual(
+    createInlineCompletionCacheKey({ ...base, modelId: 'gpt-4o-mini' }),
+    createInlineCompletionCacheKey({ ...base, modelId: 'claude-haiku-4-5' }),
+  );
+});
+
+test('createInlineCompletionCacheKey treats an omitted modelId as the completion default', () => {
+  const base = { outline: '@root: Topic', cursor: { lineNumber: 1, column: 5 } } as const;
+
+  assert.equal(
+    createInlineCompletionCacheKey(base),
+    createInlineCompletionCacheKey({ ...base, modelId: 'gpt-4o-mini' }),
+  );
+});
+
 test('cache helpers return cached responses until the ttl expires', () => {
   resetInlineCompletionRuntimeControlsForTests();
   const cacheKey = 'completion-key';

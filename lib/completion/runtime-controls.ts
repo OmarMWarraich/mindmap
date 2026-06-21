@@ -1,3 +1,4 @@
+import { selectModelIdForRole } from '../model/catalog.ts';
 import type { InlineCompletionRequest, InlineCompletionResponse } from './service.ts';
 
 interface InlineCompletionCacheEntry {
@@ -19,6 +20,11 @@ const rateLimitMaxRequests = 18;
 
 export function createInlineCompletionCacheKey(request: InlineCompletionRequest): string {
   return JSON.stringify([
+    // The effective model (requested id or the completion-role default) so a
+    // cached completion is never served for a different model. Resolving the
+    // default here means an omitted `modelId` and an explicit default-equal id
+    // share one cache entry, since they dispatch to the same model.
+    selectModelIdForRole('completion', request.modelId),
     request.outline,
     request.cursor.lineNumber,
     request.cursor.column,
