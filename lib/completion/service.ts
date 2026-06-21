@@ -4,6 +4,7 @@ import { getModelProviderEnv, type ModelProviderEnv } from '../config/env.ts';
 import { extractInlineCompletionContextWindow } from './context.ts';
 import { normalizeInlineCompletionOutput } from './normalize.ts';
 import { createInlineCompletionPrompt } from './prompt.ts';
+import { knownModelIdSchema } from '../model/catalog.ts';
 import { requestModelProviderChatCompletion } from '../model/openai-compatible-adapter.ts';
 import { evaluateInlineCompletionRelevance } from './relevance.ts';
 import { rejectDuplicateSiblingCompletion } from './sibling-check.ts';
@@ -15,6 +16,7 @@ export const inlineCompletionRequestSchema = z.object({
     column: z.number().int().positive(),
   }),
   recentTokenBudget: z.number().int().positive().max(400).optional(),
+  modelId: knownModelIdSchema.optional(),
 }).strict();
 
 export const inlineCompletionResponseSchema = z.object({

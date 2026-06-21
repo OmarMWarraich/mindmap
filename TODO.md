@@ -484,7 +484,8 @@ Reference: https://github.com/OmarMWarraich/mindmap/issues/15
 
 ### Phase 3 — Thread `modelId` Through the Request Contract
 
-- [ ] Add optional `modelId` to the completion, generation, and source `.strict()` request schemas
+- [x] Add optional `modelId` to the completion, generation, and source `.strict()` request schemas
+  Added `modelId: knownModelIdSchema.optional()` to `inlineCompletionRequestSchema` ([lib/completion/service.ts](lib/completion/service.ts)), `generationRequestSchema` ([lib/generation/service.ts](lib/generation/service.ts)), and `sourceMindmapGenerationRequestSchema` ([lib/generation/source-schema.ts](lib/generation/source-schema.ts)), importing `knownModelIdSchema` from the catalog in each. Reusing the catalog schema means an unknown id is rejected at the contract boundary while omission stays valid (backward-compatible); provider-configured + allow-list checks come in the next item. All three keep `.strict()`. New [lib/model/request-model-id.test.ts](lib/model/request-model-id.test.ts) asserts the omitted case still validates, known catalog ids (`gpt-4o-mini`, `claude-sonnet-4-5`, `gpt-4o`) are accepted, and unknown ids are rejected across all three schemas (3/3 pass). Typecheck and lint clean; completion/generation suites 62/63 (the lone failure is the pre-existing unrelated 35-word-limit test).
   Purpose: Lets the client express a model choice while staying backward-compatible.
 
 - [ ] Validate and authorize `modelId` server-side in each route

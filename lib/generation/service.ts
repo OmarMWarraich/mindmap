@@ -6,6 +6,7 @@ import {
   mindmapValidationWarningSchema,
 } from '../dsl/validation.ts';
 import { getModelProviderEnv, type ModelProviderEnv } from '../config/env.ts';
+import { knownModelIdSchema } from '../model/catalog.ts';
 import { requestModelProviderChatCompletion } from '../model/openai-compatible-adapter.ts';
 import { generateMindmapFromAst } from '../mindmap/from-ast.ts';
 import { generatedMindmapSchema } from '../mindmap/schema.ts';
@@ -57,6 +58,7 @@ export const generationRequestSchema = z.object({
   ast: mindmapDocumentAstSchema,
   warnings: z.array(mindmapValidationWarningSchema).optional(),
   errors: z.array(mindmapValidationErrorSchema).optional(),
+  modelId: knownModelIdSchema.optional(),
 }).strict();
 
 export const generationOverlayResponseSchema = z.object({

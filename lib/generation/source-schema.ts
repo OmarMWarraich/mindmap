@@ -4,12 +4,14 @@ import {
   mindmapValidationErrorSchema,
   mindmapValidationWarningSchema,
 } from '../dsl/validation.ts';
+import { knownModelIdSchema } from '../model/catalog.ts';
 
 const requiredString = z.string().trim().min(1);
 
 export const sourceMindmapGenerationRequestSchema = z.object({
   sourceText: requiredString,
   detailLevel: z.enum(['standard', 'detailed']).optional(),
+  modelId: knownModelIdSchema.optional(),
 }).strict();
 
 export const sourceMindmapModelResponseSchema = z.object({
