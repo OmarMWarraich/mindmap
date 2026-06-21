@@ -23,6 +23,12 @@ let mindmapDslInlineCompletionRegistered = false;
 const mindmapDslLanguageId = 'mindmap-dsl';
 const enableMonacoInlineCompletions = true;
 
+// The inline-completion provider is registered once globally, but the selected
+// completion model lives in React state. This module-level holder bridges the
+// two: the provider reads it lazily on each request, and the component keeps it
+// in sync, so the latest selection is always used without re-registering.
+let activeCompletionModelId: string | undefined;
+
 // ── Public types ───────────────────────────────────────────────────────────
 
 export interface DslEditorPanelHandle {
@@ -37,6 +43,7 @@ interface DslEditorPanelProps {
   onChange: (value: string) => void;
   onGenerateMindmap: () => void;
   onResetDsl: () => void;
+  completionModelId?: string;
 }
 
 // ── Icons ─────────────────────────────────────────────────────────────────
@@ -90,6 +97,7 @@ function configureMindmapDslMonaco(monaco: Monaco): void {
       monaco,
       requestInlineCompletionFromApi,
       trackInlineCompletionEvent,
+      () => activeCompletionModelId,
     ),
   );
 
@@ -105,7 +113,7 @@ const editorLoadingFallback = (
 );
 
 const DslEditorPanel = forwardRef<DslEditorPanelHandle, DslEditorPanelProps>(
-  function DslEditorPanel({ defaultValue, onChange, onGenerateMindmap, onResetDsl }, ref) {
+  function DslEditorPanel({ defaultValue, onChange, onGenerateMindmap, onResetDsl, completionModelId }, ref) {
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
     const editorDisposablesRef = useRef<Array<{ dispose(): void }>>([]);
     const ghostTextDecorationIdsRef = useRef<string[]>([]);
@@ -151,6 +159,12 @@ const DslEditorPanel = forwardRef<DslEditorPanelHandle, DslEditorPanelProps>(
         editorDisposablesRef.current = [];
       };
     }, []);
+
+    // Keep the globally-registered inline-completion provider pointed at the
+    // currently-selected completion model.
+    useEffect(() => {
+      activeCompletionModelId = completionModelId;
+    }, [completionModelId]);
 
     return (
       <div className="flex h-full flex-col overflow-hidden rounded-xl border border-zinc-300 bg-white shadow-sm">

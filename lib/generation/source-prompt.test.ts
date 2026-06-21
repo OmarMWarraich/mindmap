@@ -10,7 +10,7 @@ import {
 test('source mindmap generation system prompt requires exactly one root and strict JSON', () => {
   assert.match(sourceMindmapGenerationSystemPrompt, /Return one JSON object/i);
   assert.match(sourceMindmapGenerationSystemPrompt, /exactly one @root/i);
-  assert.match(sourceMindmapGenerationSystemPrompt, /15 words or fewer/i);
+  assert.match(sourceMindmapGenerationSystemPrompt, /35 words or fewer/i);
 });
 
 test('createSourceMindmapGenerationPrompt injects source density targets', () => {

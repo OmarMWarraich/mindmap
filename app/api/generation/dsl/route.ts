@@ -5,6 +5,7 @@ import {
   generateMindmapDslFromSource,
   sourceMindmapGenerationRequestSchema,
 } from '../../../../lib/generation/source-service.ts';
+import { authorizeModelId } from '../../../../lib/model/authorization.ts';
 
 export const runtime = 'nodejs';
 
@@ -15,6 +16,15 @@ export const POST = auth(async (req) => {
 
   try {
     const payload = sourceMindmapGenerationRequestSchema.parse(await req.json());
+
+    if (payload.modelId) {
+      const authorization = authorizeModelId(payload.modelId, { role: 'generation' });
+
+      if (!authorization.ok) {
+        return Response.json({ error: authorization.reason }, { status: authorization.status });
+      }
+    }
+
     const response = await generateMindmapDslFromSource(payload);
     return Response.json(response);
   } catch (error) {

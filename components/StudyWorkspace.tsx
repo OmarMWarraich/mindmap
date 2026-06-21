@@ -12,12 +12,14 @@ import GenerationHistoryPanel from './GenerationHistoryPanel';
 import type { HistoryEntry } from './GenerationHistoryPanel';
 import MindmapPreviewDrawer from './MindmapPreviewDrawer';
 import MindmapSvgPreview from './MindmapSvgPreview';
+import ModelSelector from './ModelSelector';
 import SourceNotesPanel from './SourceNotesPanel';
 import type { SourceGenerationDetailLevel } from './SourceNotesPanel';
 import { useWorkspace } from './WorkspaceContext';
 import type { MindmapSvgPreviewHandle } from './MindmapSvgPreview';
 import { requestMindmapDslGenerationFromApi } from '../lib/generation/client';
 import type { SourceMindmapGenerationResponse } from '../lib/generation/source-schema';
+import { loadModelChoices, saveModelChoices } from '../lib/model/model-choice-storage';
 import { generateMindmapFromAst } from '../lib/mindmap/from-ast';
 import {
   createExportMindmapVariant,
@@ -44,6 +46,7 @@ import {
 import { parseMindmapDsl } from '../lib/dsl/parse';
 import { mindmapDslStarterOutline } from '../lib/dsl/mvp';
 import type { MindmapValidationIssue } from '../lib/dsl/validation';
+import type { PublicModel } from '../lib/model/public-catalog';
 
 interface StudyWorkspaceProps {
   userId: string;
@@ -96,24 +99,105 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
   const [projectId, setProjectId] = useState<string | null>(null);
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [models, setModels] = useState<PublicModel[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(true);
+  const [completionModelId, setCompletionModelId] = useState<string | undefined>(undefined);
+  const [generationModelId, setGenerationModelId] = useState<string | undefined>(undefined);
   const { activePanel, setActivePanel, setProjectName, previewOpen, setPreviewOpen } = useWorkspace();
 
   // Fetch history when the user switches to the history panel.
   useEffect(() => {
     if (activePanel !== 'history' || !projectId) return;
 
-    setHistoryLoading(true);
+    const controller = new AbortController();
+
     void (async () => {
+      setHistoryLoading(true);
       try {
-        const res = await fetch(`/api/projects/${projectId}/history`);
+        const res = await fetch(`/api/projects/${projectId}/history`, {
+          signal: controller.signal,
+        });
         if (res.ok) {
           setHistoryEntries((await res.json()) as HistoryEntry[]);
         }
+      } catch (error) {
+        if (!controller.signal.aborted) throw error;
       } finally {
-        setHistoryLoading(false);
+        if (!controller.signal.aborted) setHistoryLoading(false);
       }
     })();
+
+    return () => controller.abort();
   }, [activePanel, projectId]);
+
+  // Fetch the offerable model catalog once so the selectors can render.
+  useEffect(() => {
+    const controller = new AbortController();
+
+    void (async () => {
+      try {
+        const res = await fetch('/api/models', { signal: controller.signal });
+        if (!res.ok) return;
+        const payload = (await res.json()) as { models?: PublicModel[] };
+        if (!controller.signal.aborted) {
+          setModels(payload.models ?? []);
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          console.error('Failed to load model catalog.', error);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setModelsLoading(false);
+        }
+      }
+    })();
+
+    return () => controller.abort();
+  }, []);
+
+  const completionModels = useMemo(
+    () => models.filter((model) => model.roles.includes('completion')),
+    [models],
+  );
+  const generationModels = useMemo(
+    () => models.filter((model) => model.roles.includes('generation')),
+    [models],
+  );
+
+  // Restore the user's persisted model choices once on mount (client-only).
+  // localStorage can only be read after hydration, so this is a mount effect;
+  // the reads are wrapped in a closure to keep the seeding off the synchronous
+  // effect body (which would otherwise cascade-render).
+  const modelChoicesRestoredRef = useRef(false);
+  useEffect(() => {
+    void (async () => {
+      const stored = loadModelChoices();
+      setCompletionModelId(stored.completionModelId);
+      setGenerationModelId(stored.generationModelId);
+      modelChoicesRestoredRef.current = true;
+    })();
+  }, []);
+
+  // Drop a restored choice that the server no longer offers for its role (e.g.
+  // the provider key was removed) so we fall back to the per-role default. Done
+  // during render (guarded) instead of in an effect to avoid a cascading render;
+  // each branch clears the stale id, which makes its own condition false on the
+  // next render, so this cannot loop.
+  if (!modelsLoading && models.length > 0) {
+    if (completionModelId && !completionModels.some((m) => m.id === completionModelId)) {
+      setCompletionModelId(undefined);
+    }
+    if (generationModelId && !generationModels.some((m) => m.id === generationModelId)) {
+      setGenerationModelId(undefined);
+    }
+  }
+
+  // Persist choices after the initial restore so reloads keep the selection.
+  useEffect(() => {
+    if (!modelChoicesRestoredRef.current) return;
+    saveModelChoices({ completionModelId, generationModelId });
+  }, [completionModelId, generationModelId]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -138,6 +222,20 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
       errors: parseResult.errors,
     });
   }, [parseResult.ast, parseResult.errors, parseResult.warnings]);
+
+  // Sticky "last good" snapshot: retain the most recent non-null mindmap so the
+  // preview survives transient outlines that fail to parse. Updated during render
+  // (guarded) instead of in an effect to avoid a cascading render; the guard
+  // matches the previous effect's deps (re-store whenever the mindmap or outline
+  // changes) and becomes false once both are in sync, so this cannot loop.
+  if (
+    generatedMindmap
+    && (latestMindmapSnapshot !== generatedMindmap || latestMindmapSnapshotOutline !== outline)
+  ) {
+    setLatestMindmapSnapshot(generatedMindmap);
+    setLatestMindmapSnapshotOutline(outline);
+  }
+
   const effectiveMindmap = generatedMindmap
     ?? (latestMindmapSnapshotOutline === outline ? latestMindmapSnapshot : null);
 
@@ -224,23 +322,20 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
   }, []);
 
   useEffect(() => {
-    if (!generatedMindmap) {
-      return;
-    }
-
-    setLatestMindmapSnapshot(generatedMindmap);
-    setLatestMindmapSnapshotOutline(outline);
-  }, [generatedMindmap, outline]);
-
-  useEffect(() => {
     if (!effectiveMindmap) {
-      setLayoutResult(null);
-      setLayoutStatus('idle');
-      setLayoutError(null);
-      setLayoutDiagnostics({
-        phase: 'idle',
-        summary: 'Preview is idle until the outline parses into a valid AST.',
-      });
+      // Reset to idle when there's no valid mindmap to lay out. Kept in the
+      // effect (not during render) so render stays pure; the state writes run in
+      // a closure to avoid a synchronous cascade-render in the effect body, and
+      // still apply immediately when the mindmap becomes unavailable.
+      void (async () => {
+        setLayoutResult(null);
+        setLayoutStatus('idle');
+        setLayoutError(null);
+        setLayoutDiagnostics({
+          phase: 'idle',
+          summary: 'Preview is idle until the outline parses into a valid AST.',
+        });
+      })();
       return;
     }
 
@@ -249,18 +344,18 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
     const startedAt = performance.now();
     let cancelled = false;
 
-    setLayoutStatus('loading');
-    setLayoutError(null);
+    void (async () => {
+      setLayoutStatus('loading');
+      setLayoutError(null);
+      setLayoutDiagnostics({
+        phase: 'main-thread',
+        summary: `Computing layout request ${requestId} in the page thread.`,
+        detail: `Running ELK for ${effectiveMindmap.nodes.length} nodes and ${effectiveMindmap.edges.length} edges without the dedicated worker path.`,
+        requestId,
+      });
 
-    setLayoutDiagnostics({
-      phase: 'main-thread',
-      summary: `Computing layout request ${requestId} in the page thread.`,
-      detail: `Running ELK for ${effectiveMindmap.nodes.length} nodes and ${effectiveMindmap.edges.length} edges without the dedicated worker path.`,
-      requestId,
-    });
-
-    void layoutMindmapWithElk(effectiveMindmap)
-      .then((result) => {
+      try {
+        const result = await layoutMindmapWithElk(effectiveMindmap);
         if (cancelled || layoutRequestIdRef.current !== requestId) {
           return;
         }
@@ -276,8 +371,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
           requestId,
           elapsedMs,
         });
-      })
-      .catch((error) => {
+      } catch (error) {
         if (cancelled || layoutRequestIdRef.current !== requestId) {
           return;
         }
@@ -297,7 +391,8 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
           detail,
           requestId,
         });
-      });
+      }
+    })();
 
     return () => {
       cancelled = true;
@@ -435,7 +530,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
     });
 
     try {
-      const response = await requestMindmapDslGenerationFromApi({ sourceText, detailLevel });
+      const response = await requestMindmapDslGenerationFromApi({ sourceText, detailLevel, modelId: generationModelId });
 
       dslEditorRef.current?.setValue(response.dsl);
       dslEditorRef.current?.focus();
@@ -509,6 +604,15 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
             <ChatPanel />
           ) : (
             <>
+              <ModelSelector
+                id="generation-model"
+                label="Generation model"
+                loading={modelsLoading}
+                models={generationModels}
+                onChange={setGenerationModelId}
+                placeholder="Default generation model"
+                value={generationModelId}
+              />
               <SourceNotesPanel
                 generationStatus={generationStatus}
                 latestDslGeneration={latestDslGeneration}
@@ -540,9 +644,19 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
 
         {/* Right column: DSL Editor (upper) + Preview/Export (lower) */}
         <div className="flex flex-col gap-4">
+          <ModelSelector
+            id="completion-model"
+            label="Completion model"
+            loading={modelsLoading}
+            models={completionModels}
+            onChange={setCompletionModelId}
+            placeholder="Default completion model"
+            value={completionModelId}
+          />
           <div className="h-[480px]">
             <DslEditorPanel
               ref={dslEditorRef}
+              completionModelId={completionModelId}
               defaultValue={mindmapDslStarterOutline}
               onChange={setOutline}
               onGenerateMindmap={handleGenerateMindmapFromDsl}

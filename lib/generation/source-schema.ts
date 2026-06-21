@@ -4,12 +4,15 @@ import {
   mindmapValidationErrorSchema,
   mindmapValidationWarningSchema,
 } from '../dsl/validation.ts';
+import { knownModelIdSchema } from '../model/catalog.ts';
+import { parseStructuredModelJson } from '../model/json-parse.ts';
 
 const requiredString = z.string().trim().min(1);
 
 export const sourceMindmapGenerationRequestSchema = z.object({
   sourceText: requiredString,
   detailLevel: z.enum(['standard', 'detailed']).optional(),
+  modelId: knownModelIdSchema.optional(),
 }).strict();
 
 export const sourceMindmapModelResponseSchema = z.object({
@@ -63,5 +66,5 @@ export const sourceMindmapModelResponseJsonSchema = {
 } as const;
 
 export function parseSourceMindmapModelResponse(value: string): SourceMindmapModelResponse {
-  return sourceMindmapModelResponseSchema.parse(JSON.parse(value));
+  return sourceMindmapModelResponseSchema.parse(parseStructuredModelJson(value));
 }

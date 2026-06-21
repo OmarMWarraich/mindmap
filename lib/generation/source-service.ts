@@ -1,5 +1,4 @@
-import { getModelProviderEnv, type ModelProviderEnv } from '../config/env.ts';
-import { requestModelProviderChatCompletion } from '../completion/provider.ts';
+import { requestStructuredModelCompletion } from '../model/dispatch.ts';
 import { parseMindmapDsl } from '../dsl/parse.ts';
 import {
   createSourceMindmapGenerationPrompt,
@@ -18,6 +17,8 @@ const maximumExpansionRatio = 2.7;
 const detailedMaximumExpansionRatio = 3.2;
 const maxWordsPerLine = 35;
 
+type EnvRecord = Record<string, string | undefined>;
+
 type DensityStatus = 'below-target' | 'target-met' | 'over-target';
 
 export { sourceMindmapGenerationRequestSchema };
@@ -25,13 +26,12 @@ export { sourceMindmapGenerationRequestSchema };
 export async function generateMindmapDslFromSource(
   request: SourceMindmapGenerationRequest,
   options: {
-    env?: ModelProviderEnv;
+    env?: Record<string, string | undefined>;
     fetchImpl?: typeof fetch;
   } = {},
 ): Promise<SourceMindmapGenerationResponse> {
   const validatedRequest = sourceMindmapGenerationRequestSchema.parse(request);
   const detailLevel = validatedRequest.detailLevel ?? 'standard';
-  const env = options.env ?? getModelProviderEnv();
   const sourceMeaningfulLineCount = countMeaningfulNonEmptyLines(validatedRequest.sourceText);
   const baseTargetMinLineCount = Math.max(1, Math.ceil(sourceMeaningfulLineCount * minimumExpansionRatio));
   const baseTargetMaxLineCount = Math.max(
@@ -66,7 +66,8 @@ export async function generateMindmapDslFromSource(
     detailLevel,
     minimumChildrenPerBranch,
     prompt,
-    env,
+    validatedRequest.modelId,
+    options.env,
     options.fetchImpl,
   );
 
@@ -93,7 +94,8 @@ export async function generateMindmapDslFromSource(
       detailLevel,
       minimumChildrenPerBranch,
       retryPrompt,
-      env,
+      validatedRequest.modelId,
+      options.env,
       options.fetchImpl,
     );
   }
@@ -248,22 +250,22 @@ async function generateDslAttempt(
   detailLevel: SourceMindmapGenerationRequest['detailLevel'],
   minimumChildrenPerBranch: number,
   prompt: ReturnType<typeof createSourceMindmapGenerationPrompt>,
-  env: ModelProviderEnv,
+  modelId: string | undefined,
+  env: EnvRecord | undefined,
   fetchImpl?: typeof fetch,
 ): Promise<DslAttemptResult> {
-  const completionText = await requestModelProviderChatCompletion({
+  const completion = await requestStructuredModelCompletion({
+    role: 'generation',
+    modelId,
     env,
     fetchImpl,
-    model: env.MODEL_GENERATION_MODEL,
-    maxCompletionTokens: detailLevel === 'detailed' ? 3200 : 2200,
+    maxTokens: detailLevel === 'detailed' ? 3200 : 2200,
     temperature: 0.2,
-    responseFormat: {
-      type: 'json_schema',
-      json_schema: {
-        name: 'mindmap_source_to_dsl',
-        strict: true,
-        schema: sourceMindmapModelResponseJsonSchema,
-      },
+    structuredOutput: {
+      kind: 'json_schema',
+      name: 'mindmap_source_to_dsl',
+      strict: true,
+      schema: sourceMindmapModelResponseJsonSchema,
     },
     messages: [
       { role: 'system', content: prompt.system },
@@ -271,7 +273,7 @@ async function generateDslAttempt(
     ],
   });
 
-  const parsedModelResponse = parseSourceMindmapModelResponse(completionText);
+  const parsedModelResponse = parseSourceMindmapModelResponse(completion.text);
   const resolvedDsl = resolveParserSafeDsl(parsedModelResponse.dsl, sourceText);
   const generatedMeaningfulLineCount = countMeaningfulNonEmptyLines(resolvedDsl.dsl);
   const expansionRatio = sourceMeaningfulLineCount === 0
@@ -288,7 +290,7 @@ async function generateDslAttempt(
     : false;
 
   if (!lineWordLimitSatisfied) {
-    throw new Error('Generated DSL exceeded the 15-word per-line limit.');
+    throw new Error('Generated DSL exceeded the 35-word per-line limit.');
   }
 
   return {

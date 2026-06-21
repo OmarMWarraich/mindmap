@@ -1,3 +1,4 @@
+import { getModelById, selectModelIdForRole } from '../model/catalog.ts';
 import type { InlineCompletionRequest, InlineCompletionResponse } from './service.ts';
 
 interface InlineCompletionCacheEntry {
@@ -19,6 +20,11 @@ const rateLimitMaxRequests = 18;
 
 export function createInlineCompletionCacheKey(request: InlineCompletionRequest): string {
   return JSON.stringify([
+    // The effective model (requested id or the completion-role default) so a
+    // cached completion is never served for a different model. Resolving the
+    // default here means an omitted `modelId` and an explicit default-equal id
+    // share one cache entry, since they dispatch to the same model.
+    selectModelIdForRole('completion', request.modelId),
     request.outline,
     request.cursor.lineNumber,
     request.cursor.column,
@@ -85,6 +91,24 @@ export function getInlineCompletionClientKey(request: Request): string {
   return request.headers.get('x-forwarded-for')
     ?? request.headers.get('x-real-ip')
     ?? 'anonymous';
+}
+
+// Resolves the upstream provider for the request's effective completion model so
+// each provider gets an independent budget. This keeps one provider's burst (or
+// upstream 429s) from consuming another provider's allowance and lets us reason
+// about per-provider cost separately.
+export function getInlineCompletionProvider(request: InlineCompletionRequest): string {
+  const modelId = selectModelIdForRole('completion', request.modelId);
+  return getModelById(modelId)?.provider ?? 'unknown';
+}
+
+// Composite key that scopes the per-client rate-limit window to a single
+// provider, e.g. "203.0.113.7:openai" vs "203.0.113.7:anthropic".
+export function getInlineCompletionRateLimitKey(
+  httpRequest: Request,
+  request: InlineCompletionRequest,
+): string {
+  return `${getInlineCompletionClientKey(httpRequest)}:${getInlineCompletionProvider(request)}`;
 }
 
 export function resetInlineCompletionRuntimeControlsForTests(): void {
