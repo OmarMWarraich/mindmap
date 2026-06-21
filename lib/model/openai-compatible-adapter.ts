@@ -1,4 +1,5 @@
 import type { ModelProviderEnv } from '../config/env.ts';
+import { resolveModelDefaults } from './catalog.ts';
 import type {
   ModelAdapter,
   ModelChatCompletionRequest,
@@ -66,9 +67,10 @@ export function buildModelProviderChatCompletionRequest(
   options: RequestModelProviderChatCompletionOptions,
 ): ModelHttpRequest {
   const { env } = options;
-  const temperature = options.temperature ?? 0.2;
-  const maxCompletionTokens = options.maxCompletionTokens ?? 72;
   const model = options.model ?? env.MODEL_COMPLETION_MODEL;
+  const modelDefaults = resolveModelDefaults(model);
+  const temperature = options.temperature ?? modelDefaults.temperature;
+  const maxCompletionTokens = options.maxCompletionTokens ?? modelDefaults.maxTokens;
   const requestBody = buildChatCompletionRequestBody({
     messages: options.messages,
     maxCompletionTokens,

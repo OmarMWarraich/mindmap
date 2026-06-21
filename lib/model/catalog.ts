@@ -128,6 +128,19 @@ export function listModelsForProvider(provider: ModelProvider): ModelCatalogEntr
   return MODEL_CATALOG.filter((entry) => entry.provider === provider);
 }
 
+// Last-resort defaults for model ids that are not present in the catalog (e.g.
+// raw Azure deployment names or provider-prefixed slugs used before request-time
+// model selection lands). Mirrors the previous provider-level global default,
+// which was tuned for the short ghost-text inline-completion budget.
+export const FALLBACK_MODEL_DEFAULTS: ModelDefaults = Object.freeze({
+  temperature: 0.2,
+  maxTokens: 72,
+});
+
+export function resolveModelDefaults(modelId: string): ModelDefaults {
+  return getModelById(modelId)?.defaults ?? FALLBACK_MODEL_DEFAULTS;
+}
+
 export const knownModelIdSchema = z
   .string()
   .refine(isKnownModelId, { message: 'Unknown model id' });
