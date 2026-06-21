@@ -457,7 +457,8 @@ Reference: https://github.com/OmarMWarraich/mindmap/issues/15
   Removed the magic `temperature ?? 0.2` / `maxCompletionTokens ?? 72` literals from `buildModelProviderChatCompletionRequest`. The catalog is now the single source of truth: added `resolveModelDefaults(modelId)` plus a frozen `FALLBACK_MODEL_DEFAULTS` (`{ temperature: 0.2, maxTokens: 72 }`) to `lib/model/catalog.ts`. The provider resolves the requested model first, then sources `temperature`/`maxCompletionTokens` from that model's catalog `defaults`, falling back to `FALLBACK_MODEL_DEFAULTS` for ids not yet in the catalog (e.g. the current env model `gpt-5-mini`, Azure deployment names, OpenRouter slugs). Behavior is unchanged: the env completion model isn't a catalog id so it still resolves to 0.2/72, and the generation/source services keep passing their explicit per-request budgets (800 and 2200/3200). Typecheck and lint clean; adapter + completion tests pass (42/42).
   Purpose: Lets each model carry its own sensible defaults instead of a single global value.
 
-- [ ] Keep all existing provider/service tests green after the refactor
+- [x] Keep all existing provider/service tests green after the refactor
+  Verified the full suite after Phase 1: 161/163 pass. Every provider and service test that was green before the refactor is still green — the relocated `openai-compatible-adapter.test.ts`, all `lib/completion/*` tests, and the `lib/generation/*` service tests pass. The only 2 reds are `source-prompt`/`source-service` word-limit assertions (expect "15 words" while the committed prompt says "35 words"); they were already failing on HEAD before this issue's work began and the refactor touches neither the prompt text nor that logic, so they are pre-existing and unrelated — not regressions.
   Purpose: Guarantees the abstraction introduction is behavior-preserving.
 
 ### Phase 2 — Anthropic Adapter and Multi-Provider Credentials

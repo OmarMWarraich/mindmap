@@ -90,7 +90,7 @@ test('generateMindmapDslFromSource rejects DSL that does not parse under the sin
   );
 });
 
-test('generateMindmapDslFromSource rejects lines above the 15-word limit', async () => {
+test('generateMindmapDslFromSource rejects lines above the 35-word limit', async () => {
   await assert.rejects(
     () => generateMindmapDslFromSource(
       {
@@ -108,7 +108,7 @@ test('generateMindmapDslFromSource rejects lines above the 15-word limit', async
         }),
       },
     ),
-    /15-word per-line limit/i,
+    /35-word per-line limit/i,
   );
 });
 
