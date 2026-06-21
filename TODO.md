@@ -428,3 +428,112 @@ The goal is to convert the current single-page layout into the multi-column SaaS
 
 - [x] Run existing tests to confirm generation, parsing, and persistence logic is unchanged
   Purpose: Confirms that extracting UI components did not accidentally break any logic that moved with the JSX.
+
+---
+
+## Issue #15 — Multiple Model Providers with User-Selectable Provider/Model
+
+Shift from a deploy-time single provider to request-time model selection backed by multiple server-side credentials. The client sends only an opaque `modelId`; the server resolves provider, base URL, key, and wire format. Initial providers: OpenAI and Anthropic (Claude, native Messages API). Designed so DeepSeek/Kimi can be added later as catalog rows.
+Reference: https://github.com/OmarMWarraich/mindmap/issues/15
+
+### Phase 1 — Model Catalog and Adapter Abstraction (no behavior change)
+
+- [x] Add `lib/model/catalog.ts` as the single source of truth for supported models
+  Each entry: `id`, `provider`, `wireFormat`, `label`, `roles` (`completion`/`generation`), `capabilities` (e.g. `structuredOutput: 'response_format' | 'tool' | 'prompt'`, `contextWindow`), and `defaults` (`temperature`, `maxTokens`).
+  Implemented `modelCatalogEntrySchema` (`.strict()`, derived types via `z.infer`) plus enum constants/schemas for provider, wire format, role, and structured-output strategy. `MODEL_CATALOG` is frozen and self-validates at load via `modelCatalogSchema.parse` (rejects duplicate ids). Seeded OpenAI (`gpt-4o-mini`, `gpt-4o`) and Anthropic (`claude-haiku-4-5`, `claude-sonnet-4-5`) entries. Exposed lookups: `getModelById`, `isKnownModelId`, `listModels`, `listModelsForRole`, `listModelsForProvider`, and `knownModelIdSchema`. Typecheck, lint, and a runtime load check all pass.
+  Purpose: Drives the UI dropdown, validates incoming `modelId`, and tells the service how to request structured output.
+
+- [ ] Define a `ModelAdapter` interface keyed by wire format
+  `buildRequest(opts): { url; init }` and `parseResponse(payload): string`. Adapters are selected by `wireFormat`, not vendor name.
+  Purpose: Decouples request/response shape from individual providers so new vendors reuse existing adapters.
+
+- [ ] Move `lib/completion/provider.ts` into `lib/model/` and refactor it into the `openai-compatible` adapter
+  Preserve current OpenAI/Azure/OpenRouter behavior exactly. Update imports in `lib/completion/service.ts`, `lib/generation/service.ts`, and `lib/generation/source-service.ts`.
+  Purpose: Establishes the shared model home and proves the abstraction with zero behavior change.
+
+- [ ] Move hardcoded temperature/max-token defaults out of the provider into per-model catalog defaults
+  Purpose: Lets each model carry its own sensible defaults instead of a single global value.
+
+- [ ] Keep all existing provider/service tests green after the refactor
+  Purpose: Guarantees the abstraction introduction is behavior-preserving.
+
+### Phase 2 — Anthropic Adapter and Multi-Provider Credentials
+
+- [ ] Implement the `anthropic-messages` adapter
+  `x-api-key` + `anthropic-version` headers, top-level `system`, `messages` (user/assistant only), `max_tokens`, and `content[]` response parsing.
+  Purpose: Adds first-class native Claude support beyond the OpenAI-compatibility shim.
+
+- [ ] Replace single-key env with per-provider credentials validated lazily
+  Add `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` (and a commented `DEEPSEEK_API_KEY` placeholder). Validate a provider's key only when one of its models is used. Update `lib/config/env.ts`.
+  Purpose: Lets the server hold multiple providers' credentials without forcing every key to be set.
+
+- [ ] Derive provider availability from configured keys
+  A provider is "available" only when its key is present; `catalog × configured providers` = the models the UI may show.
+  Purpose: Prevents offering models the server cannot actually call.
+
+- [ ] Update `.env.example` and document the new per-provider variables
+  Purpose: Keeps onboarding accurate after the env schema change.
+
+### Phase 3 — Thread `modelId` Through the Request Contract
+
+- [ ] Add optional `modelId` to the completion, generation, and source `.strict()` request schemas
+  Purpose: Lets the client express a model choice while staying backward-compatible.
+
+- [ ] Validate and authorize `modelId` server-side in each route
+  Check it exists in the catalog, its provider is configured, and it passes a server-side allow-list before dispatching.
+  Purpose: Prevents clients from invoking arbitrary or disallowed models.
+
+- [ ] Resolve credentials and adapter server-side from the validated `modelId`
+  Purpose: Ensures keys and base URLs are never accepted from or exposed to the client.
+
+- [ ] Fall back to a per-role default model when `modelId` is absent
+  Purpose: Preserves current behavior and keeps existing tests passing.
+
+- [ ] Include `modelId` in `createInlineCompletionCacheKey` (`lib/completion/runtime-controls.ts`)
+  Purpose: Stops one model's cached completion from being served for another model.
+
+### Phase 4 — Capability-Aware Structured Output
+
+- [ ] Select the structured-output strategy from catalog capabilities
+  `response_format` (OpenAI), `tool` / `tool_choice` (Anthropic), or prompt-only JSON + robust parse fallback. Update `lib/generation/service.ts` and `lib/generation/source-service.ts`.
+  Purpose: Ensures a provider swap does not silently break or degrade DSL generation.
+
+- [ ] Add a robust JSON parse fallback for prompt-only structured output
+  Purpose: Supports models lacking native structured-output features.
+
+### Phase 5 — UI Selector and Persistence
+
+- [ ] Add a `/api/models` endpoint returning catalog metadata filtered to configured providers
+  Expose only non-secret fields; never return keys or base URLs.
+  Purpose: Lets the client render the dropdown without hardcoding the model list or seeing secrets.
+
+- [ ] Add a reusable provider-grouped `ModelSelector` component
+  Purpose: Provides the shared UI control for picking a provider/model.
+
+- [ ] Wire separate completion-model and generation-model selections into the workspace
+  Purpose: Allows a cheap/fast model for inline completion and a stronger model for generation.
+
+- [ ] Persist the user's model choices
+  localStorage for MVP; later user/project settings via the existing persistence layer.
+  Purpose: Keeps the selection across reloads and (eventually) across devices.
+
+### Phase 6 — Extensibility Validation and Hardening
+
+- [ ] Add DeepSeek and Kimi as catalog rows (OpenAI-compatible)
+  Purpose: Proves a new model requires only a catalog entry plus a key.
+
+- [ ] Add per-wire-format adapter tests and per-provider service tests
+  Extend `lib/completion/provider.test.ts` and `lib/generation/source-service.test.ts`.
+  Purpose: Locks in correct request/response handling for each wire format.
+
+- [ ] Consider per-provider rate limiting
+  Purpose: Avoids one provider's limits affecting another and controls cost.
+
+- [ ] Rotate the OpenAI key currently in `.env.local` and confirm `.env.local` is gitignored
+  Purpose: Removes a committed secret and prevents future leakage.
+
+### Out of Scope (for this issue)
+
+- Streaming responses.
+- Per-org/per-user bring-your-own API keys.
+- Provider-specific advanced features beyond chat + structured output.
