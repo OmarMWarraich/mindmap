@@ -22,6 +22,7 @@ export type RequestInlineCompletion = (
   request: {
     outline: string;
     cursor: { lineNumber: number; column: number };
+    modelId?: string;
   },
   options: { signal: AbortSignal },
 ) => Promise<InlineCompletionApiResponse | null>;
@@ -44,6 +45,7 @@ export function createMindmapDslInlineCompletionsProvider(
   monaco: Monaco,
   requestInlineCompletion: RequestInlineCompletion,
   trackInlineCompletionEvent: TrackInlineCompletionEvent,
+  getModelId?: () => string | undefined,
 ): languages.InlineCompletionsProvider<MindmapInlineCompletions> {
   return {
     async provideInlineCompletions(
@@ -61,10 +63,12 @@ export function createMindmapDslInlineCompletionsProvider(
 
       try {
         const correlationId = createInlineCompletionCorrelationId();
+        const modelId = getModelId?.();
         const response = await requestInlineCompletion(
           {
             outline: model.getValue(),
             cursor: { lineNumber: position.lineNumber, column: position.column },
+            ...(modelId ? { modelId } : {}),
           },
           { signal: abortController.signal },
         );
