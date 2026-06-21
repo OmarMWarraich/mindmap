@@ -180,24 +180,18 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
   }, []);
 
   // Drop a restored choice that the server no longer offers for its role (e.g.
-  // the provider key was removed) so we fall back to the per-role default.
-  useEffect(() => {
-    if (modelsLoading || models.length === 0) return;
-
+  // the provider key was removed) so we fall back to the per-role default. Done
+  // during render (guarded) instead of in an effect to avoid a cascading render;
+  // each branch clears the stale id, which makes its own condition false on the
+  // next render, so this cannot loop.
+  if (!modelsLoading && models.length > 0) {
     if (completionModelId && !completionModels.some((m) => m.id === completionModelId)) {
       setCompletionModelId(undefined);
     }
     if (generationModelId && !generationModels.some((m) => m.id === generationModelId)) {
       setGenerationModelId(undefined);
     }
-  }, [
-    modelsLoading,
-    models,
-    completionModels,
-    generationModels,
-    completionModelId,
-    generationModelId,
-  ]);
+  }
 
   // Persist choices after the initial restore so reloads keep the selection.
   useEffect(() => {
@@ -230,15 +224,17 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
   }, [parseResult.ast, parseResult.errors, parseResult.warnings]);
 
   // Sticky "last good" snapshot: retain the most recent non-null mindmap so the
-  // preview survives transient outlines that fail to parse.
-  useEffect(() => {
-    if (!generatedMindmap) {
-      return;
-    }
-
+  // preview survives transient outlines that fail to parse. Updated during render
+  // (guarded) instead of in an effect to avoid a cascading render; the guard
+  // matches the previous effect's deps (re-store whenever the mindmap or outline
+  // changes) and becomes false once both are in sync, so this cannot loop.
+  if (
+    generatedMindmap
+    && (latestMindmapSnapshot !== generatedMindmap || latestMindmapSnapshotOutline !== outline)
+  ) {
     setLatestMindmapSnapshot(generatedMindmap);
     setLatestMindmapSnapshotOutline(outline);
-  }, [generatedMindmap, outline]);
+  }
 
   const effectiveMindmap = generatedMindmap
     ?? (latestMindmapSnapshotOutline === outline ? latestMindmapSnapshot : null);
@@ -325,22 +321,21 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
     };
   }, []);
 
-  // Derived idle reset: when there's no mindmap, the layout is idle. Done during
-  // render (guarded so it can't loop) rather than in an effect, so it doesn't
-  // cascade-render and never flashes stale layout for an empty mindmap.
-  if (!effectiveMindmap && layoutStatus !== 'idle') {
-    setLayoutResult(null);
-    setLayoutStatus('idle');
-    setLayoutError(null);
-    setLayoutDiagnostics({
-      phase: 'idle',
-      summary: 'Preview is idle until the outline parses into a valid AST.',
-    });
-  }
-
   useEffect(() => {
     if (!effectiveMindmap) {
-      // Idle reset handled during render above; nothing to do here.
+      // Reset to idle when there's no valid mindmap to lay out. Kept in the
+      // effect (not during render) so render stays pure; the state writes run in
+      // a closure to avoid a synchronous cascade-render in the effect body, and
+      // still apply immediately when the mindmap becomes unavailable.
+      void (async () => {
+        setLayoutResult(null);
+        setLayoutStatus('idle');
+        setLayoutError(null);
+        setLayoutDiagnostics({
+          phase: 'idle',
+          summary: 'Preview is idle until the outline parses into a valid AST.',
+        });
+      })();
       return;
     }
 

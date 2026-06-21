@@ -6,7 +6,7 @@ import type { PublicModel } from '../lib/model/public-catalog';
 interface ModelSelectorProps {
   models: PublicModel[];
   value: string | undefined;
-  onChange: (modelId: string) => void;
+  onChange: (modelId: string | undefined) => void;
   id?: string;
   label?: string;
   disabled?: boolean;
@@ -58,11 +58,11 @@ export default function ModelSelector({
           disabled={isDisabled}
           id={id}
           onChange={(event) => {
-            onChange(event.target.value);
+            onChange(event.target.value === '' ? undefined : event.target.value);
           }}
           value={value ?? ''}
         >
-          <option disabled value="">
+          <option disabled={isDisabled} value="">
             {statusText}
           </option>
           {groups.map((group) => (

@@ -1,13 +1,17 @@
 import { z } from 'zod';
 
-import { getModelProviderEnv, type ModelProviderEnv } from '../config/env.ts';
 import { extractInlineCompletionContextWindow } from './context.ts';
 import { normalizeInlineCompletionOutput } from './normalize.ts';
 import { createInlineCompletionPrompt } from './prompt.ts';
 import { knownModelIdSchema } from '../model/catalog.ts';
-import { requestModelProviderChatCompletion } from '../model/openai-compatible-adapter.ts';
+import { requestStructuredModelCompletion } from '../model/dispatch.ts';
 import { evaluateInlineCompletionRelevance } from './relevance.ts';
 import { rejectDuplicateSiblingCompletion } from './sibling-check.ts';
+
+// Ghost-text inline completions are intentionally short, so cap the budget here
+// rather than inheriting a model's larger general-purpose default. This keeps the
+// previous tuned ghost-text budget regardless of which model the request selects.
+const inlineCompletionMaxTokens = 72;
 
 export const inlineCompletionRequestSchema = z.object({
   outline: z.string(),
@@ -30,11 +34,10 @@ export type InlineCompletionResponse = z.infer<typeof inlineCompletionResponseSc
 export async function generateInlineCompletion(
   request: InlineCompletionRequest,
   options: {
-    env?: ModelProviderEnv;
+    env?: Record<string, string | undefined>;
     fetchImpl?: typeof fetch;
   } = {},
 ): Promise<InlineCompletionResponse> {
-  const env = options.env ?? getModelProviderEnv();
   const context = extractInlineCompletionContextWindow(request.outline, request.cursor, {
     recentTokenBudget: request.recentTokenBudget,
   });
@@ -44,15 +47,22 @@ export async function generateInlineCompletion(
     currentLineWithCursor: context.currentLineWithCursor,
   });
 
-  const completionText = await requestModelProviderChatCompletion({
-    env,
+  // Dispatch by role so the request honors the caller's `modelId` (the UI
+  // selection) or the completion-role default, resolving the provider and its
+  // server-side credentials from per-provider env. Inline completion is free
+  // text, so no structured-output strategy is requested.
+  const completion = await requestStructuredModelCompletion({
+    role: 'completion',
+    modelId: request.modelId,
+    env: options.env,
     fetchImpl: options.fetchImpl,
+    maxTokens: inlineCompletionMaxTokens,
     messages: [
       { role: 'system', content: prompt.system },
       { role: 'user', content: prompt.user },
     ],
   });
-  const normalizedCompletionText = normalizeInlineCompletionOutput(completionText, {
+  const normalizedCompletionText = normalizeInlineCompletionOutput(completion.text, {
     currentLinePrefix: context.linePrefix,
   });
   const relevance = evaluateInlineCompletionRelevance(normalizedCompletionText, context);
