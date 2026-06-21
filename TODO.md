@@ -443,8 +443,9 @@ Reference: https://github.com/OmarMWarraich/mindmap/issues/15
   Implemented `modelCatalogEntrySchema` (`.strict()`, derived types via `z.infer`) plus enum constants/schemas for provider, wire format, role, and structured-output strategy. `MODEL_CATALOG` is frozen and self-validates at load via `modelCatalogSchema.parse` (rejects duplicate ids). Seeded OpenAI (`gpt-4o-mini`, `gpt-4o`) and Anthropic (`claude-haiku-4-5`, `claude-sonnet-4-5`) entries. Exposed lookups: `getModelById`, `isKnownModelId`, `listModels`, `listModelsForRole`, `listModelsForProvider`, and `knownModelIdSchema`. Typecheck, lint, and a runtime load check all pass.
   Purpose: Drives the UI dropdown, validates incoming `modelId`, and tells the service how to request structured output.
 
-- [ ] Define a `ModelAdapter` interface keyed by wire format
+- [x] Define a `ModelAdapter` interface keyed by wire format
   `buildRequest(opts): { url; init }` and `parseResponse(payload): string`. Adapters are selected by `wireFormat`, not vendor name.
+  Added `lib/model/adapter.ts` with the `ModelAdapter` interface (`readonly wireFormat`, `buildRequest(request): ModelHttpRequest`, `parseResponse(payload: unknown): string`) plus wire-format-neutral request types: `ModelChatMessage`, `ModelAdapterCredentials` (server-only `apiKey`/`baseUrl`), `ModelStructuredOutput` (discriminated `json_object` | `json_schema` so each adapter maps to `response_format`/tool/prompt later), and `ModelChatCompletionRequest`. `ModelAdapterRegistry` is `Partial<Record<ModelWireFormat, ModelAdapter>>`; `resolveModelAdapter(registry, wireFormat)` selects by wire format and throws on a missing adapter. Typecheck and lint pass; no existing code touched.
   Purpose: Decouples request/response shape from individual providers so new vendors reuse existing adapters.
 
 - [ ] Move `lib/completion/provider.ts` into `lib/model/` and refactor it into the `openai-compatible` adapter
