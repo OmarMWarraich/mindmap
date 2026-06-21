@@ -6,7 +6,7 @@ import {
   mindmapValidationWarningSchema,
 } from '../dsl/validation.ts';
 import { getModelProviderEnv, type ModelProviderEnv } from '../config/env.ts';
-import { requestModelProviderChatCompletion } from '../completion/provider.ts';
+import { requestModelProviderChatCompletion } from '../model/openai-compatible-adapter.ts';
 import { generateMindmapFromAst } from '../mindmap/from-ast.ts';
 import { generatedMindmapSchema } from '../mindmap/schema.ts';
 import { mergeDeterministicMindmapWithOverlay } from './merge.ts';

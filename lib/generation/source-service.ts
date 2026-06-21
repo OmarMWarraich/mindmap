@@ -1,5 +1,5 @@
 import { getModelProviderEnv, type ModelProviderEnv } from '../config/env.ts';
-import { requestModelProviderChatCompletion } from '../completion/provider.ts';
+import { requestModelProviderChatCompletion } from '../model/openai-compatible-adapter.ts';
 import { parseMindmapDsl } from '../dsl/parse.ts';
 import {
   createSourceMindmapGenerationPrompt,

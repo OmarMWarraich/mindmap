@@ -4,7 +4,7 @@ import { getModelProviderEnv, type ModelProviderEnv } from '../config/env.ts';
 import { extractInlineCompletionContextWindow } from './context.ts';
 import { normalizeInlineCompletionOutput } from './normalize.ts';
 import { createInlineCompletionPrompt } from './prompt.ts';
-import { requestModelProviderChatCompletion } from './provider.ts';
+import { requestModelProviderChatCompletion } from '../model/openai-compatible-adapter.ts';
 import { evaluateInlineCompletionRelevance } from './relevance.ts';
 import { rejectDuplicateSiblingCompletion } from './sibling-check.ts';
 

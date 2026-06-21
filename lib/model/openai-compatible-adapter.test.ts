@@ -4,7 +4,7 @@ import test from 'node:test';
 import {
   buildModelProviderChatCompletionRequest,
   extractAssistantText,
-} from './provider.ts';
+} from './openai-compatible-adapter.ts';
 
 test('buildModelProviderChatCompletionRequest targets the OpenAI chat completions endpoint', () => {
   const request = buildModelProviderChatCompletionRequest({
