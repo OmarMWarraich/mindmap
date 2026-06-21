@@ -19,6 +19,7 @@ import { useWorkspace } from './WorkspaceContext';
 import type { MindmapSvgPreviewHandle } from './MindmapSvgPreview';
 import { requestMindmapDslGenerationFromApi } from '../lib/generation/client';
 import type { SourceMindmapGenerationResponse } from '../lib/generation/source-schema';
+import { loadModelChoices, saveModelChoices } from '../lib/model/model-choice-storage';
 import { generateMindmapFromAst } from '../lib/mindmap/from-ast';
 import {
   createExportMindmapVariant,
@@ -161,6 +162,38 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
     () => models.filter((model) => model.roles.includes('generation')),
     [models],
   );
+
+  // Restore the user's persisted model choices once on mount (client-only).
+  // localStorage can only be read after hydration, so this is a mount effect;
+  // the reads are wrapped in a closure to keep the seeding off the synchronous
+  // effect body (which would otherwise cascade-render).
+  const modelChoicesRestoredRef = useRef(false);
+  useEffect(() => {
+    void (async () => {
+      const stored = loadModelChoices();
+      setCompletionModelId(stored.completionModelId);
+      setGenerationModelId(stored.generationModelId);
+      modelChoicesRestoredRef.current = true;
+    })();
+  }, []);
+
+  // Drop a restored choice that the server no longer offers for its role (e.g.
+  // the provider key was removed) so we fall back to the per-role default. Done
+  // during render (guarded so it can't loop) instead of in an effect.
+  if (!modelsLoading && models.length > 0) {
+    if (completionModelId && !completionModels.some((m) => m.id === completionModelId)) {
+      setCompletionModelId(undefined);
+    }
+    if (generationModelId && !generationModels.some((m) => m.id === generationModelId)) {
+      setGenerationModelId(undefined);
+    }
+  }
+
+  // Persist choices after the initial restore so reloads keep the selection.
+  useEffect(() => {
+    if (!modelChoicesRestoredRef.current) return;
+    saveModelChoices({ completionModelId, generationModelId });
+  }, [completionModelId, generationModelId]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
