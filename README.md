@@ -160,7 +160,15 @@ Next.js loads `.env*` files automatically for server-side code. Model provider s
 
 Use [.env.example](.env.example) as the template for local configuration.
 
-Required model provider variables:
+Model provider credentials (per-provider keys):
+
+- `OPENAI_API_KEY` — secret key for OpenAI models (e.g. `gpt-4o-mini`, `gpt-4o`)
+- `ANTHROPIC_API_KEY` — secret key for Anthropic Claude models (e.g. `claude-haiku-4-5`, `claude-sonnet-4-5`)
+- `DEEPSEEK_API_KEY` — commented placeholder; uncomment once DeepSeek joins the model catalog
+
+Set only the providers you plan to use. Each key is validated lazily — the first time one of that provider's models is requested — so the server can hold credentials for several providers without forcing every key to be set. A provider whose key is absent is simply omitted from the models the UI may offer.
+
+Legacy single-provider variables (transitional — still consumed by the current completion/generation services until request-time model selection lands):
 
 - `MODEL_PROVIDER` — one of `openai`, `azure-openai`, or `openrouter`
 - `MODEL_API_KEY` — secret key for the chosen provider
