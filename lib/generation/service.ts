@@ -7,6 +7,7 @@ import {
 } from '../dsl/validation.ts';
 import { knownModelIdSchema } from '../model/catalog.ts';
 import { requestStructuredModelCompletion } from '../model/dispatch.ts';
+import { parseStructuredModelJson } from '../model/json-parse.ts';
 import { generateMindmapFromAst } from '../mindmap/from-ast.ts';
 import { generatedMindmapSchema } from '../mindmap/schema.ts';
 import { mergeDeterministicMindmapWithOverlay } from './merge.ts';
@@ -135,7 +136,7 @@ export async function generateMindmapOverlay(
 }
 
 export function parseMindmapGenerationOverlay(value: string): MindmapGenerationResponse {
-  return mindmapGenerationResponseSchema.parse(JSON.parse(value));
+  return mindmapGenerationResponseSchema.parse(parseStructuredModelJson(value));
 }
 
 export function summarizeMindmapAst(ast: MindmapDocumentAst): string {
