@@ -5,9 +5,8 @@ import {
   mindmapValidationErrorSchema,
   mindmapValidationWarningSchema,
 } from '../dsl/validation.ts';
-import { getModelProviderEnv, type ModelProviderEnv } from '../config/env.ts';
 import { knownModelIdSchema } from '../model/catalog.ts';
-import { requestModelProviderChatCompletion } from '../model/openai-compatible-adapter.ts';
+import { requestStructuredModelCompletion } from '../model/dispatch.ts';
 import { generateMindmapFromAst } from '../mindmap/from-ast.ts';
 import { generatedMindmapSchema } from '../mindmap/schema.ts';
 import { mergeDeterministicMindmapWithOverlay } from './merge.ts';
@@ -76,11 +75,10 @@ export type GenerationOverlayResponse = z.infer<typeof generationOverlayResponse
 export async function generateMindmapOverlay(
   request: GenerationRequest,
   options: {
-    env?: ModelProviderEnv;
+    env?: Record<string, string | undefined>;
     fetchImpl?: typeof fetch;
   } = {},
 ): Promise<GenerationOverlayResponse> {
-  const env = options.env ?? getModelProviderEnv();
   const deterministicMindmap = generateMindmapFromAst(request.ast, {
     warnings: request.warnings,
     errors: request.errors,
@@ -93,19 +91,18 @@ export async function generateMindmapOverlay(
   const warnings = request.warnings ?? [];
   const errors = request.errors ?? [];
   try {
-    const completionText = await requestModelProviderChatCompletion({
-      env,
+    const completion = await requestStructuredModelCompletion({
+      role: 'generation',
+      modelId: request.modelId,
+      env: options.env,
       fetchImpl: options.fetchImpl,
-      model: env.MODEL_GENERATION_MODEL,
-      maxCompletionTokens: 800,
+      maxTokens: 800,
       temperature: 0.2,
-      responseFormat: {
-        type: 'json_schema',
-        json_schema: {
-          name: 'mindmap_generation_overlay',
-          strict: true,
-          schema: mindmapGenerationResponseJsonSchema,
-        },
+      structuredOutput: {
+        kind: 'json_schema',
+        name: 'mindmap_generation_overlay',
+        strict: true,
+        schema: mindmapGenerationResponseJsonSchema,
       },
       messages: [
         { role: 'system', content: prompt.system },
@@ -113,7 +110,7 @@ export async function generateMindmapOverlay(
       ],
     });
 
-    const overlay = parseMindmapGenerationOverlay(completionText);
+    const overlay = parseMindmapGenerationOverlay(completion.text);
 
     return generationOverlayResponseSchema.parse({
       fallbackUsed: false,

@@ -1,19 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { ModelProviderEnv } from '../config/env.ts';
 import {
   countMeaningfulNonEmptyLines,
   generateMindmapDslFromSource,
   normalizeGeneratedDsl,
 } from './source-service.ts';
 
-const testEnv: ModelProviderEnv = {
-  MODEL_PROVIDER: 'openai',
-  MODEL_API_KEY: 'test-key',
-  MODEL_BASE_URL: undefined,
-  MODEL_COMPLETION_MODEL: 'gpt-5-mini',
-  MODEL_GENERATION_MODEL: 'gpt-5',
+const testEnv: Record<string, string | undefined> = {
+  OPENAI_API_KEY: 'test-key',
 };
 
 test('countMeaningfulNonEmptyLines ignores blank lines', () => {
