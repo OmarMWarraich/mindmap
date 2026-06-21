@@ -141,6 +141,33 @@ export function resolveModelDefaults(modelId: string): ModelDefaults {
   return getModelById(modelId)?.defaults ?? FALLBACK_MODEL_DEFAULTS;
 }
 
+// Per-role default model used when a request omits `modelId`. Both defaults are
+// OpenAI models, so they resolve whenever `OPENAI_API_KEY` is configured: inline
+// completion favors a cheap/fast model, generation favors a stronger one.
+export const DEFAULT_MODEL_IDS = Object.freeze({
+  completion: 'gpt-4o-mini',
+  generation: 'gpt-4o',
+}) satisfies Record<ModelRole, string>;
+
+// Fail fast on a typo'd default rather than surfacing it as a runtime "unknown
+// model id" only when a request without `modelId` is dispatched.
+for (const defaultModelId of Object.values(DEFAULT_MODEL_IDS)) {
+  if (!isKnownModelId(defaultModelId)) {
+    throw new Error(`Default model id is not in the catalog: ${defaultModelId}`);
+  }
+}
+
+export function getDefaultModelIdForRole(role: ModelRole): string {
+  return DEFAULT_MODEL_IDS[role];
+}
+
+// Picks the model id to use for a role: the explicitly requested one when
+// present, otherwise the role's default. Pure (no env/credentials) so it can also
+// key caches and logs by the effective model.
+export function selectModelIdForRole(role: ModelRole, requestedModelId?: string): string {
+  return requestedModelId ?? DEFAULT_MODEL_IDS[role];
+}
+
 export const knownModelIdSchema = z
   .string()
   .refine(isKnownModelId, { message: 'Unknown model id' });

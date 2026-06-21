@@ -2,7 +2,7 @@ import { getProviderCredentials } from '../config/env.ts';
 import type { ModelAdapter, ModelAdapterCredentials, ModelAdapterRegistry } from './adapter.ts';
 import { resolveModelAdapter } from './adapter.ts';
 import { anthropicMessagesAdapter } from './anthropic-messages-adapter.ts';
-import { getModelById, type ModelCatalogEntry } from './catalog.ts';
+import { getModelById, selectModelIdForRole, type ModelCatalogEntry, type ModelRole } from './catalog.ts';
 import { openaiCompatibleAdapter } from './openai-compatible-adapter.ts';
 
 type EnvRecord = Record<string, string | undefined>;
@@ -44,4 +44,16 @@ export function resolveModel(modelId: string, options: ResolveModelOptions = {})
   const credentials = getProviderCredentials(entry.provider, options.env);
 
   return { entry, adapter, credentials };
+}
+
+// Resolves the model for a role, falling back to the role's default model when
+// `requestedModelId` is absent. Keeps callers from having to special-case the
+// "no model chosen" path and preserves current behavior for requests that omit
+// `modelId`.
+export function resolveModelForRole(
+  role: ModelRole,
+  requestedModelId: string | undefined,
+  options: ResolveModelOptions = {},
+): ResolvedModel {
+  return resolveModel(selectModelIdForRole(role, requestedModelId), options);
 }
