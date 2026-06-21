@@ -463,8 +463,9 @@ Reference: https://github.com/OmarMWarraich/mindmap/issues/15
 
 ### Phase 2 — Anthropic Adapter and Multi-Provider Credentials
 
-- [ ] Implement the `anthropic-messages` adapter
+- [x] Implement the `anthropic-messages` adapter
   `x-api-key` + `anthropic-version` headers, top-level `system`, `messages` (user/assistant only), `max_tokens`, and `content[]` response parsing.
+  Added `lib/model/anthropic-messages-adapter.ts` exporting `anthropicMessagesAdapter` (`wireFormat: 'anthropic-messages'`). `buildRequest` posts to `{baseUrl}/messages` (default `https://api.anthropic.com/v1`) with `x-api-key`, `anthropic-version: 2023-06-01`, and `Content-Type` headers; it lifts all `system` turns into the top-level `system` string (joined by blank lines, omitted when absent) and keeps only `user`/`assistant` turns in `messages`, alongside `model`, `max_tokens`, and `temperature`. Neutral `ModelStructuredOutput` maps to Anthropic's idiomatic forced tool call (`tools` + `tool_choice: { type: 'tool' }`) — `json_schema` → a named tool with `input_schema`/`strict`, `json_object` → a permissive `json_output` tool. `parseResponse` (via exported `extractAnthropicText`) concatenates `text` content blocks, or returns a `tool_use` block's `input` as a JSON string so callers parse it exactly like the OpenAI path. Verified against the live Anthropic Messages API reference. Typecheck and lint clean; 9/9 new adapter tests pass.
   Purpose: Adds first-class native Claude support beyond the OpenAI-compatibility shim.
 
 - [ ] Replace single-key env with per-provider credentials validated lazily
