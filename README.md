@@ -168,7 +168,7 @@ Model provider credentials (per-provider keys):
 
 Set only the providers you plan to use. Each key is validated lazily — the first time one of that provider's models is requested — so the server can hold credentials for several providers without forcing every key to be set. A provider whose key is absent is simply omitted from the models the UI may offer.
 
-Legacy single-provider variables (transitional — still consumed by the current completion/generation services until request-time model selection lands):
+Legacy single-provider variables (transitional — still consumed by inline completions until the completion endpoint is migrated to request-time model selection):
 
 - `MODEL_PROVIDER` — one of `openai`, `azure-openai`, or `openrouter`
 - `MODEL_API_KEY` — secret key for the chosen provider

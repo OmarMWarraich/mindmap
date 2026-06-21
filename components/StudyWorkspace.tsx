@@ -143,7 +143,9 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
           setModels(payload.models ?? []);
         }
       } catch (error) {
-        if (!controller.signal.aborted) throw error;
+        if (!controller.signal.aborted) {
+          console.error('Failed to load model catalog.', error);
+        }
       } finally {
         if (!controller.signal.aborted) {
           setModelsLoading(false);
@@ -178,16 +180,24 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
   }, []);
 
   // Drop a restored choice that the server no longer offers for its role (e.g.
-  // the provider key was removed) so we fall back to the per-role default. Done
-  // during render (guarded so it can't loop) instead of in an effect.
-  if (!modelsLoading && models.length > 0) {
+  // the provider key was removed) so we fall back to the per-role default.
+  useEffect(() => {
+    if (modelsLoading || models.length === 0) return;
+
     if (completionModelId && !completionModels.some((m) => m.id === completionModelId)) {
       setCompletionModelId(undefined);
     }
     if (generationModelId && !generationModels.some((m) => m.id === generationModelId)) {
       setGenerationModelId(undefined);
     }
-  }
+  }, [
+    modelsLoading,
+    models,
+    completionModels,
+    generationModels,
+    completionModelId,
+    generationModelId,
+  ]);
 
   // Persist choices after the initial restore so reloads keep the selection.
   useEffect(() => {
@@ -220,13 +230,15 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
   }, [parseResult.ast, parseResult.errors, parseResult.warnings]);
 
   // Sticky "last good" snapshot: retain the most recent non-null mindmap so the
-  // preview survives transient outlines that fail to parse. Updating during
-  // render (guarded so it can't loop) avoids the cascading re-render that an
-  // effect-driven mirror would cause.
-  if (generatedMindmap && generatedMindmap !== latestMindmapSnapshot) {
+  // preview survives transient outlines that fail to parse.
+  useEffect(() => {
+    if (!generatedMindmap) {
+      return;
+    }
+
     setLatestMindmapSnapshot(generatedMindmap);
     setLatestMindmapSnapshotOutline(outline);
-  }
+  }, [generatedMindmap, outline]);
 
   const effectiveMindmap = generatedMindmap
     ?? (latestMindmapSnapshotOutline === outline ? latestMindmapSnapshot : null);
