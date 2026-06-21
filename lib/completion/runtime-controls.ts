@@ -1,4 +1,4 @@
-import { selectModelIdForRole } from '../model/catalog.ts';
+import { getModelById, selectModelIdForRole } from '../model/catalog.ts';
 import type { InlineCompletionRequest, InlineCompletionResponse } from './service.ts';
 
 interface InlineCompletionCacheEntry {
@@ -91,6 +91,24 @@ export function getInlineCompletionClientKey(request: Request): string {
   return request.headers.get('x-forwarded-for')
     ?? request.headers.get('x-real-ip')
     ?? 'anonymous';
+}
+
+// Resolves the upstream provider for the request's effective completion model so
+// each provider gets an independent budget. This keeps one provider's burst (or
+// upstream 429s) from consuming another provider's allowance and lets us reason
+// about per-provider cost separately.
+export function getInlineCompletionProvider(request: InlineCompletionRequest): string {
+  const modelId = selectModelIdForRole('completion', request.modelId);
+  return getModelById(modelId)?.provider ?? 'unknown';
+}
+
+// Composite key that scopes the per-client rate-limit window to a single
+// provider, e.g. "203.0.113.7:openai" vs "203.0.113.7:anthropic".
+export function getInlineCompletionRateLimitKey(
+  httpRequest: Request,
+  request: InlineCompletionRequest,
+): string {
+  return `${getInlineCompletionClientKey(httpRequest)}:${getInlineCompletionProvider(request)}`;
 }
 
 export function resetInlineCompletionRuntimeControlsForTests(): void {

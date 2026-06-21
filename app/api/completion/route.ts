@@ -5,7 +5,7 @@ import {
   consumeInlineCompletionRateLimit,
   createInlineCompletionCacheKey,
   getCachedInlineCompletion,
-  getInlineCompletionClientKey,
+  getInlineCompletionRateLimitKey,
   setCachedInlineCompletion,
 } from '../../../lib/completion/runtime-controls.ts';
 import { inlineCompletionRequestSchema, generateInlineCompletion } from '../../../lib/completion/service.ts';
@@ -29,7 +29,7 @@ export const POST = auth(async (req) => {
       }
     }
 
-    const clientKey = getInlineCompletionClientKey(req);
+    const clientKey = getInlineCompletionRateLimitKey(req, payload);
     const rateLimit = consumeInlineCompletionRateLimit(clientKey);
 
     if (!rateLimit.allowed) {

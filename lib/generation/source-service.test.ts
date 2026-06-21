@@ -63,6 +63,60 @@ test('generateMindmapDslFromSource returns validated DSL metrics for parser-safe
   assert.deepEqual(response.validation.parserErrors, []);
 });
 
+test('generateMindmapDslFromSource dispatches an anthropic model over the Messages wire format', async () => {
+  const anthropicEnv: Record<string, string | undefined> = {
+    ANTHROPIC_API_KEY: 'sk-ant-test-key',
+  };
+  const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+  const anthropicDsl = [
+    '@root: Photosynthesis',
+    '- @branch: Light reactions',
+    '  - overview == first energy-conversion stage',
+    '  - Inputs',
+    '    - light + H2O + ADP + NADP+',
+    '  - Outputs',
+    '    - O2 + ATP + NADPH',
+    '- @branch: Calvin cycle',
+    '  - fixes CO2 => carbohydrates',
+    '  - stages == fixation + reduction + regeneration',
+    '- @branch: Importance',
+    '  - supports biomass + food webs',
+  ].join('\n');
+
+  const response = await generateMindmapDslFromSource(
+    {
+      sourceText: 'Photosynthesis\nLight reactions\nCalvin cycle\nInputs and outputs\nImportance',
+      modelId: 'claude-sonnet-4-5',
+    },
+    {
+      env: anthropicEnv,
+      fetchImpl: async (input: RequestInfo | URL, init?: RequestInit) => {
+        calls.push({
+          url: String(input),
+          body: JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>,
+        });
+        return new Response(JSON.stringify({
+          content: [{ type: 'tool_use', name: 'mindmap_source_to_dsl', input: { dsl: anthropicDsl } }],
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      },
+    },
+  );
+
+  // Routed through the anthropic-messages adapter, not the OpenAI path.
+  assert.equal(calls[0].url.endsWith('/messages'), true);
+  assert.equal(calls[0].body.model, 'claude-sonnet-4-5');
+  assert.equal(Array.isArray(calls[0].body.tools), true);
+  assert.deepEqual(calls[0].body.tool_choice, { type: 'tool', name: 'mindmap_source_to_dsl' });
+  assert.equal('response_format' in calls[0].body, false);
+
+  // The tool_use input is parsed back into the validated DSL response.
+  assert.equal(response.dsl.startsWith('@root: Photosynthesis'), true);
+  assert.deepEqual(response.validation.parserErrors, []);
+});
+
 test('generateMindmapDslFromSource rejects DSL that does not parse under the single-root app rules', async () => {
   await assert.rejects(
     () => generateMindmapDslFromSource(
@@ -95,7 +149,7 @@ test('generateMindmapDslFromSource rejects lines above the 35-word limit', async
         env: testEnv,
         fetchImpl: async () => new Response(JSON.stringify({
           choices: [{ message: { content: JSON.stringify({
-            dsl: '@root: Photosynthesis\n- @branch: Stages\n  - this line definitely contains more than fifteen distinct words for validation failure in parser-safe testing today',
+            dsl: '@root: Photosynthesis\n- @branch: Stages\n  - this generated branch line intentionally contains far more than thirty five separate distinct words so that the per line word limit validation rule will actually trigger a rejection inside the source generation service during this particular parser safe regression test case today',
           }) } }],
         }), {
           status: 200,

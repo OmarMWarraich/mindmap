@@ -290,7 +290,7 @@ async function generateDslAttempt(
     : false;
 
   if (!lineWordLimitSatisfied) {
-    throw new Error('Generated DSL exceeded the 15-word per-line limit.');
+    throw new Error('Generated DSL exceeded the 35-word per-line limit.');
   }
 
   return {

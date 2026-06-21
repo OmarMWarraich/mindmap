@@ -539,12 +539,41 @@ Reference: https://github.com/OmarMWarraich/mindmap/issues/15
 - [ ] Add DeepSeek and Kimi as catalog rows (OpenAI-compatible)
   Purpose: Proves a new model requires only a catalog entry plus a key.
 
-- [ ] Add per-wire-format adapter tests and per-provider service tests
+- [x] Add per-wire-format adapter tests and per-provider service tests
   Extend `lib/completion/provider.test.ts` and `lib/generation/source-service.test.ts`.
   Purpose: Locks in correct request/response handling for each wire format.
+  Note: `provider.test.ts` was renamed to `lib/model/openai-compatible-adapter.test.ts`
+  in Phase 1, so the real targets were the adapter test files plus the service test.
+  Added direct `openaiCompatibleAdapter` object tests (wireFormat, Bearer-auth
+  `/chat/completions` request, custom base-URL trailing-slash stripping, `json_schema`
+  and `json_object` -> `response_format` mapping, `parseResponse` extraction + empty/
+  undefined-payload tolerance) in `lib/model/openai-compatible-adapter.test.ts`; the
+  `anthropic-messages` adapter already had matching per-wire-format coverage (9 tests).
+  Added a per-provider service test in `lib/generation/source-service.test.ts` that
+  dispatches a `claude-sonnet-4-5` generation with `ANTHROPIC_API_KEY` and asserts the
+  outgoing request hits `/messages` with `tools`/`tool_choice` (no `response_format`)
+  and that the `tool_use` input is parsed back into validated DSL; the OpenAI
+  `response_format`/`choices` path was already covered. Also fixed a real bug surfaced
+  here: the line-length guard threw "15-word per-line limit" while the constant is 35,
+  and the matching test's sample line only had 16 words so it never tripped the 35-word
+  rule — corrected the message to "35-word per-line limit" and lengthened the sample
+  line past 35 words. Suite now 36/36 (was 35 with one long-standing red). Typecheck and
+  lint clean (lint unchanged at the 21-problem baseline).
 
-- [ ] Consider per-provider rate limiting
+- [x] Consider per-provider rate limiting
   Purpose: Avoids one provider's limits affecting another and controls cost.
+  Note: Implemented. The inline-completion limiter was keyed only on client IP, so a
+  burst (or upstream 429s) against one provider consumed the shared budget for every
+  provider. Added `getInlineCompletionProvider` (resolves the effective completion
+  model's provider via `selectModelIdForRole` + `getModelById`) and
+  `getInlineCompletionRateLimitKey` (composite `client:provider` key, e.g.
+  `203.0.113.7:openai` vs `203.0.113.7:anthropic`) in
+  `lib/completion/runtime-controls.ts`, and switched `app/api/completion/route.ts` to
+  use it. The 30s/18-request window now applies per provider per client, so exhausting
+  the OpenAI budget no longer blocks Anthropic and vice versa. Added four
+  `runtime-controls.test.ts` cases (provider resolution incl. default fallback,
+  composite-key shape, and starvation isolation). Suite 9/9; typecheck and lint clean
+  (lint unchanged at the 21-problem baseline).
 
 - [ ] Rotate the OpenAI key currently in `.env.local` and confirm `.env.local` is gitignored
   Purpose: Removes a committed secret and prevents future leakage.
