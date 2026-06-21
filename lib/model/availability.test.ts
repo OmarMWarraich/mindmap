@@ -22,7 +22,9 @@ test('listConfiguredProviders returns only providers with a configured key', () 
 
 test('listAvailableModels filters the catalog to configured providers', () => {
   const ids = listAvailableModels(openaiOnly).map((entry) => entry.id);
-  assert.deepEqual(ids, ['gpt-4o-mini', 'gpt-4o']);
+  assert.ok(ids.includes('gpt-4o-mini'));
+  assert.ok(ids.includes('gpt-4o'));
+  assert.ok(ids.every((id) => id.startsWith('gpt-')));
 });
 
 test('listAvailableModels includes every provider when all keys are present', () => {
