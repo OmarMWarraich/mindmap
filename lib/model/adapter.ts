@@ -27,12 +27,13 @@ export type ModelStructuredOutput =
     };
 
 // Provider-agnostic chat completion request. `model` is the concrete model name
-// sent on the wire (e.g. the catalog entry `id`).
+// sent on the wire (e.g. the catalog entry `id`). `temperature` is omitted for
+// models whose catalog capability marks `supportsTemperature: false`.
 export interface ModelChatCompletionRequest {
   model: string;
   messages: ModelChatMessage[];
   maxTokens: number;
-  temperature: number;
+  temperature?: number;
   credentials: ModelAdapterCredentials;
   structuredOutput?: ModelStructuredOutput;
 }

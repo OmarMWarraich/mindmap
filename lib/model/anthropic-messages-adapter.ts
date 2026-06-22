@@ -41,7 +41,7 @@ export const anthropicMessagesAdapter: ModelAdapter = {
     const body: Record<string, unknown> = {
       model: request.model,
       max_tokens: request.maxTokens,
-      temperature: request.temperature,
+      ...(request.temperature === undefined ? {} : { temperature: request.temperature }),
       ...(systemPrompt ? { system: systemPrompt } : {}),
       messages: conversation,
     };

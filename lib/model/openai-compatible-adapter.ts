@@ -1,5 +1,5 @@
 import type { ModelProviderEnv } from '../config/env.ts';
-import { resolveModelDefaults } from './catalog.ts';
+import { getModelById, resolveModelDefaults } from './catalog.ts';
 import type {
   ModelAdapter,
   ModelChatCompletionRequest,
@@ -69,7 +69,11 @@ export function buildModelProviderChatCompletionRequest(
   const { env } = options;
   const model = options.model ?? env.MODEL_COMPLETION_MODEL;
   const modelDefaults = resolveModelDefaults(model);
-  const temperature = options.temperature ?? modelDefaults.temperature;
+  // Omit temperature for catalog models that reject a non-default value.
+  const supportsTemperature = getModelById(model)?.capabilities.supportsTemperature ?? true;
+  const temperature = supportsTemperature
+    ? (options.temperature ?? modelDefaults.temperature)
+    : undefined;
   const maxCompletionTokens = options.maxCompletionTokens ?? modelDefaults.maxTokens;
   const requestBody = buildChatCompletionRequestBody({
     messages: options.messages,
@@ -172,13 +176,13 @@ export const openaiCompatibleAdapter: ModelAdapter = {
 function buildChatCompletionRequestBody(params: {
   messages: ModelChatMessage[];
   maxCompletionTokens: number;
-  temperature: number;
+  temperature?: number;
   responseFormat?: OpenAiChatResponseFormat;
 }): Record<string, unknown> {
   return {
     messages: params.messages,
     max_completion_tokens: params.maxCompletionTokens,
-    temperature: params.temperature,
+    ...(params.temperature === undefined ? {} : { temperature: params.temperature }),
     n: 1,
     ...(params.responseFormat ? { response_format: params.responseFormat } : {}),
   };

@@ -81,6 +81,60 @@ test('uses tool/tool_choice for an anthropic model and parses tool_use input', a
   assert.equal('response_format' in calls[0].body, false);
 });
 
+test('sends the catalog default temperature for a model that supports it', async () => {
+  const { fetchImpl, calls } = captureFetch({
+    choices: [{ message: { content: '{}' } }],
+  });
+
+  await requestStructuredModelCompletion({
+    role: 'generation',
+    modelId: 'gpt-4o',
+    env: openaiKey,
+    fetchImpl,
+    maxTokens: 256,
+    messages: [{ role: 'user', content: 'hi' }],
+  });
+
+  assert.equal(calls[0].body.temperature, 0.2);
+});
+
+test('omits temperature for an openai model that only allows the default value', async () => {
+  const { fetchImpl, calls } = captureFetch({
+    choices: [{ message: { content: '{}' } }],
+  });
+
+  await requestStructuredModelCompletion({
+    role: 'generation',
+    modelId: 'gpt-5.5',
+    env: openaiKey,
+    fetchImpl,
+    maxTokens: 256,
+    temperature: 0.2,
+    messages: [{ role: 'user', content: 'hi' }],
+  });
+
+  assert.equal('temperature' in calls[0].body, false);
+});
+
+test('omits temperature for an anthropic model that deprecated it', async () => {
+  const { fetchImpl, calls } = captureFetch({
+    content: [{ type: 'text', text: '{}' }],
+  });
+
+  await requestStructuredModelCompletion({
+    role: 'generation',
+    modelId: 'claude-opus-4-8',
+    env: anthropicKey,
+    fetchImpl,
+    maxTokens: 256,
+    temperature: 0.2,
+    messages: [{ role: 'user', content: 'hi' }],
+  });
+
+  assert.equal(calls[0].url.endsWith('/messages'), true);
+  assert.equal('temperature' in calls[0].body, false);
+});
+
 test('falls back to the role default model when modelId is omitted', async () => {
   const { fetchImpl } = captureFetch({ choices: [{ message: { content: '' } }] });
 
