@@ -21,6 +21,11 @@ export type StructuredOutputStrategy = z.infer<typeof structuredOutputStrategySc
 export const modelCapabilitiesSchema = z.object({
   structuredOutput: structuredOutputStrategySchema,
   contextWindow: z.number().int().positive(),
+  // Some newer reasoning models reject a non-default `temperature` (GPT-5.5
+  // accepts only the default, Claude Opus 4.7/4.8 deprecated it entirely).
+  // Defaults to true so existing entries need no change; adapters omit the
+  // `temperature` wire field when this is false.
+  supportsTemperature: z.boolean().default(true),
 }).strict();
 export type ModelCapabilities = z.infer<typeof modelCapabilitiesSchema>;
 
@@ -40,6 +45,9 @@ export const modelCatalogEntrySchema = z.object({
   defaults: modelDefaultsSchema,
 }).strict();
 export type ModelCatalogEntry = z.infer<typeof modelCatalogEntrySchema>;
+// Input shape accepted before parsing, where defaulted capability fields
+// (e.g. `supportsTemperature`) may be omitted from raw entries below.
+type ModelCatalogEntryInput = z.input<typeof modelCatalogEntrySchema>;
 
 export const modelCatalogSchema = z
   .array(modelCatalogEntrySchema)
@@ -61,7 +69,7 @@ export const modelCatalogSchema = z
 // Static, developer-maintained source of truth. Adding a new model is just a new
 // entry here (plus its provider credential). `defaults` are model-level hints;
 // role-specific call sites may override token budgets per request.
-const rawModelCatalog: ModelCatalogEntry[] = [
+const rawModelCatalog: ModelCatalogEntryInput[] = [
   {
     id: 'gpt-4o-mini',
     provider: 'openai',
@@ -113,7 +121,11 @@ const rawModelCatalog: ModelCatalogEntry[] = [
     wireFormat: 'openai-compatible',
     label: 'GPT-5.5',
     roles: ['completion', 'generation'],
-    capabilities: { structuredOutput: 'response_format', contextWindow: 400_000 },
+    capabilities: {
+      structuredOutput: 'response_format',
+      contextWindow: 400_000,
+      supportsTemperature: false,
+    },
     defaults: { temperature: 0.2, maxTokens: 4096 },
   },
   {
@@ -149,7 +161,11 @@ const rawModelCatalog: ModelCatalogEntry[] = [
     wireFormat: 'anthropic-messages',
     label: 'Claude Opus 4.7',
     roles: ['completion', 'generation'],
-    capabilities: { structuredOutput: 'tool', contextWindow: 200_000 },
+    capabilities: {
+      structuredOutput: 'tool',
+      contextWindow: 200_000,
+      supportsTemperature: false,
+    },
     defaults: { temperature: 0.2, maxTokens: 4096 },
   },
   {
@@ -158,7 +174,11 @@ const rawModelCatalog: ModelCatalogEntry[] = [
     wireFormat: 'anthropic-messages',
     label: 'Claude Opus 4.8',
     roles: ['completion', 'generation'],
-    capabilities: { structuredOutput: 'tool', contextWindow: 200_000 },
+    capabilities: {
+      structuredOutput: 'tool',
+      contextWindow: 200_000,
+      supportsTemperature: false,
+    },
     defaults: { temperature: 0.2, maxTokens: 4096 },
   },
 ];

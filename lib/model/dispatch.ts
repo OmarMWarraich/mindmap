@@ -48,12 +48,18 @@ export async function requestStructuredModelCompletion(
   const strategy = resolved.entry.capabilities.structuredOutput;
   const useNativeStructuredOutput = strategy !== 'prompt' && options.structuredOutput !== undefined;
 
+  // Models that reject a non-default temperature (e.g. GPT-5.5, Claude Opus
+  // 4.7/4.8) omit the field entirely rather than sending the catalog default.
+  const temperature = resolved.entry.capabilities.supportsTemperature
+    ? (options.temperature ?? resolved.entry.defaults.temperature)
+    : undefined;
+
   const request: ModelChatCompletionRequest = {
     model: resolved.entry.id,
     messages: options.messages,
     maxTokens: options.maxTokens,
-    temperature: options.temperature ?? resolved.entry.defaults.temperature,
     credentials: resolved.credentials,
+    ...(temperature === undefined ? {} : { temperature }),
     ...(useNativeStructuredOutput ? { structuredOutput: options.structuredOutput } : {}),
   };
 
