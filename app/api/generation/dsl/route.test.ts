@@ -21,11 +21,8 @@ test('dsl generation route returns validated DSL output for a valid request', as
   const originalEnv = { ...process.env };
   const originalFetch = globalThis.fetch;
 
-  process.env.MODEL_PROVIDER = 'openai';
-  process.env.MODEL_API_KEY = 'test-key';
-  process.env.MODEL_COMPLETION_MODEL = 'gpt-5-mini';
-  process.env.MODEL_GENERATION_MODEL = 'gpt-5';
-  delete process.env.MODEL_BASE_URL;
+  process.env.OPENAI_API_KEY = 'sk-openai-test';
+  delete process.env.ANTHROPIC_API_KEY;
 
   globalThis.fetch = async () => new Response(JSON.stringify({
     choices: [{ message: { content: JSON.stringify({
@@ -93,11 +90,8 @@ test('dsl generation route surfaces model output validation failures', async () 
   const originalEnv = { ...process.env };
   const originalFetch = globalThis.fetch;
 
-  process.env.MODEL_PROVIDER = 'openai';
-  process.env.MODEL_API_KEY = 'test-key';
-  process.env.MODEL_COMPLETION_MODEL = 'gpt-5-mini';
-  process.env.MODEL_GENERATION_MODEL = 'gpt-5';
-  delete process.env.MODEL_BASE_URL;
+  process.env.OPENAI_API_KEY = 'sk-openai-test';
+  delete process.env.ANTHROPIC_API_KEY;
 
   globalThis.fetch = async () => new Response(JSON.stringify({
     choices: [{ message: { content: JSON.stringify({

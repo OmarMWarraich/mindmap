@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import type { ModelAdapterCredentials } from "../model/adapter.ts";
-import type { ModelProvider } from "../model/catalog.ts";
+import { MODEL_PROVIDERS, type ModelProvider } from "../model/catalog.ts";
 
 const requiredValue = (name: string) =>
   z
@@ -12,21 +12,6 @@ const requiredValue = (name: string) =>
       message: `${name} must be set to a real value`,
     });
 
-const modelProviderEnvSchema = z.object({
-  MODEL_PROVIDER: z.enum(["openai", "azure-openai", "openrouter"]),
-  MODEL_API_KEY: requiredValue("MODEL_API_KEY"),
-  MODEL_BASE_URL: z.preprocess(
-    (value) => (value === "" ? undefined : value),
-    z.string().url("MODEL_BASE_URL must be a valid URL").optional(),
-  ),
-  MODEL_COMPLETION_MODEL: requiredValue("MODEL_COMPLETION_MODEL"),
-  MODEL_GENERATION_MODEL: requiredValue("MODEL_GENERATION_MODEL"),
-});
-
-export type ModelProviderEnv = z.infer<typeof modelProviderEnvSchema>;
-
-let cachedModelProviderEnv: ModelProviderEnv | null = null;
-
 function formatIssues(error: z.ZodError): string {
   return error.issues
     .map((issue) => {
@@ -36,33 +21,25 @@ function formatIssues(error: z.ZodError): string {
     .join("\n");
 }
 
-export function validateModelProviderEnv(
-  env: NodeJS.ProcessEnv = process.env,
-): ModelProviderEnv {
-  const parsed = modelProviderEnvSchema.safeParse({
-    MODEL_PROVIDER: env.MODEL_PROVIDER,
-    MODEL_API_KEY: env.MODEL_API_KEY,
-    MODEL_BASE_URL: env.MODEL_BASE_URL,
-    MODEL_COMPLETION_MODEL: env.MODEL_COMPLETION_MODEL,
-    MODEL_GENERATION_MODEL: env.MODEL_GENERATION_MODEL,
-  });
+// Boot-time guard. The server runs as long as at least one provider's key is
+// configured; this replaces the legacy all-or-nothing single-provider validation
+// so a deploy that sets only (say) OPENAI_API_KEY starts cleanly. Per-provider keys
+// are still validated lazily at first use by `getProviderCredentials`.
+export function assertAtLeastOneProviderConfigured(
+  env: Record<string, string | undefined> = process.env,
+): void {
+  const hasConfiguredProvider = MODEL_PROVIDERS.some((provider) =>
+    isProviderConfigured(provider, env),
+  );
 
-  if (!parsed.success) {
+  if (!hasConfiguredProvider) {
+    const envVarNames = MODEL_PROVIDERS.map(
+      (provider) => PROVIDER_API_KEY_ENV_VARS[provider],
+    ).join(", ");
     throw new Error(
-      `Invalid model provider environment variables:\n${formatIssues(parsed.error)}`,
+      `No model provider is configured. Set at least one provider API key (${envVarNames}).`,
     );
   }
-
-  return parsed.data;
-}
-
-export function getModelProviderEnv(): ModelProviderEnv {
-  if (cachedModelProviderEnv) {
-    return cachedModelProviderEnv;
-  }
-
-  cachedModelProviderEnv = Object.freeze(validateModelProviderEnv());
-  return cachedModelProviderEnv;
 }
 
 // Per-provider API key environment variables. A provider's key is validated

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  assertAtLeastOneProviderConfigured,
   getProviderApiKeyEnvVarName,
   getProviderCredentials,
   isProviderConfigured,
@@ -52,4 +53,24 @@ test("getProviderCredentials validates lazily per provider", () => {
     apiKey: "sk-real-openai-key",
   });
   assert.throws(() => getProviderCredentials("anthropic", env));
+});
+
+test("assertAtLeastOneProviderConfigured passes when any single provider key is set", () => {
+  assert.doesNotThrow(() =>
+    assertAtLeastOneProviderConfigured({ OPENAI_API_KEY: "sk-real-openai-key" }),
+  );
+  assert.doesNotThrow(() =>
+    assertAtLeastOneProviderConfigured({ ANTHROPIC_API_KEY: "sk-ant-real-key" }),
+  );
+});
+
+test("assertAtLeastOneProviderConfigured throws listing every provider key when none is set", () => {
+  assert.throws(
+    () => assertAtLeastOneProviderConfigured({}),
+    /Set at least one provider API key \(OPENAI_API_KEY, ANTHROPIC_API_KEY\)/,
+  );
+  assert.throws(
+    () => assertAtLeastOneProviderConfigured({ OPENAI_API_KEY: "replace-with-real-openai-key" }),
+    /No model provider is configured/,
+  );
 });

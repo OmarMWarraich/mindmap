@@ -27,11 +27,6 @@ test('completion route returns model output for a valid request', async () => {
 
   process.env.OPENAI_API_KEY = 'sk-openai-test';
   delete process.env.ANTHROPIC_API_KEY;
-  delete process.env.MODEL_PROVIDER;
-  delete process.env.MODEL_API_KEY;
-  delete process.env.MODEL_COMPLETION_MODEL;
-  delete process.env.MODEL_GENERATION_MODEL;
-  delete process.env.MODEL_BASE_URL;
 
   resetInlineCompletionRuntimeControlsForTests();
 
@@ -74,11 +69,6 @@ test('completion route drops off-topic model output after relevance filtering', 
 
   process.env.OPENAI_API_KEY = 'sk-openai-test';
   delete process.env.ANTHROPIC_API_KEY;
-  delete process.env.MODEL_PROVIDER;
-  delete process.env.MODEL_API_KEY;
-  delete process.env.MODEL_COMPLETION_MODEL;
-  delete process.env.MODEL_GENERATION_MODEL;
-  delete process.env.MODEL_BASE_URL;
 
   resetInlineCompletionRuntimeControlsForTests();
 
@@ -121,11 +111,6 @@ test('completion route drops duplicate nearby sibling suggestions', async () => 
 
   process.env.OPENAI_API_KEY = 'sk-openai-test';
   delete process.env.ANTHROPIC_API_KEY;
-  delete process.env.MODEL_PROVIDER;
-  delete process.env.MODEL_API_KEY;
-  delete process.env.MODEL_COMPLETION_MODEL;
-  delete process.env.MODEL_GENERATION_MODEL;
-  delete process.env.MODEL_BASE_URL;
 
   resetInlineCompletionRuntimeControlsForTests();
 
@@ -185,11 +170,6 @@ test('completion route serves identical requests from cache before calling fetch
 
   process.env.OPENAI_API_KEY = 'sk-openai-test';
   delete process.env.ANTHROPIC_API_KEY;
-  delete process.env.MODEL_PROVIDER;
-  delete process.env.MODEL_API_KEY;
-  delete process.env.MODEL_COMPLETION_MODEL;
-  delete process.env.MODEL_GENERATION_MODEL;
-  delete process.env.MODEL_BASE_URL;
   resetInlineCompletionRuntimeControlsForTests();
 
   globalThis.fetch = async () => {
@@ -236,11 +216,6 @@ test('completion route returns 429 after repeated burst requests from the same c
 
   process.env.OPENAI_API_KEY = 'sk-openai-test';
   delete process.env.ANTHROPIC_API_KEY;
-  delete process.env.MODEL_PROVIDER;
-  delete process.env.MODEL_API_KEY;
-  delete process.env.MODEL_COMPLETION_MODEL;
-  delete process.env.MODEL_GENERATION_MODEL;
-  delete process.env.MODEL_BASE_URL;
   resetInlineCompletionRuntimeControlsForTests();
 
   globalThis.fetch = async () => new Response(JSON.stringify({
@@ -304,11 +279,6 @@ test('completion route dispatches an explicit anthropic modelId to the anthropic
   // credentials instead of reaching the mocked Messages endpoint.
   process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
   delete process.env.OPENAI_API_KEY;
-  delete process.env.MODEL_PROVIDER;
-  delete process.env.MODEL_API_KEY;
-  delete process.env.MODEL_COMPLETION_MODEL;
-  delete process.env.MODEL_GENERATION_MODEL;
-  delete process.env.MODEL_BASE_URL;
 
   resetInlineCompletionRuntimeControlsForTests();
 
