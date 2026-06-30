@@ -23,10 +23,10 @@ import { loadModelChoices, saveModelChoices } from '../lib/model/model-choice-st
 import { generateMindmapFromAst } from '../lib/mindmap/from-ast';
 import {
   createExportMindmapVariant,
-  layoutMindmapWithElk,
   type MindmapExportScaleOptions,
   type MindmapLayoutResult,
 } from '../lib/mindmap/layout';
+import { getMindmapLayoutClient } from '../lib/mindmap/layout-client';
 import {
   createSvgPreviewSnapshot,
   createDefaultSvgPreviewTransform,
@@ -92,8 +92,8 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
   const [selectedDetailLevel, setSelectedDetailLevel] = useState<SourceGenerationDetailLevel>('standard');
   const [latestDslGeneration, setLatestDslGeneration] = useState<SourceMindmapGenerationResponse | null>(null);
   const [layoutDiagnostics, setLayoutDiagnostics] = useState<LayoutWorkerDiagnostics>({
-    phase: 'main-thread',
-    summary: 'Using the in-page layout engine for beta preview rendering.',
+    phase: 'idle',
+    summary: 'Preview is idle until the outline parses into a valid AST.',
   });
   const [exportControls, setExportControls] = useState<ScalingValues>(defaultScalingValues);
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -348,14 +348,15 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
       setLayoutStatus('loading');
       setLayoutError(null);
       setLayoutDiagnostics({
-        phase: 'main-thread',
-        summary: `Computing layout request ${requestId} in the page thread.`,
-        detail: `Running ELK for ${effectiveMindmap.nodes.length} nodes and ${effectiveMindmap.edges.length} edges without the dedicated worker path.`,
+        phase: 'posting',
+        summary: `Posting layout request ${requestId} to the layout worker.`,
+        detail: `Laying out ${effectiveMindmap.nodes.length} nodes and ${effectiveMindmap.edges.length} edges off the main thread.`,
         requestId,
       });
 
       try {
-        const result = await layoutMindmapWithElk(effectiveMindmap);
+        const { result, transport, fallbackReason } =
+          await getMindmapLayoutClient().layout(effectiveMindmap);
         if (cancelled || layoutRequestIdRef.current !== requestId) {
           return;
         }
@@ -364,13 +365,23 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
         setLayoutResult(result);
         setLayoutStatus('ready');
         setLayoutError(null);
-        setLayoutDiagnostics({
-          phase: 'ready',
-          summary: `Layout completed in ${elapsedMs}ms on the page thread.`,
-          detail: `Request ${requestId} returned ${result.nodes.length} nodes and ${result.edges.length} routed edges.`,
-          requestId,
-          elapsedMs,
-        });
+        setLayoutDiagnostics(
+          transport === 'worker'
+            ? {
+                phase: 'ready',
+                summary: `Layout worker completed request ${requestId} in ${elapsedMs}ms.`,
+                detail: `Returned ${result.nodes.length} nodes and ${result.edges.length} routed edges.`,
+                requestId,
+                elapsedMs,
+              }
+            : {
+                phase: 'main-thread',
+                summary: `Layout completed in ${elapsedMs}ms on the main thread (worker unavailable).`,
+                detail: fallbackReason ?? 'The layout worker was unavailable; used the in-page engine.',
+                requestId,
+                elapsedMs,
+              },
+        );
       } catch (error) {
         if (cancelled || layoutRequestIdRef.current !== requestId) {
           return;
@@ -467,7 +478,9 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
         effectiveMindmap,
         getExportScaleOptions(exportControls),
       );
-      const exportLayout = await layoutMindmapWithElk(exportMindmap);
+      // Off the main thread via the layout client (falls back to in-page ELK if
+      // the worker is unavailable), so the upscaled export layout cannot jank the UI.
+      const { result: exportLayout } = await getMindmapLayoutClient().layout(exportMindmap);
       const snapshot = createSvgPreviewSnapshot(exportMindmap, exportLayout, {
         profile: 'export',
         renderScale: exportControls.fontScale,
