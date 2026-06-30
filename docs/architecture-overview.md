@@ -228,11 +228,11 @@ worker file is a *browser* Web Worker, currently unused.)
   is set on both providers.
 - **Config** — *Two coexisting systems.* (1) **Legacy** single-provider env
   (`MODEL_PROVIDER` / `MODEL_API_KEY` / `MODEL_BASE_URL` / `MODEL_COMPLETION_MODEL`
-  / `MODEL_GENERATION_MODEL`), eagerly validated at boot, still consumed by inline
-  completion. (2) **Per-provider keys** (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`),
-  validated lazily on first use, used by the new model layer. Optional ops gate
-  via model allow-list. `DATABASE_URL` for Neon. All env access flows through
-  [`lib/config/env.ts`](../lib/config/env.ts).
+  / `MODEL_GENERATION_MODEL`), eagerly validated at boot and currently read by the
+  workspace page (e.g. to display the active provider). (2) **Per-provider keys**
+  (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`), validated lazily on first use, used by
+  model dispatch for completion + generation. Optional ops gate via model allow-list.
+  `DATABASE_URL` for Neon. All env access flows through [`lib/config/env.ts`](../lib/config/env.ts).
 - **Caching** — In-memory completion cache (15s TTL) + sliding-window rate limiter
   per `(provider, client)` ([`runtime-controls.ts`](../lib/completion/runtime-controls.ts)).
   Client model choice in `localStorage`; drafts in IndexedDB.
@@ -269,18 +269,17 @@ worker file is a *browser* Web Worker, currently unused.)
 > Observations only — no fixes proposed or applied. Each is a candidate for
 > follow-up investigation.
 
-- **Test suite is red (3 failing tests).** The generation route tests
+- **Generation route tests appear stale.** The generation route tests
   ([`app/api/generation/dsl/route.test.ts`](../app/api/generation/dsl/route.test.ts) ×2,
   [`app/api/generation/route.test.ts`](../app/api/generation/route.test.ts) ×1) still
-  configure the *legacy* `MODEL_*` env, but the generation endpoints now require
-  per-provider keys (`OPENAI_API_KEY`). The tests went stale during the
-  multi-provider migration; completion tests still pass because completion hasn't
-  migrated yet.
-- **`npm run typecheck` is broken by tooling, not code.** `node_modules/.bin/tsc`
-  is a copied file rather than a symlink, so it can't resolve `../lib/tsc.js`.
-  Running the compiler directly (`node node_modules/typescript/bin/tsc --noEmit`)
-  passes clean — the source typechecks; only the script shim is broken (an install
-  artifact, fixed by reinstall/rebuild).
+  configure the *legacy* `MODEL_*` env, but the generation endpoints resolve models via
+  the catalog and (by default) require per-provider keys (e.g. `OPENAI_API_KEY` for the
+  OpenAI role defaults). Update these tests to set `OPENAI_API_KEY` (and/or pass an env
+  override into the service) to match production behavior.
+- **Typecheck failures can be install-artifact-dependent.** If `npm run typecheck` fails due to
+  a broken `tsc` shim in `node_modules/.bin`, try reinstalling dependencies or running
+  `node node_modules/typescript/bin/tsc --noEmit`. Avoid treating this as a source-code issue
+  unless it reproduces after a clean install.
 - **Split-brain configuration.** Two model-config systems run side by side. The
   server *eagerly* validates legacy `MODEL_*` vars at boot
   ([`instrumentation.ts`](../instrumentation.ts)), so it can fail to start on
