@@ -1,32 +1,17 @@
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
+import { ZodError } from 'zod';
 
-import { auth } from '../../../../../auth.ts';
+import { withProject } from '../../../../../lib/api/guards.ts';
+import { draftUpdateSchema } from '../../../../../lib/api/projects-schema.ts';
+import { errorResponse } from '../../../../../lib/api/responses.ts';
 import { db } from '../../../../../lib/db/index.ts';
 import { projectDrafts, projects } from '../../../../../lib/db/schema.ts';
 import { describeError, logger } from '../../../../../lib/observability/logger.ts';
 
 export const runtime = 'nodejs';
 
-type RouteContext = { params: Promise<{ id: string }> };
-
-export const GET = auth(async (req, ctx: RouteContext) => {
-  if (!req.auth?.user?.id) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const { id: projectId } = await ctx.params;
-  const userId = req.auth.user.id;
-
+export const GET = withProject(async (_req, { projectId }) => {
   try {
-    const [project] = await db
-      .select()
-      .from(projects)
-      .where(and(eq(projects.id, projectId), eq(projects.userId, userId)));
-
-    if (!project) {
-      return Response.json({ error: 'Not found' }, { status: 404 });
-    }
-
     const [draft] = await db
       .select()
       .from(projectDrafts)
@@ -39,29 +24,13 @@ export const GET = auth(async (req, ctx: RouteContext) => {
       status: 500,
       ...describeError(error),
     });
-    return Response.json({ error: 'Failed to load draft.' }, { status: 500 });
+    return errorResponse('Failed to load draft.', 500);
   }
 });
 
-export const PUT = auth(async (req, ctx: RouteContext) => {
-  if (!req.auth?.user?.id) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const { id: projectId } = await ctx.params;
-  const userId = req.auth.user.id;
-
+export const PUT = withProject(async (req, { projectId }) => {
   try {
-    const [project] = await db
-      .select()
-      .from(projects)
-      .where(and(eq(projects.id, projectId), eq(projects.userId, userId)));
-
-    if (!project) {
-      return Response.json({ error: 'Not found' }, { status: 404 });
-    }
-
-    const body = (await req.json()) as Record<string, unknown>;
+    const body = draftUpdateSchema.parse(await req.json());
 
     const [existing] = await db
       .select()
@@ -74,17 +43,12 @@ export const PUT = auth(async (req, ctx: RouteContext) => {
       const [updated] = await db
         .update(projectDrafts)
         .set({
-          outline: typeof body.outline === 'string' ? body.outline : existing.outline,
-          rawNotes: typeof body.rawNotes === 'string' ? body.rawNotes : existing.rawNotes,
-          selectedDetailLevel:
-            typeof body.selectedDetailLevel === 'string'
-              ? body.selectedDetailLevel
-              : existing.selectedDetailLevel,
+          outline: body.outline ?? existing.outline,
+          rawNotes: body.rawNotes ?? existing.rawNotes,
+          selectedDetailLevel: body.selectedDetailLevel ?? existing.selectedDetailLevel,
           mindmap: body.mindmap !== undefined ? body.mindmap : existing.mindmap,
           previewTransform:
-            body.previewTransform !== undefined
-              ? body.previewTransform
-              : existing.previewTransform,
+            body.previewTransform !== undefined ? body.previewTransform : existing.previewTransform,
           updatedAt: now,
         })
         .where(eq(projectDrafts.id, existing.id))
@@ -99,10 +63,9 @@ export const PUT = auth(async (req, ctx: RouteContext) => {
       .insert(projectDrafts)
       .values({
         projectId,
-        outline: typeof body.outline === 'string' ? body.outline : '',
-        rawNotes: typeof body.rawNotes === 'string' ? body.rawNotes : '',
-        selectedDetailLevel:
-          typeof body.selectedDetailLevel === 'string' ? body.selectedDetailLevel : 'standard',
+        outline: body.outline ?? '',
+        rawNotes: body.rawNotes ?? '',
+        selectedDetailLevel: body.selectedDetailLevel ?? 'standard',
         mindmap: body.mindmap ?? null,
         previewTransform: body.previewTransform ?? null,
       })
@@ -112,11 +75,15 @@ export const PUT = auth(async (req, ctx: RouteContext) => {
 
     return Response.json(created, { status: 201 });
   } catch (error) {
+    if (error instanceof ZodError) {
+      return errorResponse(error.message, 400);
+    }
+
     logger.error('failed to save project draft', {
       route: 'PUT /api/projects/[id]/draft',
       status: 500,
       ...describeError(error),
     });
-    return Response.json({ error: 'Failed to save draft.' }, { status: 500 });
+    return errorResponse('Failed to save draft.', 500);
   }
 });

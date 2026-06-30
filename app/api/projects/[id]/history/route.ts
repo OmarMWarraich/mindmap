@@ -1,32 +1,17 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
+import { ZodError } from 'zod';
 
-import { auth } from '@/auth';
-import { db } from '@/lib/db/index';
-import { generationHistory, projects } from '@/lib/db/schema';
-import { describeError, logger } from '@/lib/observability/logger';
+import { withProject } from '../../../../../lib/api/guards.ts';
+import { historyCreateSchema } from '../../../../../lib/api/projects-schema.ts';
+import { errorResponse } from '../../../../../lib/api/responses.ts';
+import { db } from '../../../../../lib/db/index.ts';
+import { generationHistory } from '../../../../../lib/db/schema.ts';
+import { describeError, logger } from '../../../../../lib/observability/logger.ts';
 
 export const runtime = 'nodejs';
 
-type RouteContext = { params: Promise<{ id: string }> };
-
-export const GET = auth(async (req, ctx: RouteContext) => {
-  if (!req.auth?.user?.id) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const { id: projectId } = await ctx.params;
-  const userId = req.auth.user.id;
-
+export const GET = withProject(async (_req, { projectId }) => {
   try {
-    const [project] = await db
-      .select()
-      .from(projects)
-      .where(and(eq(projects.id, projectId), eq(projects.userId, userId)));
-
-    if (!project) {
-      return Response.json({ error: 'Not found' }, { status: 404 });
-    }
-
     const history = await db
       .select()
       .from(generationHistory)
@@ -41,49 +26,37 @@ export const GET = auth(async (req, ctx: RouteContext) => {
       status: 500,
       ...describeError(error),
     });
-    return Response.json({ error: 'Failed to load history.' }, { status: 500 });
+    return errorResponse('Failed to load history.', 500);
   }
 });
 
-export const POST = auth(async (req, ctx: RouteContext) => {
-  if (!req.auth?.user?.id) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const { id: projectId } = await ctx.params;
-  const userId = req.auth.user.id;
-
+export const POST = withProject(async (req, { projectId }) => {
   try {
-    const [project] = await db
-      .select()
-      .from(projects)
-      .where(and(eq(projects.id, projectId), eq(projects.userId, userId)));
-
-    if (!project) {
-      return Response.json({ error: 'Not found' }, { status: 404 });
-    }
-
-    const body = (await req.json()) as Record<string, unknown>;
+    const body = historyCreateSchema.parse(await req.json());
 
     const [entry] = await db
       .insert(generationHistory)
       .values({
         projectId,
-        detailLevel: typeof body.detailLevel === 'string' ? body.detailLevel : 'standard',
-        dsl: typeof body.dsl === 'string' ? body.dsl : '',
-        densityStatus: typeof body.densityStatus === 'string' ? body.densityStatus : 'target-met',
-        nodeCount: typeof body.nodeCount === 'number' ? body.nodeCount : 0,
-        rawNotes: typeof body.rawNotes === 'string' ? body.rawNotes : '',
+        detailLevel: body.detailLevel,
+        dsl: body.dsl,
+        densityStatus: body.densityStatus,
+        nodeCount: body.nodeCount,
+        rawNotes: body.rawNotes,
       })
       .returning();
 
     return Response.json(entry, { status: 201 });
   } catch (error) {
+    if (error instanceof ZodError) {
+      return errorResponse(error.message, 400);
+    }
+
     logger.error('failed to record generation history', {
       route: 'POST /api/projects/[id]/history',
       status: 500,
       ...describeError(error),
     });
-    return Response.json({ error: 'Failed to record history.' }, { status: 500 });
+    return errorResponse('Failed to record history.', 500);
   }
 });
