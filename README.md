@@ -170,6 +170,10 @@ Set only the providers you plan to use. Provider keys are checked for presence (
 
 OAuth variables are also required for local sign-in flows when using Google and GitHub providers. Configure the standard Auth.js provider credentials in your local environment before testing authentication.
 
+### Inline-completion rate limiting (optional, distributed)
+
+Inline-completion requests are rate-limited per client and provider. By default the limiter — and the short-lived completion cache — is in-memory: correct for a single instance, but per-instance on serverless. To enforce a global budget across instances, set both `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (Upstash Redis REST); the limiter then uses Redis and fails open if it is unreachable. The completion cache deliberately stays in-memory — its keys are per-user and per-cursor, so the cross-instance hit rate is negligible and a shared cache would only add latency to the ghost-text path.
+
 ## Available Scripts
 
 - `npm run dev` starts the local development server.

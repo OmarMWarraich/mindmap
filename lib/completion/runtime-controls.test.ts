@@ -56,17 +56,17 @@ test('cache helpers return cached responses until the ttl expires', () => {
   assert.equal(getCachedInlineCompletion(cacheKey, 20_000), null);
 });
 
-test('rate-limit helper rejects burst traffic after the configured window budget', () => {
+test('rate-limit helper rejects burst traffic after the configured window budget', async () => {
   resetInlineCompletionRuntimeControlsForTests();
 
   for (let attempt = 0; attempt < 18; attempt += 1) {
-    assert.deepEqual(consumeInlineCompletionRateLimit('client-1', 1_000), {
+    assert.deepEqual(await consumeInlineCompletionRateLimit('client-1', 1_000), {
       allowed: true,
       retryAfterSeconds: 0,
     });
   }
 
-  assert.deepEqual(consumeInlineCompletionRateLimit('client-1', 1_000), {
+  assert.deepEqual(await consumeInlineCompletionRateLimit('client-1', 1_000), {
     allowed: false,
     retryAfterSeconds: 30,
   });
@@ -106,7 +106,7 @@ test('getInlineCompletionRateLimitKey scopes the client window to the provider',
   );
 });
 
-test('per-provider rate-limit keys keep one provider from starving another', () => {
+test('per-provider rate-limit keys keep one provider from starving another', async () => {
   resetInlineCompletionRuntimeControlsForTests();
   const httpRequest = new Request('http://localhost', {
     headers: { 'x-forwarded-for': '203.0.113.9' },
@@ -117,12 +117,12 @@ test('per-provider rate-limit keys keep one provider from starving another', () 
 
   // Exhaust the OpenAI budget for this client.
   for (let attempt = 0; attempt < 18; attempt += 1) {
-    assert.equal(consumeInlineCompletionRateLimit(openaiKey, 1_000).allowed, true);
+    assert.equal((await consumeInlineCompletionRateLimit(openaiKey, 1_000)).allowed, true);
   }
-  assert.equal(consumeInlineCompletionRateLimit(openaiKey, 1_000).allowed, false);
+  assert.equal((await consumeInlineCompletionRateLimit(openaiKey, 1_000)).allowed, false);
 
   // The Anthropic budget for the same client is untouched.
-  assert.deepEqual(consumeInlineCompletionRateLimit(anthropicKey, 1_000), {
+  assert.deepEqual(await consumeInlineCompletionRateLimit(anthropicKey, 1_000), {
     allowed: true,
     retryAfterSeconds: 0,
   });

@@ -1,4 +1,9 @@
 import { getModelById, selectModelIdForRole } from '../model/catalog.ts';
+import {
+  getRateLimiterStore,
+  resetRateLimiterStoreForTests,
+  type RateLimitOutcome,
+} from './rate-limiter-store.ts';
 import type { InlineCompletionRequest, InlineCompletionResponse } from './service.ts';
 
 interface InlineCompletionCacheEntry {
@@ -6,17 +11,15 @@ interface InlineCompletionCacheEntry {
   response: InlineCompletionResponse;
 }
 
-interface InlineCompletionRateLimitEntry {
-  count: number;
-  windowStartedAt: number;
-}
-
+// The completion cache is intentionally process-local. Its key is one user's exact
+// editor state (effective model + outline + cursor), so the cross-instance hit rate
+// is effectively zero; backing it with a shared store would add a network round-trip
+// to the latency-sensitive ghost-text path for no real benefit. Rate limiting — which
+// must be enforced globally — is what uses the shared store (see rate-limiter-store.ts
+// and README.md#inline-completion-rate-limiting-optional-distributed for the trade-off).
 const completionCache = new Map<string, InlineCompletionCacheEntry>();
-const rateLimitEntries = new Map<string, InlineCompletionRateLimitEntry>();
 
 const completionCacheTtlMs = 15_000;
-const rateLimitWindowMs = 30_000;
-const rateLimitMaxRequests = 18;
 
 export function createInlineCompletionCacheKey(request: InlineCompletionRequest): string {
   return JSON.stringify([
@@ -61,30 +64,14 @@ export function setCachedInlineCompletion(
   });
 }
 
+// Delegates to the configured rate-limiter store (in-memory by default, Upstash Redis
+// when configured). Async so a distributed backing store can be awaited; the in-memory
+// store resolves immediately.
 export function consumeInlineCompletionRateLimit(
   clientKey: string,
   now = Date.now(),
-): { allowed: boolean; retryAfterSeconds: number } {
-  const entry = rateLimitEntries.get(clientKey);
-
-  if (!entry || entry.windowStartedAt + rateLimitWindowMs <= now) {
-    rateLimitEntries.set(clientKey, {
-      count: 1,
-      windowStartedAt: now,
-    });
-
-    return { allowed: true, retryAfterSeconds: 0 };
-  }
-
-  if (entry.count >= rateLimitMaxRequests) {
-    return {
-      allowed: false,
-      retryAfterSeconds: Math.max(1, Math.ceil((entry.windowStartedAt + rateLimitWindowMs - now) / 1000)),
-    };
-  }
-
-  entry.count += 1;
-  return { allowed: true, retryAfterSeconds: 0 };
+): Promise<RateLimitOutcome> {
+  return getRateLimiterStore().consume(clientKey, now);
 }
 
 export function getInlineCompletionClientKey(request: Request): string {
@@ -113,5 +100,5 @@ export function getInlineCompletionRateLimitKey(
 
 export function resetInlineCompletionRuntimeControlsForTests(): void {
   completionCache.clear();
-  rateLimitEntries.clear();
+  resetRateLimiterStoreForTests();
 }

@@ -30,7 +30,7 @@ export const POST = auth(async (req) => {
     }
 
     const clientKey = getInlineCompletionRateLimitKey(req, payload);
-    const rateLimit = consumeInlineCompletionRateLimit(clientKey);
+    const rateLimit = await consumeInlineCompletionRateLimit(clientKey);
 
     if (!rateLimit.allowed) {
       return Response.json(
