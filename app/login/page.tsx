@@ -23,12 +23,36 @@ function MindFlowIcon() {
   );
 }
 
-export default async function LoginPage() {
+// Auth.js redirects sign-in failures to pages.signIn (this page) with ?error=<code>.
+// Map the codes we care about to a human message; the duplicate-email case
+// (OAuthAccountNotLinked) is the deliberate result of disabling cross-provider
+// email linking — see auth.ts and README "Authentication".
+function signInErrorMessage(error: string | undefined): string | null {
+  switch (error) {
+    case undefined:
+      return null;
+    case 'OAuthAccountNotLinked':
+      return 'An account with this email already exists. Sign in with the provider you used the first time (GitHub or Google) — for security, we never link providers by email automatically.';
+    case 'AccessDenied':
+      return 'Access was denied. Please try again.';
+    default:
+      return 'Sign-in failed. Please try again.';
+  }
+}
+
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string | string[] }>;
+}) {
   const session = await auth();
 
   if (session?.user?.id) {
     redirect('/workspace');
   }
+
+  const { error } = await searchParams;
+  const errorMessage = signInErrorMessage(Array.isArray(error) ? error[0] : error);
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-white px-6 py-12">
@@ -59,6 +83,15 @@ export default async function LoginPage() {
           </div>
 
           <div className="grid gap-6 px-8 py-8">
+            {errorMessage ? (
+              <div
+                className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700"
+                role="alert"
+              >
+                {errorMessage}
+              </div>
+            ) : null}
+
             <p className="text-sm leading-6 text-zinc-500">
               Use a verified GitHub or Google account. Successful OAuth sign-in continues directly to your workspace.
             </p>

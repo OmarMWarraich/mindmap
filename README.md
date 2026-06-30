@@ -171,6 +171,18 @@ Set only the providers you plan to use. Provider keys are checked for presence (
 
 OAuth variables are also required for local sign-in flows when using Google and GitHub providers. Configure the standard Auth.js provider credentials in your local environment before testing authentication.
 
+## Authentication
+
+Sign-in is handled by Auth.js with the Google and GitHub OAuth providers and database-backed sessions (Drizzle adapter).
+
+### Account-linking decision: no automatic cross-provider linking
+
+Cross-provider email account linking is intentionally **disabled** (`allowDangerousEmailAccountLinking` is not set; it defaults to `false`).
+
+- **Why.** With that option enabled, an unauthenticated OAuth sign-in is merged into any existing user that has the same email address. Auth.js performs this merge on an email match alone — it does not verify that the provider confirmed the user owns that email (the default GitHub provider, for instance, selects the primary email without checking its `verified` flag). If any enabled provider returns an unverified email, that auto-link becomes an account-takeover vector. Disabling it follows Auth.js's own recommended practice.
+- **Behavior.** Each provider's sign-in works normally. If you sign in with one provider and later sign in with a *different* provider that presents an email already attached to an account, Auth.js raises `OAuthAccountNotLinked` and the [login page](app/login/page.tsx) explains it; sign in with the provider you used originally to reach that account.
+- **Where it lives.** The decision and rationale are recorded in [auth.ts](auth.ts); a source test locks it so it cannot be silently re-enabled.
+
 ### Inline-completion rate limiting (optional, distributed)
 
 Inline-completion requests are rate-limited per client and provider. By default the limiter — and the short-lived completion cache — is in-memory: correct for a single instance, but per-instance on serverless. To enforce a global budget across instances, set both `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (Upstash Redis REST); the limiter then uses Redis and fails open if it is unreachable. The completion cache deliberately stays in-memory — its keys are per-user and per-cursor, so the cross-instance hit rate is negligible and a shared cache would only add latency to the ghost-text path.
