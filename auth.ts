@@ -22,14 +22,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     sessionsTable: sessions,
     verificationTokensTable: verificationTokens,
   }),
-  providers: [
-    GitHub({
-      allowDangerousEmailAccountLinking: true,
-    }),
-    Google({
-      allowDangerousEmailAccountLinking: true,
-    }),
-  ],
+  // Account-linking decision: cross-provider email linking is intentionally OFF.
+  // `allowDangerousEmailAccountLinking` would silently merge a GitHub and a Google
+  // login that present the same email. Auth.js core performs that merge purely on
+  // an email match — it does not verify the provider actually confirmed ownership
+  // of that email (the default GitHub provider, for one, selects the primary email
+  // without checking its `verified` flag). That makes it an account-takeover vector.
+  // We follow Auth.js's recommended practice: never auto-link an unauthenticated
+  // sign-in. A duplicate-email sign-in surfaces OAuthAccountNotLinked, which the
+  // login page explains; users link providers by signing in with the original one.
+  // See README "Authentication" for the full rationale.
+  providers: [GitHub, Google],
   callbacks: {
     session: ({ session, user }) => ({
       ...session,
