@@ -123,6 +123,7 @@ The product mixes deterministic parsing and rendering with model-backed assistan
 - Signed-in users work inside a multi-panel study workspace with notes, DSL editing, preview, chat, scaling, and generation history surfaces.
 - Raw source notes can be expanded into parser-ready DSL in `standard` or `detailed` mode.
 - The DSL is parsed into a deterministic AST, then rendered into a visual mindmap preview.
+- Graph layout for both preview and PNG export runs off the main thread in a Web Worker ([workers/mindmap-layout.worker.ts](workers/mindmap-layout.worker.ts)), so large or upscaled maps stay responsive; it falls back to in-page layout where workers are unavailable (e.g. server-side rendering).
 - Drafts are restored from cloud persistence when available and fall back to local IndexedDB state.
 - The current preview can be exported as PNG.
 
