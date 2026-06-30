@@ -1,3 +1,5 @@
+import { createUpstashRateLimiterStore } from './upstash-rate-limiter-store.ts';
+
 export interface RateLimitOutcome {
   allowed: boolean;
   retryAfterSeconds: number;
@@ -61,13 +63,54 @@ export function createInMemoryRateLimiterStore(
 const rateLimitWindowMs = 30_000;
 const rateLimitMaxRequests = 18;
 
+type EnvRecord = Record<string, string | undefined>;
+
+// Selects the backing store from configuration. With both Upstash REST variables set,
+// rate limiting is enforced globally across instances; with neither, it falls back to
+// the in-memory adapter (per-instance). A partial configuration is almost certainly a
+// mistake, so fail loudly rather than silently degrade to per-instance limiting.
+export function createRateLimiterStore(
+  config: RateLimiterStoreConfig,
+  env: EnvRecord = process.env,
+): RateLimiterStore {
+  const url = env.UPSTASH_REDIS_REST_URL?.trim();
+  const token = env.UPSTASH_REDIS_REST_TOKEN?.trim();
+
+  if (url && token) {
+    return createUpstashRateLimiterStore({ ...config, url, token });
+  }
+
+  if (url || token) {
+    throw new Error(
+      'Incomplete Upstash configuration: set both UPSTASH_REDIS_REST_URL and ' +
+        'UPSTASH_REDIS_REST_TOKEN, or neither.',
+    );
+  }
+
+  // No shared store configured: limiting is per-instance. Warn once where the app
+  // very likely runs multiple instances; stay quiet in local dev.
+  if (isLikelyMultiInstance(env)) {
+    console.warn(
+      '[rate-limit] No UPSTASH_REDIS_REST_URL/TOKEN configured — inline-completion ' +
+        'rate limiting is per-instance and will not enforce a global budget across ' +
+        'serverless instances. See docs/ISSUE_NO_2.md.',
+    );
+  }
+
+  return createInMemoryRateLimiterStore(config);
+}
+
+function isLikelyMultiInstance(env: EnvRecord): boolean {
+  return env.VERCEL === '1' || env.NODE_ENV === 'production';
+}
+
 let cachedStore: RateLimiterStore | null = null;
 
 // Process-wide singleton so all requests share one limiter instance. The backing
 // adapter is selected once; see resetRateLimiterStoreForTests to rebuild it.
 export function getRateLimiterStore(): RateLimiterStore {
   if (!cachedStore) {
-    cachedStore = createInMemoryRateLimiterStore({
+    cachedStore = createRateLimiterStore({
       windowMs: rateLimitWindowMs,
       maxRequests: rateLimitMaxRequests,
     });
