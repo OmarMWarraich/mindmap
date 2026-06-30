@@ -5,7 +5,7 @@ import NavBar from '../../components/NavBar';
 import Sidebar from '../../components/Sidebar';
 import StudyWorkspace from '../../components/StudyWorkspace';
 import { WorkspaceProvider } from '../../components/WorkspaceContext';
-import { getModelProviderEnv } from '../../lib/config/env';
+import { listConfiguredProviders } from '../../lib/model/availability';
 
 export default async function WorkspacePage() {
   const session = await auth();
@@ -14,7 +14,7 @@ export default async function WorkspacePage() {
     redirect('/login');
   }
 
-  const modelProviderEnv = getModelProviderEnv();
+  const configuredProviders = listConfiguredProviders();
 
   async function handleSignOut() {
     'use server';
@@ -26,7 +26,7 @@ export default async function WorkspacePage() {
       <AppShell
         nav={
           <NavBar
-            modelProvider={modelProviderEnv.MODEL_PROVIDER}
+            modelProviders={configuredProviders}
             signOutAction={handleSignOut}
             userEmail={session.user.email}
             userName={session.user.name}

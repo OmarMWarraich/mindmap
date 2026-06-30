@@ -7,7 +7,7 @@ import { useRef, useState } from 'react';
 import { useWorkspace } from './WorkspaceContext';
 
 export interface NavBarProps {
-  modelProvider: string;
+  modelProviders: string[];
   userEmail?: string | null;
   userName?: string | null;
   signOutAction: () => Promise<void>;
@@ -71,7 +71,20 @@ function getUserInitials(name?: string | null, email?: string | null): string {
   return 'ME';
 }
 
-export default function NavBar({ modelProvider, userEmail, userName, signOutAction }: NavBarProps) {
+const PROVIDER_LABELS: Record<string, string> = {
+  openai: 'OpenAI',
+  anthropic: 'Anthropic',
+};
+
+function formatConfiguredProviders(providers: string[]): string {
+  if (providers.length === 0) {
+    return 'None';
+  }
+
+  return providers.map((provider) => PROVIDER_LABELS[provider] ?? provider).join(' · ');
+}
+
+export default function NavBar({ modelProviders, userEmail, userName, signOutAction }: NavBarProps) {
   const pathname = usePathname();
   const [avatarOpen, setAvatarOpen] = useState(false);
   const avatarRef = useRef<HTMLDivElement>(null);
@@ -135,7 +148,7 @@ export default function NavBar({ modelProvider, userEmail, userName, signOutActi
           type="button"
         >
           Model Preview:
-          <span className="font-semibold">{modelProvider}</span>
+          <span className="font-semibold">{formatConfiguredProviders(modelProviders)}</span>
         </button>
 
         {/* Trained Notes badge */}
