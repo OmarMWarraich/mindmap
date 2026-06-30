@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { getCompletionTelemetryStore } from './telemetry-store.ts';
+
 export const inlineCompletionEventSchema = z.object({
   correlationId: z.string().min(1),
   outcome: z.enum(['accepted', 'dismissed', 'ignored']),
@@ -12,16 +14,21 @@ export const inlineCompletionEventSchema = z.object({
 
 export type InlineCompletionEvent = z.infer<typeof inlineCompletionEventSchema>;
 
-const inlineCompletionEventLog: InlineCompletionEvent[] = [];
-
-export function recordInlineCompletionEvent(event: InlineCompletionEvent): void {
-  inlineCompletionEventLog.push(event);
-}
-
-export function getInlineCompletionEventLogForTests(): InlineCompletionEvent[] {
-  return [...inlineCompletionEventLog];
-}
-
-export function resetInlineCompletionEventLogForTests(): void {
-  inlineCompletionEventLog.length = 0;
+// Persists a telemetry event for the given user via the configured telemetry store.
+// Privacy: the raw suggestion text is never stored — only its length — since it can
+// echo the user's notes.
+export async function recordInlineCompletionEvent(
+  event: InlineCompletionEvent,
+  userId: string,
+): Promise<void> {
+  await getCompletionTelemetryStore().record({
+    userId,
+    correlationId: event.correlationId,
+    outcome: event.outcome,
+    source: event.source,
+    requestReason: event.requestReason,
+    outlineLength: event.outlineLength,
+    suggestionLength: event.suggestionText.length,
+    shownDurationMs: Math.round(event.shownDurationMs),
+  });
 }
