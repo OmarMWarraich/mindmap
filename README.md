@@ -166,7 +166,7 @@ Model provider credentials (per-provider keys):
 - `ANTHROPIC_API_KEY` — secret key for Anthropic Claude models (e.g. `claude-haiku-4-5`, `claude-sonnet-4-5`)
 - `DEEPSEEK_API_KEY` — commented placeholder; uncomment once DeepSeek joins the model catalog
 
-Set only the providers you plan to use. Each key is validated lazily — the first time one of that provider's models is requested — so the server can hold credentials for several providers without forcing every key to be set. A provider whose key is absent is simply omitted from the models the UI may offer. At least one provider key must be configured, or the server refuses to start (validated at boot in [instrumentation.ts](instrumentation.ts)).
+Set only the providers you plan to use. Provider keys are checked for presence (and placeholder values) at boot and when deriving the list of available providers; request-time failures will still surface when a provider model is actually used. At least one provider key must be configured, or the server refuses to start (validated at boot in [instrumentation.ts](instrumentation.ts)).
 
 OAuth variables are also required for local sign-in flows when using Google and GitHub providers. Configure the standard Auth.js provider credentials in your local environment before testing authentication.
 
