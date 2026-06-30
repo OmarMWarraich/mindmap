@@ -1,3 +1,4 @@
+import { logger } from '../observability/logger.ts';
 import { createUpstashRateLimiterStore } from './upstash-rate-limiter-store.ts';
 
 export interface RateLimitOutcome {
@@ -90,10 +91,9 @@ export function createRateLimiterStore(
   // No shared store configured: limiting is per-instance. Warn once where the app
   // very likely runs multiple instances; stay quiet in local dev.
   if (isLikelyMultiInstance(env)) {
-    console.warn(
-      '[rate-limit] No UPSTASH_REDIS_REST_URL/TOKEN configured — inline-completion ' +
-        'rate limiting is per-instance and will not enforce a global budget across ' +
-        'serverless instances. See README.md#inline-completion-rate-limiting-optional-distributed.',
+    logger.warn(
+      'inline-completion rate limiting is per-instance: UPSTASH_REDIS_REST_URL/TOKEN not configured',
+      { component: 'rate-limit', docs: 'README.md#inline-completion-rate-limiting-optional-distributed' },
     );
   }
 

@@ -10,6 +10,7 @@ import {
 } from '../../../lib/completion/runtime-controls.ts';
 import { inlineCompletionRequestSchema, generateInlineCompletion } from '../../../lib/completion/service.ts';
 import { authorizeModelId } from '../../../lib/model/authorization.ts';
+import { describeError, logger } from '../../../lib/observability/logger.ts';
 
 export const runtime = 'nodejs';
 
@@ -55,6 +56,14 @@ export const POST = auth(async (req) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected completion route failure.';
     const status = error instanceof ZodError ? 400 : 500;
+
+    if (status >= 500) {
+      logger.error('inline completion request failed', {
+        route: 'POST /api/completion',
+        status,
+        ...describeError(error),
+      });
+    }
 
     return Response.json({ error: message }, { status });
   }

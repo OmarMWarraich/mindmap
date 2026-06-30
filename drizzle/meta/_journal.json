@@ -8,6 +8,13 @@
       "when": 1779884864853,
       "tag": "0000_open_the_twelve",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1782813896411,
+      "tag": "0001_add_completion_event",
+      "breakpoints": true
     }
   ]
 }

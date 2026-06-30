@@ -109,6 +109,27 @@ export const generationHistory = pgTable('generation_history', {
   projectCreatedAtIdx: index('generation_history_projectId_createdAt_idx').on(history.projectId, history.createdAt),
 }));
 
+// Inline-completion telemetry. Privacy: the raw suggestion text is never stored — only
+// its length — since it can echo the user's notes. Indexed for the acceptance-rate
+// query path (by user over time, and by outcome).
+export const completionEvents = pgTable('completion_event', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text('userId')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  correlationId: text('correlationId').notNull(),
+  outcome: text('outcome').notNull(),
+  source: text('source').notNull(),
+  requestReason: text('requestReason').notNull(),
+  outlineLength: integer('outlineLength').notNull(),
+  suggestionLength: integer('suggestionLength').notNull(),
+  shownDurationMs: integer('shownDurationMs').notNull(),
+  createdAt: timestamp('createdAt', { mode: 'date' }).notNull().defaultNow(),
+}, (event) => ({
+  userCreatedAtIdx: index('completion_event_userId_createdAt_idx').on(event.userId, event.createdAt),
+  outcomeIdx: index('completion_event_outcome_idx').on(event.outcome),
+}));
+
 // TypeScript types inferred from schema
 export type User = typeof users.$inferSelect;
 export type Account = typeof accounts.$inferSelect;
@@ -116,3 +137,4 @@ export type Session = typeof sessions.$inferSelect;
 export type Project = typeof projects.$inferSelect;
 export type ProjectDraft = typeof projectDrafts.$inferSelect;
 export type GenerationHistoryEntry = typeof generationHistory.$inferSelect;
+export type CompletionEvent = typeof completionEvents.$inferSelect;
