@@ -36,6 +36,7 @@ export const GET = auth(async (req, ctx: RouteContext) => {
   } catch (error) {
     logger.error('failed to load project draft', {
       route: 'GET /api/projects/[id]/draft',
+      status: 500,
       ...describeError(error),
     });
     return Response.json({ error: 'Failed to load draft.' }, { status: 500 });
@@ -113,6 +114,7 @@ export const PUT = auth(async (req, ctx: RouteContext) => {
   } catch (error) {
     logger.error('failed to save project draft', {
       route: 'PUT /api/projects/[id]/draft',
+      status: 500,
       ...describeError(error),
     });
     return Response.json({ error: 'Failed to save draft.' }, { status: 500 });

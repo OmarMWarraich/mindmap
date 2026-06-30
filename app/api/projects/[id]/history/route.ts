@@ -38,6 +38,7 @@ export const GET = auth(async (req, ctx: RouteContext) => {
   } catch (error) {
     logger.error('failed to load generation history', {
       route: 'GET /api/projects/[id]/history',
+      status: 500,
       ...describeError(error),
     });
     return Response.json({ error: 'Failed to load history.' }, { status: 500 });
@@ -80,6 +81,7 @@ export const POST = auth(async (req, ctx: RouteContext) => {
   } catch (error) {
     logger.error('failed to record generation history', {
       route: 'POST /api/projects/[id]/history',
+      status: 500,
       ...describeError(error),
     });
     return Response.json({ error: 'Failed to record history.' }, { status: 500 });

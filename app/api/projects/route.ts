@@ -23,7 +23,7 @@ export const GET = auth(async (req) => {
 
     return Response.json(userProjects);
   } catch (error) {
-    logger.error('failed to list projects', { route: 'GET /api/projects', ...describeError(error) });
+    logger.error('failed to list projects', { route: 'GET /api/projects', status: 500, ...describeError(error) });
     return Response.json({ error: 'Failed to load projects.' }, { status: 500 });
   }
 });
@@ -46,7 +46,7 @@ export const POST = auth(async (req) => {
 
     return Response.json(project, { status: 201 });
   } catch (error) {
-    logger.error('failed to create project', { route: 'POST /api/projects', ...describeError(error) });
+    logger.error('failed to create project', { route: 'POST /api/projects', status: 500, ...describeError(error) });
     return Response.json({ error: 'Failed to create project.' }, { status: 500 });
   }
 });

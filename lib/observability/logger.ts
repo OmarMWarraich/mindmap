@@ -37,11 +37,15 @@ function emit(level: LogLevel, message: string, fields?: LogFields): void {
   }
 
   const line = safeStringify({
+    ...fields,
     level,
     time: new Date().toISOString(),
     msg: message,
-    ...fields,
   });
+
+  if (!line) {
+    return;
+  }
 
   // Warnings and errors to stderr; informational logs to stdout.
   if (level === 'warn' || level === 'error') {
@@ -51,11 +55,18 @@ function emit(level: LogLevel, message: string, fields?: LogFields): void {
   }
 }
 
-function safeStringify(entry: Record<string, unknown>): string {
+function safeStringify(entry: Record<string, unknown>): string | null {
   try {
     return JSON.stringify(entry);
   } catch {
-    return JSON.stringify({ level: 'error', msg: 'log_serialization_failed' });
+    // Always surface serialization failures as errors on stderr.
+    const fallback = JSON.stringify({
+      level: 'error',
+      time: new Date().toISOString(),
+      msg: 'log_serialization_failed',
+    });
+    process.stderr.write(`${fallback}\n`);
+    return null;
   }
 }
 
