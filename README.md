@@ -174,6 +174,16 @@ OAuth variables are also required for local sign-in flows when using Google and 
 
 Inline-completion requests are rate-limited per client and provider. By default the limiter — and the short-lived completion cache — is in-memory: correct for a single instance, but per-instance on serverless. To enforce a global budget across instances, set both `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (Upstash Redis REST); the limiter then uses Redis and fails open if it is unreachable. The completion cache deliberately stays in-memory — its keys are per-user and per-cursor, so the cross-instance hit rate is negligible and a shared cache would only add latency to the ghost-text path.
 
+## Observability
+
+### Structured logging
+
+Server-side code logs through a small structured logger ([lib/observability/logger.ts](lib/observability/logger.ts)): one JSON line per event (stdout for info, stderr for warnings/errors), captured automatically by serverless log drains. The level is controlled by `LOG_LEVEL` (`debug` | `info` | `warn` | `error` | `silent`); with no value set it logs at `info` in production/development and stays silent elsewhere, so the test suite is quiet. API routes log 5xx failures — model/provider, parse, and persistence errors — with structured context (route, status, error name/message); validation 4xx responses are not logged, and stack traces are intentionally omitted.
+
+### Inline-completion telemetry
+
+Inline-completion lifecycle events (accepted / dismissed / ignored, with timing and request reason) are persisted per user to the `completion_event` table for acceptance-rate analysis. For privacy, the raw suggestion text is never stored — only its length — since suggestions can echo the user's notes. Recording is best-effort: a database failure is logged and never fails the request. Applying the table requires running the Drizzle migration (`drizzle-kit migrate` / `push`).
+
 ## Available Scripts
 
 - `npm run dev` starts the local development server.
