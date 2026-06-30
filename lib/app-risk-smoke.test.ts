@@ -31,7 +31,7 @@ test('oauth providers never re-enable dangerous cross-provider email linking', (
   // silently re-enabled. See the auth.ts comment and README "Authentication".
   const authSource = readSource('../auth.ts');
 
-  assert.doesNotMatch(authSource, /allowDangerousEmailAccountLinking:\s*true/);
+  assert.doesNotMatch(authSource, /allowDangerousEmailAccountLinking\s*:/);
 });
 
 test('login page explains the duplicate-email sign-in outcome', () => {
