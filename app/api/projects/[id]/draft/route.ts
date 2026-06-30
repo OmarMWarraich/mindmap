@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { ZodError } from 'zod';
 
-import { withProject } from '../../../../../lib/api/guards.ts';
+import { withProject } from '../../../../../lib/api/project-guard.ts';
 import { draftUpdateSchema } from '../../../../../lib/api/projects-schema.ts';
 import { errorResponse } from '../../../../../lib/api/responses.ts';
 import { db } from '../../../../../lib/db/index.ts';

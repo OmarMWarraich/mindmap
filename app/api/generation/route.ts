@@ -1,17 +1,14 @@
 import { ZodError } from 'zod';
 
-import { auth } from '../../../auth.ts';
+import { withUser } from '../../../lib/api/guards.ts';
+import { errorResponse } from '../../../lib/api/responses.ts';
 import { generateMindmapOverlay, generationRequestSchema } from '../../../lib/generation/service.ts';
 import { authorizeModelId } from '../../../lib/model/authorization.ts';
 import { describeError, logger } from '../../../lib/observability/logger.ts';
 
 export const runtime = 'nodejs';
 
-export const POST = auth(async (req) => {
-  if (!req.auth?.user?.id) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
+export const POST = withUser(async (req) => {
   try {
     const payload = generationRequestSchema.parse(await req.json());
 
@@ -19,7 +16,7 @@ export const POST = auth(async (req) => {
       const authorization = authorizeModelId(payload.modelId, { role: 'generation' });
 
       if (!authorization.ok) {
-        return Response.json({ error: authorization.reason }, { status: authorization.status });
+        return errorResponse(authorization.reason, authorization.status);
       }
     }
 
@@ -37,6 +34,6 @@ export const POST = auth(async (req) => {
       });
     }
 
-    return Response.json({ error: message }, { status });
+    return errorResponse(message, status);
   }
 });

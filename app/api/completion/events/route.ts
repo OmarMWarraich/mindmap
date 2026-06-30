@@ -1,6 +1,7 @@
 import { ZodError } from 'zod';
 
-import { auth } from '../../../../auth.ts';
+import { withUser } from '../../../../lib/api/guards.ts';
+import { errorResponse } from '../../../../lib/api/responses.ts';
 import {
   inlineCompletionEventSchema,
   recordInlineCompletionEvent,
@@ -10,13 +11,7 @@ import { describeError, logger } from '../../../../lib/observability/logger.ts';
 
 export const runtime = 'nodejs';
 
-export const POST = auth(async (req) => {
-  const userId = req.auth?.user?.id;
-
-  if (!userId) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
+export const POST = withUser(async (req, userId) => {
   let payload: InlineCompletionEvent;
 
   try {
@@ -33,7 +28,7 @@ export const POST = auth(async (req) => {
       });
     }
 
-    return Response.json({ error: message }, { status });
+    return errorResponse(message, status);
   }
 
   // Telemetry is best-effort: a persistence failure is logged but never fails the
