@@ -349,8 +349,8 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
       setLayoutError(null);
       setLayoutDiagnostics({
         phase: 'posting',
-        summary: `Posting layout request ${requestId} to the layout worker.`,
-        detail: `Laying out ${effectiveMindmap.nodes.length} nodes and ${effectiveMindmap.edges.length} edges off the main thread.`,
+        summary: `Starting layout request ${requestId} (attempting worker transport).`,
+        detail: `Laying out ${effectiveMindmap.nodes.length} nodes and ${effectiveMindmap.edges.length} edges (worker preferred; main-thread fallback if unavailable).`,
         requestId,
       });
 
