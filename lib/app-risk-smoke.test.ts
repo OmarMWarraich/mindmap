@@ -25,6 +25,22 @@ test('oauth sign-in paths continue to workspace after successful login', () => {
   assert.match(loginPageSource, /signIn\('google', \{ redirectTo: '\/workspace' \}\)/);
 });
 
+test('oauth providers never re-enable dangerous cross-provider email linking', () => {
+  // Security decision (#29): an unauthenticated OAuth sign-in must not be
+  // auto-linked into an existing account by email. Lock it here so it cannot be
+  // silently re-enabled. See the auth.ts comment and README "Authentication".
+  const authSource = readSource('../auth.ts');
+
+  assert.doesNotMatch(authSource, /allowDangerousEmailAccountLinking:\s*true/);
+});
+
+test('login page explains the duplicate-email sign-in outcome', () => {
+  const loginPageSource = readSource('../app/login/page.tsx');
+
+  assert.match(loginPageSource, /OAuthAccountNotLinked/);
+  assert.match(loginPageSource, /searchParams/);
+});
+
 test('primary CTAs and brand links point to the expected destinations', () => {
   const heroSource = readSource('../components/marketing/HeroSection.tsx');
   const landingNavSource = readSource('../components/marketing/LandingNav.tsx');
