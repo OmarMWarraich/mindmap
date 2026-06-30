@@ -3,6 +3,7 @@ import { ZodError } from 'zod';
 import { auth } from '../../../auth.ts';
 import { generateMindmapOverlay, generationRequestSchema } from '../../../lib/generation/service.ts';
 import { authorizeModelId } from '../../../lib/model/authorization.ts';
+import { describeError, logger } from '../../../lib/observability/logger.ts';
 
 export const runtime = 'nodejs';
 
@@ -27,6 +28,14 @@ export const POST = auth(async (req) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected generation route failure.';
     const status = error instanceof ZodError ? 400 : 500;
+
+    if (status >= 500) {
+      logger.error('mindmap generation request failed', {
+        route: 'POST /api/generation',
+        status,
+        ...describeError(error),
+      });
+    }
 
     return Response.json({ error: message }, { status });
   }
