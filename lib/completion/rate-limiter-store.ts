@@ -93,7 +93,7 @@ export function createRateLimiterStore(
     console.warn(
       '[rate-limit] No UPSTASH_REDIS_REST_URL/TOKEN configured — inline-completion ' +
         'rate limiting is per-instance and will not enforce a global budget across ' +
-        'serverless instances. See docs/ISSUE_NO_2.md.',
+        'serverless instances. See README.md#inline-completion-rate-limiting-optional-distributed.',
     );
   }
 

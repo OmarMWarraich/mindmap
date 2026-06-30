@@ -16,7 +16,7 @@ interface InlineCompletionCacheEntry {
 // is effectively zero; backing it with a shared store would add a network round-trip
 // to the latency-sensitive ghost-text path for no real benefit. Rate limiting — which
 // must be enforced globally — is what uses the shared store (see rate-limiter-store.ts
-// and docs/ISSUE_NO_2.md for the trade-off).
+// and README.md#inline-completion-rate-limiting-optional-distributed for the trade-off).
 const completionCache = new Map<string, InlineCompletionCacheEntry>();
 
 const completionCacheTtlMs = 15_000;

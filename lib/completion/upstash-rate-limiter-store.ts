@@ -29,7 +29,8 @@ export function createUpstashRateLimiterStore(
   const fetchImpl = options.fetchImpl ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
 
   return {
-    async consume(key: string): Promise<RateLimitOutcome> {
+    async consume(key: string, now: number): Promise<RateLimitOutcome> {
+      void now;
       const redisKey = `${keyPrefix}${key}`;
       const commands = [
         ['INCR', redisKey],
