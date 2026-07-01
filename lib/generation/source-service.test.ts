@@ -587,3 +587,99 @@ test('generateMindmapDslFromSource retries standard over-target output that deta
   assert.equal(detailedResponse.quality.densityStatus, 'target-met');
   assert.equal(detailedResponse.metrics.generatedMeaningfulLineCount, 30);
 });
+
+test('generateMindmapDslFromSource distills large input into a bounded outline without forcing expansion', async () => {
+  // 60 meaningful lines crosses the distillation threshold; expanding 2.3x would
+  // be nonsensical, so the pipeline must condense instead.
+  const largeSource = Array.from(
+    { length: 60 },
+    (_, index) => `Point number ${index + 1} about the subject matter`,
+  ).join('\n');
+
+  // A deliberately condensed result: 10 meaningful lines, below the distill min (12).
+  const condensedDsl = [
+    '@root: Subject Matter',
+    '- @branch: Foundations',
+    '  - core idea one',
+    '  - core idea two',
+    '- @branch: Mechanisms',
+    '  - mechanism one',
+    '  - mechanism two',
+    '- @branch: Applications',
+    '  - application one',
+    '  - application two',
+  ].join('\n');
+
+  const userPrompts: string[] = [];
+  const response = await generateMindmapDslFromSource(
+    { sourceText: largeSource },
+    {
+      env: testEnv,
+      fetchImpl: async (_url, init) => {
+        const body = JSON.parse(String(init?.body ?? '{}')) as { messages?: Array<{ content?: unknown }> };
+        for (const message of body.messages ?? []) {
+          userPrompts.push(String(message.content));
+        }
+
+        return new Response(JSON.stringify({
+          choices: [{ message: { content: JSON.stringify({ dsl: condensedDsl }) } }],
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      },
+    },
+  );
+
+  assert.equal(response.metrics.generationMode, 'distill');
+  assert.equal(response.metrics.targetMinLineCount, 12);
+  assert.equal(response.metrics.targetMaxLineCount, 60);
+  assert.equal(response.metrics.generatedMeaningfulLineCount, 10);
+  // Below the bound is acceptable when condensing — distill must NOT retry to expand.
+  assert.equal(response.quality.densityStatus, 'below-target');
+  assert.equal(response.quality.attemptCount, 1);
+  assert.equal(response.quality.mode, 'first-pass');
+  assert.ok(userPrompts.some((prompt) => /Condense the long source/.test(prompt)));
+});
+
+test('generateMindmapDslFromSource keeps small inputs in expand mode', async () => {
+  const response = await generateMindmapDslFromSource(
+    { sourceText: 'Photosynthesis\nLight reactions\nCalvin cycle' },
+    {
+      env: testEnv,
+      fetchImpl: async () => new Response(JSON.stringify({
+        choices: [{ message: { content: JSON.stringify({
+          dsl: [
+            '@root: Photosynthesis',
+            '- @branch: Light reactions',
+            '  - converts light into chemical energy',
+            '  - splits water to release O2',
+            '- @branch: Calvin cycle',
+            '  - fixes CO2 into sugars',
+            '  - runs in the stroma',
+          ].join('\n'),
+        }) } }],
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    },
+  );
+
+  assert.equal(response.metrics.generationMode, 'expand');
+});
+
+test('generateMindmapDslFromSource rejects source text beyond the hard length cap', async () => {
+  await assert.rejects(
+    generateMindmapDslFromSource(
+      { sourceText: 'x'.repeat(100_001) },
+      {
+        env: testEnv,
+        fetchImpl: async () => {
+          throw new Error('model should not be called for over-cap input');
+        },
+      },
+    ),
+    /too long/i,
+  );
+});

@@ -58,3 +58,55 @@ test('createSourceMindmapGenerationPrompt includes retry guidance when revising 
   assert.match(prompt.user, /Expand branches with clarifications, mechanisms, examples, or outcomes/i);
   assert.match(prompt.user, /@root: Aspects/);
 });
+
+test('createSourceMindmapGenerationPrompt leads with explicit hierarchy detection in both modes', () => {
+  const expand = createSourceMindmapGenerationPrompt({
+    sourceText: 'A wall of unstructured prose with no headings at all.',
+    sourceMeaningfulLineCount: 1,
+    targetMinLineCount: 3,
+    targetMaxLineCount: 4,
+    detailLevel: 'standard',
+  });
+
+  assert.match(expand.user, /detect the topic hierarchy/i);
+  assert.match(expand.user, /umbrella topic/i);
+  assert.match(expand.user, /infer the hierarchy from meaning/i);
+});
+
+test('createSourceMindmapGenerationPrompt uses the condensation variant in distill mode', () => {
+  const distill = createSourceMindmapGenerationPrompt({
+    sourceText: 'Very long transcript text…',
+    sourceMeaningfulLineCount: 80,
+    targetMinLineCount: 12,
+    targetMaxLineCount: 60,
+    detailLevel: 'standard',
+    mode: 'distill',
+  });
+
+  assert.match(distill.user, /detect the topic hierarchy/i);
+  assert.match(distill.user, /Condense the long source/i);
+  assert.match(distill.user, /Do NOT expand/i);
+  assert.match(distill.user, /Detail preference: standard: keep only the essential structure/i);
+  assert.match(distill.user, /Target generated meaningful line count range: 12 to 60/);
+});
+
+test('createSourceMindmapGenerationPrompt preserves source text containing $-replacement patterns verbatim', () => {
+  // "$&", "$$", and "$1" are special String.prototype.replace substitution
+  // patterns. Source text (and a previous DSL attempt) must be inserted
+  // literally, not interpreted as replacement patterns.
+  const sourceText = 'Budget is $$500, refund code $& applies, tier $1 unlocked.';
+  const prompt = createSourceMindmapGenerationPrompt({
+    sourceText,
+    sourceMeaningfulLineCount: 1,
+    targetMinLineCount: 3,
+    targetMaxLineCount: 4,
+    detailLevel: 'standard',
+    previousDslAttempt: '@root: $$Prior $& Attempt $1',
+    retryReason: 'too sparse',
+  });
+
+  assert.ok(prompt.user.includes(sourceText));
+  assert.ok(prompt.user.includes('@root: $$Prior $& Attempt $1'));
+  assert.ok(!prompt.user.includes('{{SOURCE_TEXT}}'));
+  assert.ok(!prompt.user.includes('{{RETRY_BLOCK}}'));
+});

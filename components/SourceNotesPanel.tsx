@@ -133,7 +133,7 @@ export default function SourceNotesPanel({
         onChange={(event) => {
           onRawNotesChange(event.target.value);
         }}
-        placeholder="Paste class notes, textbook bullets, or source material here…"
+        placeholder="Paste notes, textbook bullets, video subtitles, or a transcript — the AI organizes it into a structured mindmap…"
         value={rawNotes}
       />
 
@@ -157,6 +157,14 @@ export default function SourceNotesPanel({
               title="First DSL result was too sparse; model was asked for a denser revision."
             >
               i
+            </span>
+          ) : null}
+          {latestDslGeneration.metrics.generationMode === 'distill' ? (
+            <span
+              className="rounded-full bg-accent-100 px-2.5 py-0.5 text-xs font-medium text-accent-800"
+              title="The source was large, so it was condensed into a structured outline instead of expanded."
+            >
+              condensed
             </span>
           ) : null}
           <span

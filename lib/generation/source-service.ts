@@ -17,9 +17,26 @@ const maximumExpansionRatio = 2.7;
 const detailedMaximumExpansionRatio = 3.2;
 const maxWordsPerLine = 35;
 
+// Above either threshold the source is large enough that *expanding* it 2.3×+ is
+// nonsensical (and risks the context limit); we switch to condensing it into a
+// bounded, structured outline instead. See resolveGenerationTargets.
+const distillSourceLineThreshold = 40;
+const distillSourceWordThreshold = 500;
+const distillTargetMinLineCount = 12;
+const distillTargetMaxLineCountStandard = 60;
+const distillTargetMaxLineCountDetailed = 90;
+
 type EnvRecord = Record<string, string | undefined>;
 
 type DensityStatus = 'below-target' | 'target-met' | 'over-target';
+
+export type GenerationMode = 'expand' | 'distill';
+
+interface GenerationTargets {
+  targetMinLineCount: number;
+  targetMaxLineCount: number;
+  minimumChildrenPerBranch: number;
+}
 
 export { sourceMindmapGenerationRequestSchema };
 
@@ -33,53 +50,46 @@ export async function generateMindmapDslFromSource(
   const validatedRequest = sourceMindmapGenerationRequestSchema.parse(request);
   const detailLevel = validatedRequest.detailLevel ?? 'standard';
   const sourceMeaningfulLineCount = countMeaningfulNonEmptyLines(validatedRequest.sourceText);
-  const baseTargetMinLineCount = Math.max(1, Math.ceil(sourceMeaningfulLineCount * minimumExpansionRatio));
-  const baseTargetMaxLineCount = Math.max(
-    baseTargetMinLineCount,
-    Math.floor(sourceMeaningfulLineCount * maximumExpansionRatio),
-  );
-  const minimumChildrenPerBranch = getMinimumChildrenPerBranch(detailLevel);
-  const effectiveTargetMaxLineCount = getEffectiveTargetMaxLineCount(
+  const generationMode = selectGenerationMode(validatedRequest.sourceText, sourceMeaningfulLineCount);
+  const { targetMinLineCount, targetMaxLineCount, minimumChildrenPerBranch } = resolveGenerationTargets(
+    generationMode,
     detailLevel,
     sourceMeaningfulLineCount,
-    baseTargetMaxLineCount,
-  );
-  const effectiveTargetMinLineCount = getEffectiveTargetMinLineCount(
-    detailLevel,
-    baseTargetMinLineCount,
-    effectiveTargetMaxLineCount,
   );
   const prompt = createSourceMindmapGenerationPrompt({
     sourceText: validatedRequest.sourceText,
     sourceMeaningfulLineCount,
-    targetMinLineCount: effectiveTargetMinLineCount,
-    targetMaxLineCount: effectiveTargetMaxLineCount,
+    targetMinLineCount,
+    targetMaxLineCount,
     detailLevel,
     minimumChildrenPerBranch,
+    mode: generationMode,
   });
   let attemptCount = 1;
   let attempt = await generateDslAttempt(
     validatedRequest.sourceText,
     sourceMeaningfulLineCount,
-    effectiveTargetMinLineCount,
-    effectiveTargetMaxLineCount,
+    targetMinLineCount,
+    targetMaxLineCount,
     detailLevel,
     minimumChildrenPerBranch,
     prompt,
     validatedRequest.modelId,
     options.env,
     options.fetchImpl,
+    generationMode,
   );
 
-  if (shouldRetryGeneration(detailLevel, attempt.validation)) {
+  if (shouldRetryGeneration(generationMode, detailLevel, attempt.validation)) {
     const retryFeedback = describeRetryNeeds(attempt.validation);
     const retryPrompt = createSourceMindmapGenerationPrompt({
       sourceText: validatedRequest.sourceText,
       sourceMeaningfulLineCount,
-      targetMinLineCount: effectiveTargetMinLineCount,
-      targetMaxLineCount: effectiveTargetMaxLineCount,
+      targetMinLineCount,
+      targetMaxLineCount,
       detailLevel,
       minimumChildrenPerBranch,
+      mode: generationMode,
       previousDslAttempt: attempt.dsl,
       retryReason: retryFeedback.reason,
       retryGuidance: retryFeedback.guidance,
@@ -89,14 +99,15 @@ export async function generateMindmapDslFromSource(
     attempt = await generateDslAttempt(
       validatedRequest.sourceText,
       sourceMeaningfulLineCount,
-      effectiveTargetMinLineCount,
-      effectiveTargetMaxLineCount,
+      targetMinLineCount,
+      targetMaxLineCount,
       detailLevel,
       minimumChildrenPerBranch,
       retryPrompt,
       validatedRequest.modelId,
       options.env,
       options.fetchImpl,
+      generationMode,
     );
   }
 
@@ -112,9 +123,10 @@ export async function generateMindmapDslFromSource(
       sourceMeaningfulLineCount,
       generatedMeaningfulLineCount,
       expansionRatio,
-      targetMinLineCount: effectiveTargetMinLineCount,
-      targetMaxLineCount: effectiveTargetMaxLineCount,
+      targetMinLineCount,
+      targetMaxLineCount,
       maxWordsPerLine,
+      generationMode,
     },
     validation: {
       parserWarnings: parseResult.warnings,
@@ -132,13 +144,69 @@ export async function generateMindmapDslFromSource(
 }
 
 function shouldRetryGeneration(
+  mode: GenerationMode,
   detailLevel: SourceMindmapGenerationRequest['detailLevel'],
   validation: DslAttemptResult['validation'],
 ): boolean {
+  if (mode === 'distill') {
+    // When condensing, being below the (bounded) target or having lean branches
+    // is expected and desirable — only retry when the result is still too dense
+    // (didn't condense enough). Parser/word-limit failures are handled elsewhere.
+    return validation.densityStatus === 'over-target';
+  }
+
   return validation.densityStatus === 'below-target'
     || validation.underdevelopedBranches.length > 0
     || validation.overlyExtractive
     || (detailLevel === 'standard' && validation.densityStatus === 'over-target');
+}
+
+function selectGenerationMode(sourceText: string, sourceMeaningfulLineCount: number): GenerationMode {
+  return sourceMeaningfulLineCount > distillSourceLineThreshold
+    || countWords(sourceText) > distillSourceWordThreshold
+    ? 'distill'
+    : 'expand';
+}
+
+function resolveGenerationTargets(
+  mode: GenerationMode,
+  detailLevel: SourceMindmapGenerationRequest['detailLevel'],
+  sourceMeaningfulLineCount: number,
+): GenerationTargets {
+  if (mode === 'distill') {
+    const targetMaxLineCount = detailLevel === 'detailed'
+      ? distillTargetMaxLineCountDetailed
+      : distillTargetMaxLineCountStandard;
+
+    return {
+      targetMinLineCount: Math.min(distillTargetMinLineCount, targetMaxLineCount),
+      targetMaxLineCount,
+      // Condensation must never be padded out to a per-branch minimum.
+      minimumChildrenPerBranch: 1,
+    };
+  }
+
+  const baseTargetMinLineCount = Math.max(1, Math.ceil(sourceMeaningfulLineCount * minimumExpansionRatio));
+  const baseTargetMaxLineCount = Math.max(
+    baseTargetMinLineCount,
+    Math.floor(sourceMeaningfulLineCount * maximumExpansionRatio),
+  );
+  const targetMaxLineCount = getEffectiveTargetMaxLineCount(
+    detailLevel,
+    sourceMeaningfulLineCount,
+    baseTargetMaxLineCount,
+  );
+
+  return {
+    targetMinLineCount: getEffectiveTargetMinLineCount(detailLevel, baseTargetMinLineCount, targetMaxLineCount),
+    targetMaxLineCount,
+    minimumChildrenPerBranch: getMinimumChildrenPerBranch(detailLevel),
+  };
+}
+
+function countWords(input: string): number {
+  const trimmed = input.trim();
+  return trimmed.length === 0 ? 0 : trimmed.split(/\s+/u).length;
 }
 
 function describeRetryNeeds(validation: DslAttemptResult['validation']): {
@@ -252,7 +320,8 @@ async function generateDslAttempt(
   prompt: ReturnType<typeof createSourceMindmapGenerationPrompt>,
   modelId: string | undefined,
   env: EnvRecord | undefined,
-  fetchImpl?: typeof fetch,
+  fetchImpl: typeof fetch | undefined,
+  mode: GenerationMode,
 ): Promise<DslAttemptResult> {
   const completion = await requestStructuredModelCompletion({
     role: 'generation',
@@ -285,7 +354,10 @@ async function generateDslAttempt(
     targetMaxLineCount,
   );
   const lineWordLimitSatisfied = getMaxWordCountPerLine(resolvedDsl.dsl) <= maxWordsPerLine;
-  const overlyExtractive = detailLevel === 'detailed'
+  // The extractive guard exists to stop *detailed expansion* from merely copying
+  // source labels. Distillation legitimately selects source phrasing, so the
+  // guard does not apply there.
+  const overlyExtractive = detailLevel === 'detailed' && mode === 'expand'
     ? isOverlyExtractiveDetailedDsl(resolvedDsl.dsl, sourceText)
     : false;
 

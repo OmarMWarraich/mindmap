@@ -9,8 +9,16 @@ import { parseStructuredModelJson } from '../model/json-parse.ts';
 
 const requiredString = z.string().trim().min(1);
 
+// Hard upper bound on source length. A single-call distillation prompt still has
+// to fit the whole source in the model context, so beyond this we fail fast with
+// a clear error instead of risking a context-overflow failure mid-generation.
+export const maxSourceTextCharacters = 100_000;
+
 export const sourceMindmapGenerationRequestSchema = z.object({
-  sourceText: requiredString,
+  sourceText: requiredString.max(
+    maxSourceTextCharacters,
+    'Source text is too long to process. Please shorten it and try again.',
+  ),
   detailLevel: z.enum(['standard', 'detailed']).optional(),
   modelId: knownModelIdSchema.optional(),
 }).strict();
@@ -26,6 +34,9 @@ export const sourceMindmapGenerationMetricsSchema = z.object({
   targetMinLineCount: z.number().int().nonnegative(),
   targetMaxLineCount: z.number().int().nonnegative(),
   maxWordsPerLine: z.number().int().positive(),
+  // Which pipeline path produced this result: expand small inputs, distill large
+  // ones. Optional so previously persisted drafts (which predate it) still parse.
+  generationMode: z.enum(['expand', 'distill']).optional(),
 }).strict();
 
 export const sourceMindmapGenerationValidationSchema = z.object({

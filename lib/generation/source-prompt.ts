@@ -5,6 +5,9 @@ export interface SourceMindmapGenerationPromptInput {
   targetMaxLineCount: number;
   detailLevel?: 'standard' | 'detailed';
   minimumChildrenPerBranch?: number;
+  // 'expand' (default): enrich smaller sources toward a density target.
+  // 'distill': condense a large source into a bounded, structured outline.
+  mode?: 'expand' | 'distill';
   previousDslAttempt?: string;
   retryReason?: string;
   retryGuidance?: string;
@@ -29,6 +32,16 @@ export const sourceMindmapGenerationOutputContract = `Return a JSON object with 
 {
   "dsl": string
 }`;
+
+// Detection-first preamble shared by both modes: organize before writing DSL, and
+// infer the hierarchy from meaning even when the source has no explicit structure.
+export const sourceMindmapHierarchyDetectionGuidance = `First, detect the topic hierarchy in the source before writing any DSL:
+- Identify the single overarching umbrella topic — it becomes the @root (main topic).
+- Identify the major sub-topics — they become "- @branch:" lines.
+- Identify deeper sub-topics and supporting points — they become nested leaf lines (two spaces per level).
+- The source may be flat or unstructured (a wall of text, raw subtitles, or a plain bullet dump) with no headings; infer the hierarchy from meaning, not from any existing indentation.
+- Group related points under the sub-topic they belong to.
+Only once the hierarchy is clear, produce the DSL.`;
 
 export const sourceMindmapGenerationUserPromptTemplate = `Convert the source notes below into compact mindmap DSL for this app.
 
@@ -84,14 +97,71 @@ SOURCE NOTES:
 
 ${sourceMindmapGenerationOutputContract}`;
 
+// Distillation variant: used when the source is large. The goal is to condense
+// and organize, not to expand — so the density rules invert and there is no
+// per-branch minimum to pad toward.
+export const sourceMindmapDistillationUserPromptTemplate = `Condense the long source below into a compact, well-structured mindmap DSL for this app.
+
+App constraints:
+- The parser accepts exactly one @root block.
+- Branch lines must use: - @branch: label
+- Child lines must use standard nested leaf bullets.
+- Output only valid DSL inside the JSON field.
+
+Condensation goals:
+- This source is large: summarize and organize it. Do NOT expand it or add new facts.
+- Select the most important topics and points; drop repetition, filler, and asides.
+- Group related points under the sub-topic they belong to; keep the hierarchy clean.
+- Rewrite long passages into short phrase-style labels.
+- Prefer fewer, stronger lines over many weak ones.
+- Never exceed 35 words on any DSL line.
+
+Size target (condensation, not expansion):
+- Source meaningful non-empty line count: {{SOURCE_LINE_COUNT}}
+- Target generated meaningful line count range: {{TARGET_MIN_LINE_COUNT}} to {{TARGET_MAX_LINE_COUNT}}
+- Stay at or below the upper bound; condense further if the outline runs over.
+- Detail preference: {{DETAIL_PREFERENCE}}
+
+Output rules:
+- Use exactly one @root as the umbrella topic; invent a concise one if the source has several themes.
+- Improve a generic root label to a clearer academic label when justified.
+- Keep labels readable for mindmap nodes.
+- Do not use markdown headings, code fences, or prose outside the DSL.
+
+Validation requirements before you answer:
+- The DSL must parse with one @root.
+- Each generated line must stay within 35 words.
+- The outline must stay within the target range; condense further if it is over.
+
+{{RETRY_BLOCK}}
+
+SOURCE NOTES:
+{{SOURCE_TEXT}}
+
+${sourceMindmapGenerationOutputContract}`;
+
+function resolveDetailPreference(
+  mode: 'expand' | 'distill',
+  detailLevel: SourceMindmapGenerationPromptInput['detailLevel'],
+): string {
+  if (mode === 'distill') {
+    return detailLevel === 'detailed'
+      ? 'detailed: keep more supporting sub-points while still condensing'
+      : 'standard: keep only the essential structure and key points';
+  }
+
+  return detailLevel === 'detailed'
+    ? 'detailed: prefer the upper half of the target range, rewrite source headings into explanations, and push branches beyond minimal coverage'
+    : 'standard: meet the target range without padding';
+}
+
 export function createSourceMindmapGenerationPrompt(
   input: SourceMindmapGenerationPromptInput,
 ): SourceMindmapGenerationPrompt {
+  const mode = input.mode ?? 'expand';
   const minimumChildrenPerBranch = input.minimumChildrenPerBranch
     ?? (input.detailLevel === 'detailed' ? 3 : 2);
-  const detailPreference = input.detailLevel === 'detailed'
-    ? 'detailed: prefer the upper half of the target range, rewrite source headings into explanations, and push branches beyond minimal coverage'
-    : 'standard: meet the target range without padding';
+  const detailPreference = resolveDetailPreference(mode, input.detailLevel);
   const retryGuidance = input.retryGuidance
     ?? [
       'Keep the same topic coverage while fixing the density problem.',
@@ -114,15 +184,24 @@ ${input.previousDslAttempt}
 `
     : '';
 
+  const template = mode === 'distill'
+    ? sourceMindmapDistillationUserPromptTemplate
+    : sourceMindmapGenerationUserPromptTemplate;
+  // Use function replacers (not string replacements) for values that may contain
+  // arbitrary user or model content: a literal "$&", "$$", etc. in source text or
+  // a previous DSL attempt would otherwise be misinterpreted as a replacement
+  // pattern by String.prototype.replace and corrupt the prompt.
+  const body = template
+    .replace('{{SOURCE_LINE_COUNT}}', String(input.sourceMeaningfulLineCount))
+    .replace('{{TARGET_MIN_LINE_COUNT}}', String(input.targetMinLineCount))
+    .replace('{{TARGET_MAX_LINE_COUNT}}', String(input.targetMaxLineCount))
+    .replace('{{MIN_CHILDREN_PER_BRANCH}}', String(minimumChildrenPerBranch))
+    .replace('{{DETAIL_PREFERENCE}}', detailPreference)
+    .replace('{{RETRY_BLOCK}}', () => retryBlock)
+    .replace('{{SOURCE_TEXT}}', () => input.sourceText);
+
   return {
     system: sourceMindmapGenerationSystemPrompt,
-    user: sourceMindmapGenerationUserPromptTemplate
-      .replace('{{SOURCE_LINE_COUNT}}', String(input.sourceMeaningfulLineCount))
-      .replace('{{TARGET_MIN_LINE_COUNT}}', String(input.targetMinLineCount))
-      .replace('{{TARGET_MAX_LINE_COUNT}}', String(input.targetMaxLineCount))
-      .replace('{{MIN_CHILDREN_PER_BRANCH}}', String(minimumChildrenPerBranch))
-      .replace('{{DETAIL_PREFERENCE}}', detailPreference)
-      .replace('{{RETRY_BLOCK}}', retryBlock)
-      .replace('{{SOURCE_TEXT}}', input.sourceText),
+    user: `${sourceMindmapHierarchyDetectionGuidance}\n\n${body}`,
   };
 }
