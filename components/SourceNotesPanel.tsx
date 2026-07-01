@@ -69,6 +69,11 @@ export default function SourceNotesPanel({
 }: SourceNotesPanelProps) {
   const isGenerating = generationStatus.tone === 'progress';
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // Always reflects the latest rawNotes prop value so the async append uses the
+  // most recent textarea content (avoids stale-closure bugs after await).
+  const rawNotesRef = useRef(rawNotes);
+  rawNotesRef.current = rawNotes;
+  const [isReading, setIsReading] = useState(false);
   const [attachStatus, setAttachStatus] = useState<{ tone: StatusTone; message: string } | null>(null);
 
   async function handleFilesSelected(files: File[]): Promise<void> {
@@ -76,13 +81,18 @@ export default function SourceNotesPanel({
       return;
     }
 
+    setIsReading(true);
     setAttachStatus({ tone: 'progress', message: 'Reading file…' });
     const result = await ingestFiles(files);
+    setIsReading(false);
 
     // Append (never overwrite) so an attachment adds to whatever is already there.
+    // Read from ref so we always append to the latest textarea content, even if the
+    // user typed while the file was being read.
     if (result.text) {
-      const separator = rawNotes.trim().length > 0 ? '\n\n' : '';
-      onRawNotesChange(rawNotes + separator + result.text);
+      const current = rawNotesRef.current;
+      const separator = current.trim().length > 0 ? '\n\n' : '';
+      onRawNotesChange(current + separator + result.text);
     }
 
     if (result.ingested.length > 0 && result.errors.length === 0) {
@@ -290,8 +300,9 @@ export default function SourceNotesPanel({
             : `Generate ${selectedDetailLevel === 'detailed' ? 'detailed' : 'standard'} DSL`}
         </button>
         <button
+          aria-label="Attach a .txt or .md file"
           className="rounded-lg border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={isGenerating}
+          disabled={isGenerating || isReading}
           onClick={() => {
             fileInputRef.current?.click();
           }}

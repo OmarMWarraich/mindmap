@@ -67,3 +67,33 @@ test('acceptedIngestionExtensions advertises txt and md', () => {
   assert.ok(acceptedIngestionExtensions.includes('txt'));
   assert.ok(acceptedIngestionExtensions.includes('md'));
 });
+
+test('ingestFile handles uppercase extensions (NOTES.TXT)', async () => {
+  const result = await ingestFile(makeFile('NOTES.TXT', 'hello', 'text/plain'));
+
+  assert.equal(result.text, 'hello');
+  assert.equal(result.meta.fileName, 'NOTES.TXT');
+});
+
+test('ingestFile rejects a file with no extension and no matching MIME type', async () => {
+  await assert.rejects(
+    ingestFile(makeFile('README', 'some content', '')),
+    (error) => error instanceof IngestionError && /not a supported file type/.test(error.message),
+  );
+});
+
+test('ingestFile matches via MIME type when extension is not recognized', async () => {
+  // Simulates a file whose name has an unrecognized extension but whose MIME type
+  // is a known text type (browser-reported MIME used as fallback).
+  const result = await ingestFile(makeFile('notes.unknown', 'content', 'text/plain'));
+
+  assert.equal(result.text, 'content');
+});
+
+test('ingestFiles with empty array returns empty result without errors', async () => {
+  const result = await ingestFiles([]);
+
+  assert.equal(result.text, '');
+  assert.deepEqual(result.ingested, []);
+  assert.deepEqual(result.errors, []);
+});
