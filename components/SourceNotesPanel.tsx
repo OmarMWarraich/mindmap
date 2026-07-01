@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { SourceMindmapGenerationResponse } from '../lib/generation/source-schema';
 import { acceptedIngestionExtensions, ingestFiles } from '../lib/ingestion';
@@ -69,10 +69,13 @@ export default function SourceNotesPanel({
 }: SourceNotesPanelProps) {
   const isGenerating = generationStatus.tone === 'progress';
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  // Always reflects the latest rawNotes prop value so the async append uses the
-  // most recent textarea content (avoids stale-closure bugs after await).
+  // Mirror the latest rawNotes into a ref so the async file-append uses the most
+  // recent textarea content (avoids stale-closure bugs after await). Updated in an
+  // effect, not during render, so it doesn't violate the rules of hooks.
   const rawNotesRef = useRef(rawNotes);
-  rawNotesRef.current = rawNotes;
+  useEffect(() => {
+    rawNotesRef.current = rawNotes;
+  }, [rawNotes]);
   const [isReading, setIsReading] = useState(false);
   const [attachStatus, setAttachStatus] = useState<{ tone: StatusTone; message: string } | null>(null);
 
