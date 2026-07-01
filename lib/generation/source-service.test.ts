@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { maxSourceTextCharacters } from './limits.ts';
 import {
   countMeaningfulNonEmptyLines,
   generateMindmapDslFromSource,
@@ -672,7 +673,7 @@ test('generateMindmapDslFromSource keeps small inputs in expand mode', async () 
 test('generateMindmapDslFromSource rejects source text beyond the hard length cap', async () => {
   await assert.rejects(
     generateMindmapDslFromSource(
-      { sourceText: 'x'.repeat(100_001) },
+      { sourceText: 'x'.repeat(maxSourceTextCharacters + 1) },
       {
         env: testEnv,
         fetchImpl: async () => {

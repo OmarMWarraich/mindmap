@@ -29,7 +29,7 @@ test('ingestFile reads a .md file even when the browser reports no MIME type', a
 
 test('ingestFile rejects an unsupported file type', async () => {
   await assert.rejects(
-    ingestFile(makeFile('slides.pdf', '%PDF-1.7 binary', 'application/pdf')),
+    ingestFile(makeFile('photo.png', 'binary', 'image/png')),
     (error) => error instanceof IngestionError && /not a supported file type/.test(error.message),
   );
 });
@@ -53,14 +53,14 @@ test('ingestFile rejects text beyond the generation character cap', async () => 
 test('ingestFiles concatenates successful files and collects per-file errors', async () => {
   const result = await ingestFiles([
     makeFile('a.txt', 'first', 'text/plain'),
-    makeFile('bad.pdf', 'nope', 'application/pdf'),
+    makeFile('bad.png', 'binary', 'image/png'),
     makeFile('b.md', 'second', ''),
   ]);
 
   assert.equal(result.text, 'first\n\nsecond');
   assert.equal(result.ingested.length, 2);
   assert.equal(result.errors.length, 1);
-  assert.equal(result.errors[0]?.fileName, 'bad.pdf');
+  assert.equal(result.errors[0]?.fileName, 'bad.png');
 });
 
 test('acceptedIngestionExtensions advertises txt and md', () => {

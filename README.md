@@ -127,6 +127,16 @@ The product mixes deterministic parsing and rendering with model-backed assistan
 - Drafts are restored from cloud persistence when available and fall back to local IndexedDB state.
 - The current preview can be exported as PNG.
 
+## Source input & file attachments
+
+Source Notes accepts pasted text and file attachments (via the **Attach** button), all normalized to plain text and fed through the same generate-DSL pipeline ([lib/ingestion](lib/ingestion)):
+
+- **Paste** — notes, bullets, subtitles, or a transcript.
+- **`.txt` / `.md`** — read in the browser.
+- **`.pdf`** — digital (text-based) PDFs are extracted client-side with pdf.js. Scanned/image-only PDFs are detected and rejected (image/OCR support is planned). pdf.js runs on the main thread here to avoid a Web Worker (it fails to instantiate under Turbopack in some browsers).
+
+> **Known limitation — PDF in Safari.** PDF text extraction currently works in Chrome and Firefox but fails in Safari (pdf.js errors during text extraction, even on the latest Safari). Use Chrome/Firefox for PDFs, or paste the text. Tracked as a follow-up.
+
 ## Getting Started
 
 Install dependencies:
