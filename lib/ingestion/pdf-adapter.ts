@@ -1,3 +1,5 @@
+import type * as Pdfjs from 'pdfjs-dist';
+
 import { IngestionError, type IngestedFile, type IngestionAdapter } from './types.ts';
 
 // Extracts the text of each page of a PDF. Injected so the adapter's logic
@@ -11,22 +13,27 @@ export const maxPdfPages = 80;
 // is almost certainly scanned/image-only rather than digital text.
 const scannedTextThreshold = 16;
 
-// Default extractor backed by pdf.js. Everything is dynamically imported so the
-// (browser-only) library never loads during SSR or the Node test runner — only
-// when a PDF is actually read in the browser.
+// Two deliberate choices here, both for browser compatibility:
 //
-// pdf.js runs on the MAIN THREAD here: importing the worker *module* registers
-// globalThis.pdfjsWorker, which makes pdf.js use its in-process message handler
-// (#initialize short-circuits to the fake worker) instead of spawning a Web
-// Worker. This is deliberate — pdf.js's Web Worker fails to instantiate under
-// Turbopack in some browsers (notably Safari), and its own fallback dynamically
-// imports a runtime worker URL that Turbopack cannot resolve. Extraction is a
-// bounded, one-shot operation, so the brief main-thread cost is acceptable.
+// 1. The LEGACY build (transpiled + core-js polyfills). The standard build uses
+//    Promise.withResolvers and other very recent APIs (Safari 17.4+); the legacy
+//    build polyfills them, so extraction works in older Safari too. Same API
+//    surface, hence the cast to the typed namespace.
+// 2. MAIN-THREAD execution. Importing the worker *module* registers
+//    globalThis.pdfjsWorker, so pdf.js uses its in-process handler (#initialize
+//    short-circuits to the fake worker) instead of spawning a Web Worker — which
+//    fails to instantiate under Turbopack in some browsers, and whose pdf.js
+//    fallback dynamically imports a runtime URL Turbopack cannot resolve.
+//
+// Everything is dynamically imported so the (browser-only) library never loads
+// during SSR or the Node test runner. Extraction is a bounded, one-shot op, so
+// the brief main-thread cost is acceptable.
 async function defaultExtractPdfPages(data: ArrayBuffer): Promise<string[]> {
-  const [pdfjs] = await Promise.all([
-    import('pdfjs-dist'),
-    import('pdfjs-dist/build/pdf.worker.min.mjs'),
+  const [pdfjsModule] = await Promise.all([
+    import('pdfjs-dist/legacy/build/pdf.mjs'),
+    import('pdfjs-dist/legacy/build/pdf.worker.min.mjs'),
   ]);
+  const pdfjs = pdfjsModule as typeof Pdfjs;
 
   const loadingTask = pdfjs.getDocument({ data });
 
