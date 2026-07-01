@@ -6,6 +6,8 @@ export interface IngestedFileMeta {
   fileName: string;
   sizeBytes: number;
   mimeType: string;
+  /** Number of pages, for paged formats (e.g. PDF). Omitted for plain text. */
+  pageCount?: number;
 }
 
 export interface IngestedFile {

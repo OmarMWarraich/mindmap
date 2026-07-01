@@ -1,9 +1,10 @@
 import { maxSourceTextCharacters } from '../generation/limits.ts';
+import { createPdfIngestionAdapter } from './pdf-adapter.ts';
 import { textIngestionAdapter } from './text-adapter.ts';
 import { IngestionError, type IngestedFile, type IngestionAdapter } from './types.ts';
 
-// Registry of available adapters. New input types (PDF, images) register here.
-const ingestionAdapters: IngestionAdapter[] = [textIngestionAdapter];
+// Registry of available adapters. New input types (images) register here.
+const ingestionAdapters: IngestionAdapter[] = [textIngestionAdapter, createPdfIngestionAdapter()];
 
 // Refuse to even read absurdly large files. The character cap
 // (maxSourceTextCharacters) is the meaningful limit — this is a coarse guard so
@@ -66,7 +67,7 @@ export async function ingestFile(file: File): Promise<IngestedFile> {
   const adapter = selectAdapter(file);
   if (!adapter) {
     throw new IngestionError(
-      `"${file.name}" is not a supported file type. Attach a .txt or .md file.`,
+      `"${file.name}" is not a supported file type. Attach a .txt, .md, or .pdf file.`,
     );
   }
 
