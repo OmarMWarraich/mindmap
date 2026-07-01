@@ -11,23 +11,22 @@ export const maxPdfPages = 80;
 // is almost certainly scanned/image-only rather than digital text.
 const scannedTextThreshold = 16;
 
-let workerConfigured = false;
-
-// Default extractor backed by pdf.js. Dynamically imported so the (browser-only)
-// library never loads during SSR or the Node test runner — only when a PDF is
-// actually read in the browser.
+// Default extractor backed by pdf.js. Everything is dynamically imported so the
+// (browser-only) library never loads during SSR or the Node test runner — only
+// when a PDF is actually read in the browser.
+//
+// pdf.js runs on the MAIN THREAD here: importing the worker *module* registers
+// globalThis.pdfjsWorker, which makes pdf.js use its in-process message handler
+// (#initialize short-circuits to the fake worker) instead of spawning a Web
+// Worker. This is deliberate — pdf.js's Web Worker fails to instantiate under
+// Turbopack in some browsers (notably Safari), and its own fallback dynamically
+// imports a runtime worker URL that Turbopack cannot resolve. Extraction is a
+// bounded, one-shot operation, so the brief main-thread cost is acceptable.
 async function defaultExtractPdfPages(data: ArrayBuffer): Promise<string[]> {
-  const pdfjs = await import('pdfjs-dist');
-
-  if (!workerConfigured) {
-    // Statically-analyzable URL so Turbopack/webpack bundle the worker asset,
-    // the same pattern the mindmap layout worker uses.
-    pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-      'pdfjs-dist/build/pdf.worker.min.mjs',
-      import.meta.url,
-    ).toString();
-    workerConfigured = true;
-  }
+  const [pdfjs] = await Promise.all([
+    import('pdfjs-dist'),
+    import('pdfjs-dist/build/pdf.worker.min.mjs'),
+  ]);
 
   const loadingTask = pdfjs.getDocument({ data });
 
