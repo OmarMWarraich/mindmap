@@ -187,14 +187,18 @@ ${input.previousDslAttempt}
   const template = mode === 'distill'
     ? sourceMindmapDistillationUserPromptTemplate
     : sourceMindmapGenerationUserPromptTemplate;
+  // Use function replacers (not string replacements) for values that may contain
+  // arbitrary user or model content: a literal "$&", "$$", etc. in source text or
+  // a previous DSL attempt would otherwise be misinterpreted as a replacement
+  // pattern by String.prototype.replace and corrupt the prompt.
   const body = template
     .replace('{{SOURCE_LINE_COUNT}}', String(input.sourceMeaningfulLineCount))
     .replace('{{TARGET_MIN_LINE_COUNT}}', String(input.targetMinLineCount))
     .replace('{{TARGET_MAX_LINE_COUNT}}', String(input.targetMaxLineCount))
     .replace('{{MIN_CHILDREN_PER_BRANCH}}', String(minimumChildrenPerBranch))
     .replace('{{DETAIL_PREFERENCE}}', detailPreference)
-    .replace('{{RETRY_BLOCK}}', retryBlock)
-    .replace('{{SOURCE_TEXT}}', input.sourceText);
+    .replace('{{RETRY_BLOCK}}', () => retryBlock)
+    .replace('{{SOURCE_TEXT}}', () => input.sourceText);
 
   return {
     system: sourceMindmapGenerationSystemPrompt,
