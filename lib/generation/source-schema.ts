@@ -6,13 +6,12 @@ import {
 } from '../dsl/validation.ts';
 import { knownModelIdSchema } from '../model/catalog.ts';
 import { parseStructuredModelJson } from '../model/json-parse.ts';
+import { maxSourceTextCharacters } from './limits.ts';
+
+// Re-exported for backward compatibility; the source of truth is ./limits.ts.
+export { maxSourceTextCharacters };
 
 const requiredString = z.string().trim().min(1);
-
-// Hard upper bound on source length. A single-call distillation prompt still has
-// to fit the whole source in the model context, so beyond this we fail fast with
-// a clear error instead of risking a context-overflow failure mid-generation.
-export const maxSourceTextCharacters = 100_000;
 
 export const sourceMindmapGenerationRequestSchema = z.object({
   sourceText: requiredString.max(
