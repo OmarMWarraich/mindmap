@@ -6,10 +6,10 @@ import { IngestionError, type IngestedFile, type IngestionAdapter } from './type
 // Registry of available adapters. New input types (images) register here.
 const ingestionAdapters: IngestionAdapter[] = [textIngestionAdapter, createPdfIngestionAdapter()];
 
-// Refuse to even read absurdly large files. The character cap
-// (maxSourceTextCharacters) is the meaningful limit — this is a coarse guard so
-// we never pull a huge blob into memory first.
-const maxIngestionBytes = 5 * 1024 * 1024;
+// Default coarse guard so we never pull a huge blob into memory first; the
+// character cap (maxSourceTextCharacters) is the meaningful limit. Adapters may
+// raise this via `maxBytes` (e.g. PDFs, which carry binary overhead beyond text).
+const defaultMaxIngestionBytes = 5 * 1024 * 1024;
 
 /** Accepted extensions across all adapters, for the file input's `accept` attribute. */
 export const acceptedIngestionExtensions: string[] = ingestionAdapters.flatMap(
@@ -58,16 +58,17 @@ function formatBytes(bytes: number): string {
  * Throws IngestionError (with a user-facing message) on any guard failure.
  */
 export async function ingestFile(file: File): Promise<IngestedFile> {
-  if (file.size > maxIngestionBytes) {
-    throw new IngestionError(
-      `"${file.name}" is too large (${formatBytes(file.size)}). Maximum is ${formatBytes(maxIngestionBytes)}.`,
-    );
-  }
-
   const adapter = selectAdapter(file);
   if (!adapter) {
     throw new IngestionError(
       `"${file.name}" is not a supported file type. Attach a .txt, .md, or .pdf file.`,
+    );
+  }
+
+  const maxBytes = adapter.maxBytes ?? defaultMaxIngestionBytes;
+  if (file.size > maxBytes) {
+    throw new IngestionError(
+      `"${file.name}" is too large (${formatBytes(file.size)}). Maximum is ${formatBytes(maxBytes)}.`,
     );
   }
 

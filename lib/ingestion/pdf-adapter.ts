@@ -9,9 +9,15 @@ export type PdfPageExtractor = (data: ArrayBuffer) => Promise<string[]>;
 
 export const maxPdfPages = 80;
 
-// If the whole document yields fewer than this many non-whitespace characters, it
-// is almost certainly scanned/image-only rather than digital text.
-const scannedTextThreshold = 16;
+// 25 MiB — PDFs carry binary overhead (fonts, figures) well beyond their text, so
+// they warrant a higher pre-read ceiling than the shared default.
+export const maxPdfBytes = 25 * 1024 * 1024;
+
+// A digital PDF yields substantial text per page; a scanned/image-only PDF yields
+// almost none (no text layer). Flag as scanned when the average extractable text
+// per page falls below this — catches both an empty single page and multi-page
+// scans whose only "text" is repeated headers or page numbers.
+const minCharsPerPage = 24;
 
 // Two deliberate choices here, both for browser compatibility:
 //
@@ -47,7 +53,16 @@ async function defaultExtractPdfPages(data: ArrayBuffer): Promise<string[]> {
     for (let pageNumber = 1; pageNumber <= pageLimit; pageNumber += 1) {
       const page = await doc.getPage(pageNumber);
       const content = await page.getTextContent();
-      pages.push(content.items.map((item) => ('str' in item ? item.str : '')).join(' '));
+      // Respect end-of-line markers so headings/lists keep their line structure
+      // (it feeds hierarchy detection); other runs are space-separated.
+      let pageText = '';
+      for (const item of content.items) {
+        if (!('str' in item)) {
+          continue;
+        }
+        pageText += item.hasEOL ? `${item.str}\n` : `${item.str} `;
+      }
+      pages.push(pageText);
     }
 
     return pages;
@@ -69,9 +84,24 @@ export function createPdfIngestionAdapter(
     id: 'pdf',
     extensions: ['pdf'],
     mimeTypes: ['application/pdf'],
+    maxBytes: maxPdfBytes,
     async read(file: File): Promise<IngestedFile> {
       const data = await file.arrayBuffer();
-      const pages = await extractPages(data);
+
+      // Normalize provider-specific failures (corrupt / encrypted / password
+      // protected) into a clean IngestionError; keep the original as `cause`.
+      let pages: string[];
+      try {
+        pages = await extractPages(data);
+      } catch (error) {
+        if (error instanceof IngestionError) {
+          throw error;
+        }
+        throw new IngestionError(
+          `"${file.name}" could not be read as a PDF. It may be corrupted, encrypted, or password-protected.`,
+          { cause: error },
+        );
+      }
 
       if (pages.length > maxPdfPages) {
         throw new IngestionError(
@@ -82,7 +112,8 @@ export function createPdfIngestionAdapter(
 
       const text = pages.join('\n\n').trim();
 
-      if (text.replace(/\s/gu, '').length < scannedTextThreshold) {
+      // Average extractable text per page — see minCharsPerPage.
+      if (text.replace(/\s/gu, '').length < minCharsPerPage * Math.max(1, pages.length)) {
         throw new IngestionError(
           `"${file.name}" has no extractable text — it looks scanned or image-only. `
             + 'Image/OCR support is coming; for now use a text-based PDF or paste the text.',

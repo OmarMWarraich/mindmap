@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createPdfIngestionAdapter, maxPdfPages, type PdfPageExtractor } from './pdf-adapter.ts';
+import {
+  createPdfIngestionAdapter,
+  maxPdfBytes,
+  maxPdfPages,
+  type PdfPageExtractor,
+} from './pdf-adapter.ts';
 import { IngestionError } from './types.ts';
 
 function pdfFile(name = 'doc.pdf'): File {
@@ -14,14 +19,32 @@ function extractorReturning(pages: string[]): PdfPageExtractor {
 }
 
 test('PDF adapter joins page text with blank lines and reports page count', async () => {
-  const adapter = createPdfIngestionAdapter(extractorReturning(['Page one text', 'Page two text']));
+  const adapter = createPdfIngestionAdapter(
+    extractorReturning([
+      'Page one covers the introduction and background of the subject in detail.',
+      'Page two continues with the core mechanisms and worked examples for clarity.',
+    ]),
+  );
 
   const result = await adapter.read(pdfFile('chapter.pdf'));
 
-  assert.equal(result.text, 'Page one text\n\nPage two text');
+  assert.equal(
+    result.text,
+    'Page one covers the introduction and background of the subject in detail.\n\n'
+      + 'Page two continues with the core mechanisms and worked examples for clarity.',
+  );
   assert.equal(result.meta.fileName, 'chapter.pdf');
   assert.equal(result.meta.mimeType, 'application/pdf');
   assert.equal(result.meta.pageCount, 2);
+});
+
+test('PDF adapter accepts a short single-page PDF with real text', async () => {
+  const adapter = createPdfIngestionAdapter(extractorReturning(['Introduction to Photosynthesis']));
+
+  const result = await adapter.read(pdfFile('title.pdf'));
+
+  assert.equal(result.text, 'Introduction to Photosynthesis');
+  assert.equal(result.meta.pageCount, 1);
 });
 
 test('PDF adapter detects a scanned/image-only PDF (no extractable text)', async () => {
@@ -29,6 +52,18 @@ test('PDF adapter detects a scanned/image-only PDF (no extractable text)', async
 
   await assert.rejects(
     adapter.read(pdfFile('scanned.pdf')),
+    (error) => error instanceof IngestionError && /scanned or image-only/.test(error.message),
+  );
+});
+
+test('PDF adapter flags a multi-page PDF whose only text is sparse headers as scanned', async () => {
+  // Ten pages, each with just a running header / page number — well below the
+  // per-page average, so the whole document is treated as scanned.
+  const sparsePages = Array.from({ length: 10 }, (_, index) => `p.${index + 1}`);
+  const adapter = createPdfIngestionAdapter(extractorReturning(sparsePages));
+
+  await assert.rejects(
+    adapter.read(pdfFile('sparse-scan.pdf')),
     (error) => error instanceof IngestionError && /scanned or image-only/.test(error.message),
   );
 });
@@ -43,9 +78,27 @@ test('PDF adapter rejects a document over the page cap', async () => {
   );
 });
 
-test('PDF adapter advertises the pdf extension and mime type', () => {
+test('PDF adapter normalizes an extractor failure into a clean IngestionError', async () => {
+  const failingExtractor: PdfPageExtractor = async () => {
+    throw new Error('PasswordException: No password given');
+  };
+  const adapter = createPdfIngestionAdapter(failingExtractor);
+
+  await assert.rejects(
+    adapter.read(pdfFile('encrypted.pdf')),
+    (error) =>
+      error instanceof IngestionError
+      && /corrupted, encrypted, or password-protected/.test(error.message)
+      // Original error preserved for debugging.
+      && error.cause instanceof Error
+      && /PasswordException/.test((error.cause as Error).message),
+  );
+});
+
+test('PDF adapter advertises the pdf type and a higher byte ceiling', () => {
   const adapter = createPdfIngestionAdapter(extractorReturning(['x']));
 
   assert.deepEqual(adapter.extensions, ['pdf']);
   assert.deepEqual(adapter.mimeTypes, ['application/pdf']);
+  assert.equal(adapter.maxBytes, maxPdfBytes);
 });

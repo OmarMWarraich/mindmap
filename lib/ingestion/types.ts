@@ -22,6 +22,12 @@ export interface IngestionAdapter {
   extensions: string[];
   /** MIME types this adapter handles (secondary — some types, e.g. .md, are unreliable). */
   mimeTypes: string[];
+  /**
+   * Max input size in bytes for this adapter. Falls back to the shared default.
+   * PDFs carry binary overhead (fonts, figures) far exceeding their text, so they
+   * warrant a higher ceiling than plain text.
+   */
+  maxBytes?: number;
   read(file: File): Promise<IngestedFile>;
 }
 
@@ -31,8 +37,8 @@ export interface IngestionAdapter {
  * ingestion rejection from an unexpected runtime error.
  */
 export class IngestionError extends Error {
-  constructor(message: string) {
-    super(message);
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
     this.name = 'IngestionError';
   }
 }
