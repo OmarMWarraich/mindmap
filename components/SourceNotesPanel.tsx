@@ -1,6 +1,11 @@
 'use client';
 
+import { useRef, useState } from 'react';
+
 import type { SourceMindmapGenerationResponse } from '../lib/generation/source-schema';
+import { acceptedIngestionExtensions, ingestFiles } from '../lib/ingestion';
+
+const fileInputAccept = acceptedIngestionExtensions.map((extension) => `.${extension}`).join(',');
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -63,6 +68,40 @@ export default function SourceNotesPanel({
   onClearNotes,
 }: SourceNotesPanelProps) {
   const isGenerating = generationStatus.tone === 'progress';
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [attachStatus, setAttachStatus] = useState<{ tone: StatusTone; message: string } | null>(null);
+
+  async function handleFilesSelected(files: File[]): Promise<void> {
+    if (files.length === 0) {
+      return;
+    }
+
+    setAttachStatus({ tone: 'progress', message: 'Reading file…' });
+    const result = await ingestFiles(files);
+
+    // Append (never overwrite) so an attachment adds to whatever is already there.
+    if (result.text) {
+      const separator = rawNotes.trim().length > 0 ? '\n\n' : '';
+      onRawNotesChange(rawNotes + separator + result.text);
+    }
+
+    if (result.ingested.length > 0 && result.errors.length === 0) {
+      const names = result.ingested.map((item) => item.meta.fileName).join(', ');
+      setAttachStatus({ tone: 'success', message: `Loaded ${names}.` });
+    } else if (result.ingested.length > 0) {
+      setAttachStatus({
+        tone: 'error',
+        message: `Loaded ${result.ingested.length} file(s); skipped others — ${result.errors
+          .map((error) => error.message)
+          .join(' ')}`,
+      });
+    } else {
+      setAttachStatus({
+        tone: 'error',
+        message: result.errors.map((error) => error.message).join(' ') || 'No file could be read.',
+      });
+    }
+  }
 
   return (
     <div className="flex h-full flex-col bg-white">
@@ -212,8 +251,32 @@ export default function SourceNotesPanel({
         </div>
       ) : null}
 
+      {/* ── Attachment status ─────────────────────────────────────── */}
+      {attachStatus ? (
+        <div className="flex shrink-0 items-center gap-2 border-t border-zinc-100 px-4 py-2">
+          <span
+            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(attachStatus.tone)}`}
+          >
+            File
+          </span>
+          <span className="text-xs text-zinc-500">{attachStatus.message}</span>
+        </div>
+      ) : null}
+
       {/* ── Action buttons ────────────────────────────────────────── */}
       <div className="flex shrink-0 gap-2 border-t border-zinc-100 px-4 py-3">
+        <input
+          accept={fileInputAccept}
+          className="hidden"
+          multiple
+          onChange={(event) => {
+            const files = event.target.files ? Array.from(event.target.files) : [];
+            event.target.value = '';
+            void handleFilesSelected(files);
+          }}
+          ref={fileInputRef}
+          type="file"
+        />
         <button
           className="flex-1 rounded-lg bg-accent-500 px-3 py-2 text-sm font-medium text-white transition hover:bg-accent-600 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={isGenerating}
@@ -225,6 +288,17 @@ export default function SourceNotesPanel({
           {isGenerating
             ? 'Generating…'
             : `Generate ${selectedDetailLevel === 'detailed' ? 'detailed' : 'standard'} DSL`}
+        </button>
+        <button
+          className="rounded-lg border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={isGenerating}
+          onClick={() => {
+            fileInputRef.current?.click();
+          }}
+          title="Attach a .txt or .md file"
+          type="button"
+        >
+          Attach
         </button>
         {latestDslGeneration?.quality.densityStatus === 'below-target' ? (
           <button
