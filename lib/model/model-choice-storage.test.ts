@@ -32,27 +32,27 @@ test('loadModelChoices returns empty choices when nothing is stored', () => {
 test('saveModelChoices then loadModelChoices round-trips known ids', () => {
   const storage = createStorage();
   saveModelChoices(
-    { completionModelId: 'gpt-4o-mini', generationModelId: 'claude-sonnet-4-5' },
+    { completionModelId: 'gpt-5.4', generationModelId: 'claude-sonnet-4-5' },
     storage,
   );
 
   assert.deepEqual(loadModelChoices(storage), {
-    completionModelId: 'gpt-4o-mini',
+    completionModelId: 'gpt-5.4',
     generationModelId: 'claude-sonnet-4-5',
   });
 });
 
 test('saveModelChoices omits undefined fields from the stored payload', () => {
   const storage = createStorage();
-  saveModelChoices({ completionModelId: 'gpt-4o-mini', generationModelId: undefined }, storage);
+  saveModelChoices({ completionModelId: 'gpt-5.4', generationModelId: undefined }, storage);
 
   const stored = JSON.parse(storage.raw.get(MODEL_CHOICES_STORAGE_KEY) ?? '{}');
-  assert.deepEqual(stored, { completionModelId: 'gpt-4o-mini' });
+  assert.deepEqual(stored, { completionModelId: 'gpt-5.4' });
 });
 
 test('saveModelChoices removes the key when both choices are cleared', () => {
   const storage = createStorage({
-    [MODEL_CHOICES_STORAGE_KEY]: JSON.stringify({ completionModelId: 'gpt-4o-mini' }),
+    [MODEL_CHOICES_STORAGE_KEY]: JSON.stringify({ completionModelId: 'gpt-5.4' }),
   });
   saveModelChoices({ completionModelId: undefined, generationModelId: undefined }, storage);
 
@@ -62,13 +62,13 @@ test('saveModelChoices removes the key when both choices are cleared', () => {
 test('loadModelChoices drops ids that are no longer in the catalog', () => {
   const storage = createStorage({
     [MODEL_CHOICES_STORAGE_KEY]: JSON.stringify({
-      completionModelId: 'gpt-4o-mini',
+      completionModelId: 'gpt-5.4',
       generationModelId: 'retired-model-id',
     }),
   });
 
   assert.deepEqual(loadModelChoices(storage), {
-    completionModelId: 'gpt-4o-mini',
+    completionModelId: 'gpt-5.4',
     generationModelId: undefined,
   });
 });

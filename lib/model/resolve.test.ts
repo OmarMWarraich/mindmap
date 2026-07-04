@@ -9,9 +9,9 @@ const openaiKey = { OPENAI_API_KEY: 'sk-real-openai-key' };
 const anthropicKey = { ANTHROPIC_API_KEY: 'sk-real-anthropic-key' };
 
 test('resolveModel returns the catalog entry, openai-compatible adapter, and credentials', () => {
-  const resolved = resolveModel('gpt-4o-mini', { env: openaiKey });
+  const resolved = resolveModel('gpt-5.4', { env: openaiKey });
 
-  assert.equal(resolved.entry.id, 'gpt-4o-mini');
+  assert.equal(resolved.entry.id, 'gpt-5.4');
   assert.equal(resolved.entry.provider, 'openai');
   assert.equal(resolved.adapter, openaiCompatibleAdapter);
   assert.deepEqual(resolved.credentials, { apiKey: 'sk-real-openai-key' });
@@ -38,7 +38,7 @@ test('resolveModel throws when the provider key is not configured', () => {
 
 test('resolveModel throws when no adapter is registered for the wire format', () => {
   assert.throws(
-    () => resolveModel('gpt-4o-mini', { env: openaiKey, registry: {} }),
+    () => resolveModel('gpt-5.4', { env: openaiKey, registry: {} }),
     /No model adapter registered for wire format: openai-compatible/,
   );
 });

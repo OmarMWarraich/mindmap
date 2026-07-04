@@ -22,8 +22,8 @@ test('listConfiguredProviders returns only providers with a configured key', () 
 
 test('listAvailableModels filters the catalog to configured providers', () => {
   const ids = listAvailableModels(openaiOnly).map((entry) => entry.id);
-  assert.ok(ids.includes('gpt-4o-mini'));
-  assert.ok(ids.includes('gpt-4o'));
+  assert.ok(ids.includes('gpt-5.4'));
+  assert.ok(ids.includes('gpt-5.5'));
   assert.ok(ids.every((id) => id.startsWith('gpt-')));
 });
 
@@ -37,7 +37,7 @@ test('listAvailableModels is empty when no keys are configured', () => {
 });
 
 test('isModelAvailable is true only when the model provider is configured', () => {
-  assert.equal(isModelAvailable('gpt-4o-mini', openaiOnly), true);
+  assert.equal(isModelAvailable('gpt-5.4', openaiOnly), true);
   assert.equal(isModelAvailable('claude-sonnet-4-5', openaiOnly), false);
   assert.equal(isModelAvailable('claude-sonnet-4-5', bothProviders), true);
 });
@@ -48,6 +48,6 @@ test('isModelAvailable is false for unknown model ids', () => {
 
 test('listAvailableModelsForRole respects both role and configured providers', () => {
   const completionIds = listAvailableModelsForRole('completion', openaiOnly).map((entry) => entry.id);
-  assert.ok(completionIds.includes('gpt-4o-mini'));
+  assert.ok(completionIds.includes('gpt-5.4'));
   assert.ok(completionIds.every((id) => id.startsWith('gpt-')));
 });

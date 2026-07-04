@@ -29,7 +29,7 @@ test('createInlineCompletionCacheKey differs across models for identical context
   const base = { outline: '@root: Topic', cursor: { lineNumber: 1, column: 5 } } as const;
 
   assert.notEqual(
-    createInlineCompletionCacheKey({ ...base, modelId: 'gpt-4o-mini' }),
+    createInlineCompletionCacheKey({ ...base, modelId: 'gpt-5.4' }),
     createInlineCompletionCacheKey({ ...base, modelId: 'claude-haiku-4-5' }),
   );
 });
@@ -39,7 +39,7 @@ test('createInlineCompletionCacheKey treats an omitted modelId as the completion
 
   assert.equal(
     createInlineCompletionCacheKey(base),
-    createInlineCompletionCacheKey({ ...base, modelId: 'gpt-4o-mini' }),
+    createInlineCompletionCacheKey({ ...base, modelId: 'claude-haiku-4-5' }),
   );
 });
 
@@ -84,10 +84,10 @@ test('getInlineCompletionClientKey prefers forwarded client ip headers', () => {
 test('getInlineCompletionProvider resolves the effective completion model provider', () => {
   const base = { outline: '@root: Topic', cursor: { lineNumber: 1, column: 5 } } as const;
 
-  assert.equal(getInlineCompletionProvider({ ...base, modelId: 'gpt-4o-mini' }), 'openai');
+  assert.equal(getInlineCompletionProvider({ ...base, modelId: 'gpt-5.4' }), 'openai');
   assert.equal(getInlineCompletionProvider({ ...base, modelId: 'claude-haiku-4-5' }), 'anthropic');
-  // An omitted modelId falls back to the completion-role default (an OpenAI model).
-  assert.equal(getInlineCompletionProvider(base), 'openai');
+  // An omitted modelId falls back to the completion-role default (an Anthropic model).
+  assert.equal(getInlineCompletionProvider(base), 'anthropic');
 });
 
 test('getInlineCompletionRateLimitKey scopes the client window to the provider', () => {
@@ -97,7 +97,7 @@ test('getInlineCompletionRateLimitKey scopes the client window to the provider',
   const base = { outline: '@root: Topic', cursor: { lineNumber: 1, column: 5 } } as const;
 
   assert.equal(
-    getInlineCompletionRateLimitKey(httpRequest, { ...base, modelId: 'gpt-4o-mini' }),
+    getInlineCompletionRateLimitKey(httpRequest, { ...base, modelId: 'gpt-5.4' }),
     '203.0.113.7:openai',
   );
   assert.equal(
@@ -112,7 +112,7 @@ test('per-provider rate-limit keys keep one provider from starving another', asy
     headers: { 'x-forwarded-for': '203.0.113.9' },
   });
   const base = { outline: '@root: Topic', cursor: { lineNumber: 1, column: 5 } } as const;
-  const openaiKey = getInlineCompletionRateLimitKey(httpRequest, { ...base, modelId: 'gpt-4o-mini' });
+  const openaiKey = getInlineCompletionRateLimitKey(httpRequest, { ...base, modelId: 'gpt-5.4' });
   const anthropicKey = getInlineCompletionRateLimitKey(httpRequest, { ...base, modelId: 'claude-haiku-4-5' });
 
   // Exhaust the OpenAI budget for this client.
