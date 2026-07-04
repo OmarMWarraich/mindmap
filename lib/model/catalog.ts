@@ -71,42 +71,6 @@ export const modelCatalogSchema = z
 // role-specific call sites may override token budgets per request.
 const rawModelCatalog: ModelCatalogEntryInput[] = [
   {
-    id: 'gpt-4o-mini',
-    provider: 'openai',
-    wireFormat: 'openai-compatible',
-    label: 'GPT-4o mini',
-    roles: ['completion', 'generation'],
-    capabilities: { structuredOutput: 'response_format', contextWindow: 128_000 },
-    defaults: { temperature: 0.2, maxTokens: 1024 },
-  },
-  {
-    id: 'gpt-4o',
-    provider: 'openai',
-    wireFormat: 'openai-compatible',
-    label: 'GPT-4o',
-    roles: ['completion', 'generation'],
-    capabilities: { structuredOutput: 'response_format', contextWindow: 128_000 },
-    defaults: { temperature: 0.2, maxTokens: 4096 },
-  },
-  {
-    id: 'gpt-5-mini',
-    provider: 'openai',
-    wireFormat: 'openai-compatible',
-    label: 'GPT-5 mini',
-    roles: ['completion', 'generation'],
-    capabilities: { structuredOutput: 'response_format', contextWindow: 400_000 },
-    defaults: { temperature: 0.2, maxTokens: 1024 },
-  },
-  {
-    id: 'gpt-5.4-mini',
-    provider: 'openai',
-    wireFormat: 'openai-compatible',
-    label: 'GPT-5.4 mini',
-    roles: ['completion', 'generation'],
-    capabilities: { structuredOutput: 'response_format', contextWindow: 400_000 },
-    defaults: { temperature: 0.2, maxTokens: 1024 },
-  },
-  {
     id: 'gpt-5.4',
     provider: 'openai',
     wireFormat: 'openai-compatible',
@@ -156,6 +120,20 @@ const rawModelCatalog: ModelCatalogEntryInput[] = [
     defaults: { temperature: 0.2, maxTokens: 4096 },
   },
   {
+    id: 'claude-sonnet-5',
+    provider: 'anthropic',
+    wireFormat: 'anthropic-messages',
+    label: 'Claude Sonnet 5',
+    roles: ['completion', 'generation'],
+    capabilities: {
+      structuredOutput: 'tool',
+      contextWindow: 200_000,
+      // Sonnet 5 rejects non-default sampling parameters.
+      supportsTemperature: false,
+    },
+    defaults: { temperature: 0.2, maxTokens: 4096 },
+  },
+  {
     id: 'claude-opus-4-7',
     provider: 'anthropic',
     wireFormat: 'anthropic-messages',
@@ -177,6 +155,20 @@ const rawModelCatalog: ModelCatalogEntryInput[] = [
     capabilities: {
       structuredOutput: 'tool',
       contextWindow: 200_000,
+      supportsTemperature: false,
+    },
+    defaults: { temperature: 0.2, maxTokens: 4096 },
+  },
+  {
+    id: 'claude-fable-5',
+    provider: 'anthropic',
+    wireFormat: 'anthropic-messages',
+    label: 'Claude Fable 5',
+    roles: ['completion', 'generation'],
+    capabilities: {
+      structuredOutput: 'tool',
+      contextWindow: 200_000,
+      // Fable 5 removes sampling parameters entirely.
       supportsTemperature: false,
     },
     defaults: { temperature: 0.2, maxTokens: 4096 },
