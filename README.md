@@ -114,6 +114,7 @@ Each document has exactly one root line, followed by one or more top-level branc
 - Runtime schema validation via `zod`
 - PNG export via `html-to-image`
 - IndexedDB persistence via `idb`
+- Security tooling: ESLint security plugins, Semgrep, Gitleaks, CodeQL, and Dependabot (see [Security & Static Analysis](#security--static-analysis-sast))
 
 The product mixes deterministic parsing and rendering with model-backed assistance, while keeping the DSL parser as the structural source of truth.
 
@@ -207,6 +208,60 @@ Server-side code logs through a small structured logger ([lib/observability/logg
 
 Inline-completion lifecycle events (accepted / dismissed / ignored, with timing and request reason) are persisted per user to the `completion_event` table for acceptance-rate analysis. For privacy, the raw suggestion text is never stored — only its length — since suggestions can echo the user's notes. Recording is best-effort: a database failure is logged and never fails the request. Applying the table requires running the Drizzle migration (`drizzle-kit migrate` / `push`).
 
+## Security & Static Analysis (SAST)
+
+Security scanning runs in CI on every push and pull request via
+[.github/workflows/security.yml](.github/workflows/security.yml), and locally via a
+pre-commit hook. Layers:
+
+- **Dependency audit (SCA)** — an `npm audit` gate (blocks on high severity and
+  above), plus [Dependabot](.github/dependabot.yml) update PRs for the npm and
+  GitHub Actions ecosystems.
+- **Static analysis** — CodeQL (`javascript-typescript`) and Semgrep. Semgrep runs
+  a blocking set of repo-invariant rules ([.semgrep/rules.yml](.semgrep/rules.yml) —
+  DOM XSS sinks, `dangerouslySetInnerHTML`, `sql.raw`, and provider secrets in
+  client code) plus report-only community rulesets.
+- **Secret scanning** — Gitleaks over the full git history.
+- **Security linting** — `eslint-plugin-security` and `eslint-plugin-no-unsanitized`
+  wired into [eslint.config.mjs](eslint.config.mjs).
+- **Type baseline** — `tsc --noEmit`.
+
+A [Husky](.husky/pre-commit) pre-commit hook runs ESLint on staged files (via
+lint-staged) and a best-effort Gitleaks staged scan; it installs automatically on
+`npm install`.
+
+> **Note:** the CI `npm test` step is currently non-blocking pending a test-suite
+> fix (tracked in #39); `tsc`, ESLint, and the security scans are blocking.
+
+### Running the audit locally
+
+`tsc`, ESLint, and the dependency audit run natively; CodeQL runs only in CI.
+Semgrep, Gitleaks, and actionlint run via their official Docker images, so no local
+install is required (Docker must be running):
+
+```bash
+# Type check, lint, and the production dependency audit (the same gates as CI)
+npm run typecheck
+npm run lint
+npm audit --omit=dev --audit-level=high
+
+# Semgrep — blocking repo-invariant rules
+docker run --rm -v "$PWD:/src" -w /src semgrep/semgrep \
+  semgrep scan --config .semgrep/rules.yml --error
+
+# Semgrep — broad community rulesets (report-only)
+docker run --rm -v "$PWD:/src" -w /src semgrep/semgrep \
+  semgrep scan --config p/typescript --config p/react --config p/nextjs \
+  --config p/owasp-top-ten --config p/secrets
+
+# Secret scan (full git history)
+docker run --rm -v "$PWD:/repo" -w /repo \
+  ghcr.io/gitleaks/gitleaks:latest git /repo
+
+# Lint the GitHub Actions workflow files
+docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest -color
+```
+
 ## Available Scripts
 
 - `npm run dev` starts the local development server.
@@ -215,6 +270,10 @@ Inline-completion lifecycle events (accepted / dismissed / ignored, with timing 
 - `npm run lint` runs ESLint.
 - `npm run test` runs the Node.js test runner and will execute discovered test files as they are added.
 - `npm run typecheck` runs TypeScript type checking without emitting build output.
+- `npm audit --omit=dev --audit-level=high` runs the production dependency audit (the CI gate blocks on high severity and above).
+- `npm run prepare` installs the Husky pre-commit hooks; it runs automatically after `npm install`.
+
+See [Security & Static Analysis](#security--static-analysis-sast) for the full set of local scan commands.
 
 ## Project Structure
 
@@ -227,6 +286,9 @@ Inline-completion lifecycle events (accepted / dismissed / ignored, with timing 
 - [lib/persistence](lib/persistence) contains project, draft, and history persistence logic.
 - [workers](workers) contains the mindmap layout worker.
 - [drizzle](drizzle) contains database migrations and metadata.
+- [.github/workflows](.github/workflows) contains CI, including the security scanning pipeline.
+- [.semgrep](.semgrep) contains the custom Semgrep rules used by CI and local scans.
+- [.husky](.husky) contains the pre-commit hook (lint-staged + secret scan).
 - [TODO.md](TODO.md) tracks the phased implementation plan.
 
 ## Development Direction
