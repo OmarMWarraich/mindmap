@@ -41,7 +41,16 @@ async function defaultExtractPdfPages(data: ArrayBuffer): Promise<string[]> {
   ]);
   const pdfjs = pdfjsModule as typeof Pdfjs;
 
-  const loadingTask = pdfjs.getDocument({ data });
+  const loadingTask = pdfjs.getDocument({
+    data,
+    // Defense-in-depth for parsing untrusted PDFs client-side: we only extract
+    // text (getTextContent), so no @font-face rendering is needed — disabling it
+    // trims the font attack surface. (pdf.js v6 removed the older
+    // `isEvalSupported` option; the eval font-exec path no longer exists, so
+    // keeping pdfjs patched via SCA is the primary mitigation.) See
+    // docs/ISSUE_NO_16.md.
+    disableFontFace: true,
+  });
 
   try {
     const doc = await loadingTask.promise;

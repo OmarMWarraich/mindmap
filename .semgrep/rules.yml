@@ -1,0 +1,55 @@
+rules:
+  # DOM XSS sinks. Untrusted content (ingested file text, model output) reaches
+  # the render path; keep it on textContent / React children. See
+  # docs/ISSUE_NO_16.md (ingestion deep-dive).
+  - id: no-dom-html-sink
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >
+      Avoid innerHTML/outerHTML/insertAdjacentHTML/document.write — these render
+      HTML from a string and are XSS sinks. Use textContent or React children.
+    patterns:
+      - pattern-either:
+          - pattern: $EL.innerHTML = $X
+          - pattern: $EL.innerHTML += $X
+          - pattern: $EL.outerHTML = $X
+          - pattern: $EL.outerHTML += $X
+          - pattern: $EL.insertAdjacentHTML(...)
+          - pattern: document.write(...)
+          - pattern: document.writeln(...)
+
+  # React equivalent of the above (not covered by eslint-plugin-no-unsanitized).
+  - id: no-dangerously-set-inner-html
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >
+      Avoid dangerouslySetInnerHTML — renders raw HTML. Render text as React
+      children, or sanitize before use. See docs/ISSUE_NO_16.md.
+    pattern: dangerouslySetInnerHTML={...}
+
+  # Drizzle parameterizes by default; sql.raw() bypasses that. Keep queries on
+  # the builder or the parameterized sql`` template.
+  - id: no-raw-sql
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >
+      Avoid sql.raw() — it bypasses parameterization and invites SQL injection.
+      Use the drizzle query builder or the parameterized sql`` tagged template.
+    pattern: sql.raw(...)
+
+  # Provider API keys are server-only (read via lib/config/env.ts). A client
+  # component ('components/**') must never read a secret env var.
+  - id: no-provider-secret-in-client
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >
+      Provider API keys / secrets are server-only. Don't read secret env vars in
+      client components — access them on the server via lib/config/env.ts.
+    paths:
+      include:
+        - components/
+    patterns:
+      - pattern: process.env.$KEY
+      - metavariable-regex:
+          metavariable: $KEY
+          regex: (API_KEY|SECRET|TOKEN|PASSWORD)
