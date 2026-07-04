@@ -8,8 +8,11 @@ import {
   normalizeGeneratedDsl,
 } from './source-service.ts';
 
+// The generation-role default is now an Anthropic model (claude-haiku-4-5), so
+// these tests resolve against ANTHROPIC_API_KEY and mock the anthropic-messages
+// response shape. (The explicit-model wire-format test below keeps its own env.)
 const testEnv: Record<string, string | undefined> = {
-  OPENAI_API_KEY: 'test-key',
+  ANTHROPIC_API_KEY: 'test-key',
 };
 
 test('countMeaningfulNonEmptyLines ignores blank lines', () => {
@@ -31,7 +34,7 @@ test('generateMindmapDslFromSource returns validated DSL metrics for parser-safe
     {
       env: testEnv,
       fetchImpl: async () => new Response(JSON.stringify({
-        choices: [{ message: { content: JSON.stringify({
+        content: [{ type: 'text', text:JSON.stringify({
           dsl: [
             '@root: Photosynthesis',
             '- @branch: Light reactions',
@@ -46,7 +49,7 @@ test('generateMindmapDslFromSource returns validated DSL metrics for parser-safe
             '- @branch: Importance',
             '  - supports biomass + food webs',
           ].join('\n'),
-        }) } }],
+        }) }],
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -127,9 +130,9 @@ test('generateMindmapDslFromSource rejects DSL that does not parse under the sin
       {
         env: testEnv,
         fetchImpl: async () => new Response(JSON.stringify({
-          choices: [{ message: { content: JSON.stringify({
+          content: [{ type: 'text', text:JSON.stringify({
             dsl: '@root: Topic A\n- @branch: Branch\n@root: Topic B',
-          }) } }],
+          }) }],
         }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
@@ -149,9 +152,9 @@ test('generateMindmapDslFromSource rejects lines above the 35-word limit', async
       {
         env: testEnv,
         fetchImpl: async () => new Response(JSON.stringify({
-          choices: [{ message: { content: JSON.stringify({
+          content: [{ type: 'text', text:JSON.stringify({
             dsl: '@root: Photosynthesis\n- @branch: Stages\n  - this generated branch line intentionally contains far more than thirty five separate distinct words so that the per line word limit validation rule will actually trigger a rejection inside the source generation service during this particular parser safe regression test case today',
-          }) } }],
+          }) }],
         }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
@@ -178,7 +181,7 @@ test('generateMindmapDslFromSource salvages Main Topic and Sub Topic style outpu
     {
       env: testEnv,
       fetchImpl: async () => new Response(JSON.stringify({
-        choices: [{ message: { content: JSON.stringify({
+        content: [{ type: 'text', text:JSON.stringify({
           dsl: [
             'Main Topic: Aspects',
             'Sub Topic: Introduction to the Aspects',
@@ -188,7 +191,7 @@ test('generateMindmapDslFromSource salvages Main Topic and Sub Topic style outpu
             'Sub Topic: International Relations',
             'Sub Topic: Political Economy',
           ].join('\n'),
-        }) } }],
+        }) }],
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -236,7 +239,7 @@ test('generateMindmapDslFromSource retries when the first parser-safe result is 
 
         if (requestCount === 1) {
           return new Response(JSON.stringify({
-            choices: [{ message: { content: JSON.stringify({
+            content: [{ type: 'text', text:JSON.stringify({
               dsl: [
                 '@root: Aspects',
                 '- @branch: Introduction to the Aspects',
@@ -251,7 +254,7 @@ test('generateMindmapDslFromSource retries when the first parser-safe result is 
                 '- @branch: Comparative Government',
                 '- @branch: Development Studies',
               ].join('\n'),
-            }) } }],
+            }) }],
           }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
@@ -259,7 +262,7 @@ test('generateMindmapDslFromSource retries when the first parser-safe result is 
         }
 
         return new Response(JSON.stringify({
-          choices: [{ message: { content: JSON.stringify({
+          content: [{ type: 'text', text:JSON.stringify({
             dsl: [
               '@root: Aspects of Political Science',
               '- @branch: Introduction to the Aspects',
@@ -296,7 +299,7 @@ test('generateMindmapDslFromSource retries when the first parser-safe result is 
               '  - development studies explores political change in developing societies',
               '  - it links governance, growth, welfare, participation, reform, and modernization',
             ].join('\n'),
-          }) } }],
+          }) }],
         }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
@@ -322,9 +325,9 @@ test('generateMindmapDslFromSource reports below-target density when even the re
     {
       env: testEnv,
       fetchImpl: async () => new Response(JSON.stringify({
-        choices: [{ message: { content: JSON.stringify({
+        content: [{ type: 'text', text:JSON.stringify({
           dsl: '@root: Aspects\n- @branch: Political Theory\n  - studies ideas of justice\n- @branch: Public Law\n  - studies constitutional rules',
-        }) } }],
+        }) }],
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -356,7 +359,7 @@ test('generateMindmapDslFromSource retries detailed generation when the first re
 
         if (requestCount === 1) {
           return new Response(JSON.stringify({
-            choices: [{ message: { content: JSON.stringify({
+            content: [{ type: 'text', text:JSON.stringify({
               dsl: [
                 '@root: Photosynthesis',
                 '- @branch: Light reactions',
@@ -369,7 +372,7 @@ test('generateMindmapDslFromSource retries detailed generation when the first re
                 '  - Importance',
                 '  - supports glucose formation for plant growth',
               ].join('\n'),
-            }) } }],
+            }) }],
           }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
@@ -377,7 +380,7 @@ test('generateMindmapDslFromSource retries detailed generation when the first re
         }
 
         return new Response(JSON.stringify({
-          choices: [{ message: { content: JSON.stringify({
+          content: [{ type: 'text', text:JSON.stringify({
             dsl: [
               '@root: Photosynthesis',
               '- @branch: Light reactions',
@@ -390,7 +393,7 @@ test('generateMindmapDslFromSource retries detailed generation when the first re
               '  - stores solar energy in organic molecules',
               '  - sustains plant biomass and food chains',
             ].join('\n'),
-          }) } }],
+          }) }],
         }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
@@ -423,7 +426,7 @@ test('generateMindmapDslFromSource retries detailed generation when branches onl
 
         if (requestCount === 1) {
           return new Response(JSON.stringify({
-            choices: [{ message: { content: JSON.stringify({
+            content: [{ type: 'text', text:JSON.stringify({
               dsl: [
                 '@root: Photosynthesis',
                 '- @branch: Light reactions',
@@ -433,7 +436,7 @@ test('generateMindmapDslFromSource retries detailed generation when branches onl
                 '  - fixes carbon dioxide into sugars',
                 '  - uses ATP and NADPH from light reactions',
               ].join('\n'),
-            }) } }],
+            }) }],
           }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
@@ -441,7 +444,7 @@ test('generateMindmapDslFromSource retries detailed generation when branches onl
         }
 
         return new Response(JSON.stringify({
-          choices: [{ message: { content: JSON.stringify({
+          content: [{ type: 'text', text:JSON.stringify({
             dsl: [
               '@root: Photosynthesis',
               '- @branch: Light reactions',
@@ -453,7 +456,7 @@ test('generateMindmapDslFromSource retries detailed generation when branches onl
               '  - uses ATP and NADPH from light reactions',
               '  - regenerates RuBP to continue carbon assimilation',
             ].join('\n'),
-          }) } }],
+          }) }],
         }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
@@ -486,7 +489,7 @@ test('generateMindmapDslFromSource gives detailed mode a wider target line band 
     {
       env: testEnv,
       fetchImpl: async () => new Response(JSON.stringify({
-        choices: [{ message: { content: JSON.stringify({ dsl: denseDsl }) } }],
+        content: [{ type: 'text', text:JSON.stringify({ dsl: denseDsl }) }],
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -502,7 +505,7 @@ test('generateMindmapDslFromSource gives detailed mode a wider target line band 
     {
       env: testEnv,
       fetchImpl: async () => new Response(JSON.stringify({
-        choices: [{ message: { content: JSON.stringify({ dsl: denseDsl }) } }],
+        content: [{ type: 'text', text:JSON.stringify({ dsl: denseDsl }) }],
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -547,9 +550,9 @@ test('generateMindmapDslFromSource retries standard over-target output that deta
         standardRequestCount += 1;
 
         return new Response(JSON.stringify({
-          choices: [{ message: { content: JSON.stringify({
+          content: [{ type: 'text', text:JSON.stringify({
             dsl: standardRequestCount === 1 ? borderlineDenseDsl : compactRetryDsl,
-          }) } }],
+          }) }],
         }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
@@ -570,7 +573,7 @@ test('generateMindmapDslFromSource retries standard over-target output that deta
         detailedRequestCount += 1;
 
         return new Response(JSON.stringify({
-          choices: [{ message: { content: JSON.stringify({ dsl: borderlineDenseDsl }) } }],
+          content: [{ type: 'text', text:JSON.stringify({ dsl: borderlineDenseDsl }) }],
         }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
@@ -617,13 +620,21 @@ test('generateMindmapDslFromSource distills large input into a bounded outline w
     {
       env: testEnv,
       fetchImpl: async (_url, init) => {
-        const body = JSON.parse(String(init?.body ?? '{}')) as { messages?: Array<{ content?: unknown }> };
+        const body = JSON.parse(String(init?.body ?? '{}')) as {
+          system?: unknown;
+          messages?: Array<{ content?: unknown }>;
+        };
+        // The anthropic-messages adapter lifts the system prompt to a top-level
+        // `system` field, so check it alongside the user turns.
+        if (body.system !== undefined) {
+          userPrompts.push(String(body.system));
+        }
         for (const message of body.messages ?? []) {
           userPrompts.push(String(message.content));
         }
 
         return new Response(JSON.stringify({
-          choices: [{ message: { content: JSON.stringify({ dsl: condensedDsl }) } }],
+          content: [{ type: 'text', text:JSON.stringify({ dsl: condensedDsl }) }],
         }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
@@ -649,7 +660,7 @@ test('generateMindmapDslFromSource keeps small inputs in expand mode', async () 
     {
       env: testEnv,
       fetchImpl: async () => new Response(JSON.stringify({
-        choices: [{ message: { content: JSON.stringify({
+        content: [{ type: 'text', text:JSON.stringify({
           dsl: [
             '@root: Photosynthesis',
             '- @branch: Light reactions',
@@ -659,7 +670,7 @@ test('generateMindmapDslFromSource keeps small inputs in expand mode', async () 
             '  - fixes CO2 into sugars',
             '  - runs in the stroma',
           ].join('\n'),
-        }) } }],
+        }) }],
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
