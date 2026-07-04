@@ -11,7 +11,9 @@ rules:
     patterns:
       - pattern-either:
           - pattern: $EL.innerHTML = $X
+          - pattern: $EL.innerHTML += $X
           - pattern: $EL.outerHTML = $X
+          - pattern: $EL.outerHTML += $X
           - pattern: $EL.insertAdjacentHTML(...)
           - pattern: document.write(...)
           - pattern: document.writeln(...)
