@@ -5,10 +5,10 @@ process.env.DATABASE_URL = 'postgresql://localhost/test';
 
 mock.module('../../../../../auth.ts', {
   namedExports: {
-    auth: (handler: Function) => (req: Request, ctx: unknown) => {
+    auth: (handler: (req: Request, ctx: unknown) => unknown) => (req: Request, ctx: unknown) => {
       const userId = req.headers.get('x-test-user-id');
       if (userId) {
-        (req as any).auth = { user: { id: userId } };
+        (req as Request & { auth?: unknown }).auth = { user: { id: userId } };
       }
       return handler(req, ctx);
     },
@@ -16,9 +16,9 @@ mock.module('../../../../../auth.ts', {
 });
 
 const dbMock = {
-  selectQueue: [] as any[][],
-  updateReturn: [] as any[],
-  insertReturn: [] as any[],
+  selectQueue: [] as unknown[][],
+  updateReturn: [] as unknown[],
+  insertReturn: [] as unknown[],
 };
 
 mock.module('../../../../../lib/db/index.ts', {
@@ -32,7 +32,9 @@ mock.module('../../../../../lib/db/index.ts', {
       update: () => ({
         set: () => ({
           where: () => {
-            const p = Promise.resolve([]) as any;
+            const p = Promise.resolve([]) as Promise<unknown[]> & {
+              returning?: () => Promise<unknown[]>;
+            };
             p.returning = () => Promise.resolve(dbMock.updateReturn);
             return p;
           },

@@ -8,10 +8,10 @@ mock.module('../../../../lib/db/index.ts', { namedExports: { db: {} } });
 
 mock.module('../../../../auth.ts', {
   namedExports: {
-    auth: (handler: Function) => (req: Request) => {
+    auth: (handler: (req: Request) => unknown) => (req: Request) => {
       const userId = req.headers.get('x-test-user-id');
       if (userId) {
-        (req as any).auth = { user: { id: userId } };
+        (req as Request & { auth?: unknown }).auth = { user: { id: userId } };
       }
       return handler(req);
     },
