@@ -21,11 +21,11 @@ test('dsl generation route returns validated DSL output for a valid request', as
   const originalEnv = { ...process.env };
   const originalFetch = globalThis.fetch;
 
-  process.env.OPENAI_API_KEY = 'sk-openai-test';
-  delete process.env.ANTHROPIC_API_KEY;
+  process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
+  delete process.env.OPENAI_API_KEY;
 
   globalThis.fetch = async () => new Response(JSON.stringify({
-    choices: [{ message: { content: JSON.stringify({
+    content: [{ type: 'text', text: JSON.stringify({
       dsl: [
         '@root: Photosynthesis',
         '- @branch: Light reactions',
@@ -40,7 +40,7 @@ test('dsl generation route returns validated DSL output for a valid request', as
         '- @branch: Importance',
         '  - supports biomass + food webs',
       ].join('\n'),
-    }) } }],
+    }) }],
   }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
@@ -90,13 +90,13 @@ test('dsl generation route surfaces model output validation failures', async () 
   const originalEnv = { ...process.env };
   const originalFetch = globalThis.fetch;
 
-  process.env.OPENAI_API_KEY = 'sk-openai-test';
-  delete process.env.ANTHROPIC_API_KEY;
+  process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
+  delete process.env.OPENAI_API_KEY;
 
   globalThis.fetch = async () => new Response(JSON.stringify({
-    choices: [{ message: { content: JSON.stringify({
+    content: [{ type: 'text', text: JSON.stringify({
       dsl: '@root: Topic A\n- @branch: Branch\n@root: Topic B',
-    }) } }],
+    }) }],
   }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
