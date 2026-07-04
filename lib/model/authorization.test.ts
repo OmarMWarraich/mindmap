@@ -14,8 +14,8 @@ const bothProviders = {
 };
 
 test('authorizeModelId accepts a known, allow-listed, configured model', () => {
-  const result = authorizeModelId('gpt-4o-mini', { role: 'completion', env: openaiOnly });
-  assert.deepEqual(result, { ok: true, modelId: 'gpt-4o-mini' });
+  const result = authorizeModelId('gpt-5.4', { role: 'completion', env: openaiOnly });
+  assert.deepEqual(result, { ok: true, modelId: 'gpt-5.4' });
 });
 
 test('authorizeModelId rejects an unknown model id with 400', () => {
@@ -32,7 +32,7 @@ test('authorizeModelId rejects a model whose provider is not configured with 403
 });
 
 test('authorizeModelId rejects a model that does not support the requested role', () => {
-  const result = authorizeModelId('gpt-4o-mini', {
+  const result = authorizeModelId('gpt-5.4', {
     role: 'embedding' as never,
     env: openaiOnly,
   });
@@ -42,8 +42,8 @@ test('authorizeModelId rejects a model that does not support the requested role'
 });
 
 test('authorizeModelId enforces the MODEL_ALLOWLIST env var', () => {
-  const env = { ...bothProviders, MODEL_ALLOWLIST: 'gpt-4o-mini, gpt-4o' };
-  assert.equal(authorizeModelId('gpt-4o-mini', { env }).ok, true);
+  const env = { ...bothProviders, MODEL_ALLOWLIST: 'gpt-5.4, gpt-5.5' };
+  assert.equal(authorizeModelId('gpt-5.4', { env }).ok, true);
 
   const blocked = authorizeModelId('claude-sonnet-4-5', { env });
   assert.equal(blocked.ok, false);
@@ -57,7 +57,7 @@ test('getModelAllowList returns null when MODEL_ALLOWLIST is unset or blank', ()
 });
 
 test('isModelAllowListed falls back to catalog membership without an allow-list', () => {
-  assert.equal(isModelAllowListed('gpt-4o-mini', {}), true);
+  assert.equal(isModelAllowListed('gpt-5.4', {}), true);
   assert.equal(isModelAllowListed('made-up-model', {}), false);
-  assert.equal(isModelAllowListed('gpt-4o', { MODEL_ALLOWLIST: 'gpt-4o-mini' }), false);
+  assert.equal(isModelAllowListed('gpt-5.5', { MODEL_ALLOWLIST: 'gpt-5.4' }), false);
 });

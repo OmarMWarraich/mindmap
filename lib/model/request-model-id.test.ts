@@ -33,7 +33,7 @@ test('request schemas remain valid when modelId is omitted (backward compatible)
 
 test('request schemas accept a known catalog modelId', () => {
   assert.equal(
-    inlineCompletionRequestSchema.safeParse({ ...baseCompletion, modelId: 'gpt-4o-mini' }).success,
+    inlineCompletionRequestSchema.safeParse({ ...baseCompletion, modelId: 'gpt-5.4' }).success,
     true,
   );
   assert.equal(
@@ -41,7 +41,7 @@ test('request schemas accept a known catalog modelId', () => {
     true,
   );
   assert.equal(
-    sourceMindmapGenerationRequestSchema.safeParse({ ...baseSource, modelId: 'gpt-4o' }).success,
+    sourceMindmapGenerationRequestSchema.safeParse({ ...baseSource, modelId: 'gpt-5.5' }).success,
     true,
   );
 });

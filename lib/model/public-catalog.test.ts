@@ -65,8 +65,8 @@ test('listPublicModels narrows to a single role', () => {
 
 test('listPublicModels honors the MODEL_ALLOWLIST env var', () => {
   const models = listPublicModels({
-    env: { ...bothKeys, MODEL_ALLOWLIST: 'gpt-4o-mini' },
+    env: { ...bothKeys, MODEL_ALLOWLIST: 'gpt-5.4' },
   });
 
-  assert.deepEqual(models.map((model) => model.id), ['gpt-4o-mini']);
+  assert.deepEqual(models.map((model) => model.id), ['gpt-5.4']);
 });

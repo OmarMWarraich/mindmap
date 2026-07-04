@@ -38,7 +38,7 @@ test('uses response_format for an openai-compatible model and parses choices', a
 
   const result = await requestStructuredModelCompletion({
     role: 'generation',
-    modelId: 'gpt-4o',
+    modelId: 'gpt-5.4',
     env: openaiKey,
     fetchImpl,
     maxTokens: 256,
@@ -46,7 +46,7 @@ test('uses response_format for an openai-compatible model and parses choices', a
     messages: [{ role: 'user', content: 'hi' }],
   });
 
-  assert.equal(result.modelId, 'gpt-4o');
+  assert.equal(result.modelId, 'gpt-5.4');
   assert.equal(result.structuredOutputStrategy, 'response_format');
   assert.equal(result.text, '{"ok":true}');
   assert.equal(calls[0].url.endsWith('/chat/completions'), true);
@@ -88,7 +88,7 @@ test('sends the catalog default temperature for a model that supports it', async
 
   await requestStructuredModelCompletion({
     role: 'generation',
-    modelId: 'gpt-4o',
+    modelId: 'gpt-5.4',
     env: openaiKey,
     fetchImpl,
     maxTokens: 256,
@@ -136,16 +136,18 @@ test('omits temperature for an anthropic model that deprecated it', async () => 
 });
 
 test('falls back to the role default model when modelId is omitted', async () => {
-  const { fetchImpl } = captureFetch({ choices: [{ message: { content: '' } }] });
+  // Default is now an Anthropic model, so the role-default path resolves against
+  // ANTHROPIC_API_KEY and the anthropic-messages response shape.
+  const { fetchImpl } = captureFetch({ content: [{ type: 'text', text: '' }] });
 
   const result = await requestStructuredModelCompletion({
     role: 'generation',
-    env: openaiKey,
+    env: anthropicKey,
     fetchImpl,
     maxTokens: 256,
     structuredOutput: jsonSchema,
     messages: [{ role: 'user', content: 'hi' }],
   });
 
-  assert.equal(result.modelId, 'gpt-4o');
+  assert.equal(result.modelId, 'claude-haiku-4-5');
 });
