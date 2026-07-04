@@ -1,0 +1,13 @@
+npx lint-staged
+
+# Secret scan of staged changes (best-effort; the CI gitleaks job is
+# authoritative). Uses a local gitleaks binary if present, else the Docker
+# image, else skips so contributors without either tool aren't blocked.
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks git --pre-commit --staged --redact .
+elif command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+  docker run --rm -v "$(git rev-parse --show-toplevel):/repo" -w /repo \
+    ghcr.io/gitleaks/gitleaks:latest git --pre-commit --staged --redact /repo
+else
+  echo "gitleaks/docker unavailable — skipping local secret scan (CI still enforces)."
+fi
