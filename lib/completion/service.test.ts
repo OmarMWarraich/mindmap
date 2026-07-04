@@ -39,14 +39,14 @@ test('generateInlineCompletion dispatches an explicit openai modelId to the chat
   });
 
   await generateInlineCompletion(
-    { ...baseRequest, modelId: 'gpt-4o-mini' },
+    { ...baseRequest, modelId: 'gpt-5.4' },
     { env: { OPENAI_API_KEY: 'sk-openai-test' }, fetchImpl },
   );
 
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url.endsWith('/chat/completions'), true);
   assert.equal(calls[0].headers.Authorization, 'Bearer sk-openai-test');
-  assert.equal(calls[0].body.model, 'gpt-4o-mini');
+  assert.equal(calls[0].body.model, 'gpt-5.4');
   assert.equal(calls[0].body.max_completion_tokens, 72);
 });
 
@@ -70,15 +70,17 @@ test('generateInlineCompletion dispatches an explicit anthropic modelId over the
 });
 
 test('generateInlineCompletion falls back to the completion-role default model when modelId is omitted', async () => {
+  // The completion-role default is now an Anthropic model, so the omitted-modelId
+  // path resolves against ANTHROPIC_API_KEY and the Messages wire format.
   const { fetchImpl, calls } = captureFetch({
-    choices: [{ message: { content: 'ynthase' } }],
+    content: [{ type: 'text', text: 'ynthase' }],
   });
 
   await generateInlineCompletion(
     baseRequest,
-    { env: { OPENAI_API_KEY: 'sk-openai-test' }, fetchImpl },
+    { env: { ANTHROPIC_API_KEY: 'sk-ant-test' }, fetchImpl },
   );
 
-  assert.equal(calls[0].url.endsWith('/chat/completions'), true);
-  assert.equal(calls[0].body.model, 'gpt-4o-mini');
+  assert.equal(calls[0].url.endsWith('/messages'), true);
+  assert.equal(calls[0].body.model, 'claude-haiku-4-5');
 });

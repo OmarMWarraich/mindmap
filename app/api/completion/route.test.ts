@@ -25,13 +25,13 @@ test('completion route returns model output for a valid request', async () => {
   };
   const originalFetch = globalThis.fetch;
 
-  process.env.OPENAI_API_KEY = 'sk-openai-test';
-  delete process.env.ANTHROPIC_API_KEY;
+  process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
+  delete process.env.OPENAI_API_KEY;
 
   resetInlineCompletionRuntimeControlsForTests();
 
   globalThis.fetch = async () => new Response(JSON.stringify({
-    choices: [{ message: { content: '  - ATP synthase' } }],
+    content: [{ type: 'text', text:'  - ATP synthase' }],
   }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
@@ -67,13 +67,13 @@ test('completion route drops off-topic model output after relevance filtering', 
   };
   const originalFetch = globalThis.fetch;
 
-  process.env.OPENAI_API_KEY = 'sk-openai-test';
-  delete process.env.ANTHROPIC_API_KEY;
+  process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
+  delete process.env.OPENAI_API_KEY;
 
   resetInlineCompletionRuntimeControlsForTests();
 
   globalThis.fetch = async () => new Response(JSON.stringify({
-    choices: [{ message: { content: 'French Revolution causes' } }],
+    content: [{ type: 'text', text:'French Revolution causes' }],
   }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
@@ -109,13 +109,13 @@ test('completion route drops duplicate nearby sibling suggestions', async () => 
   };
   const originalFetch = globalThis.fetch;
 
-  process.env.OPENAI_API_KEY = 'sk-openai-test';
-  delete process.env.ANTHROPIC_API_KEY;
+  process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
+  delete process.env.OPENAI_API_KEY;
 
   resetInlineCompletionRuntimeControlsForTests();
 
   globalThis.fetch = async () => new Response(JSON.stringify({
-    choices: [{ message: { content: 'NADPH output' } }],
+    content: [{ type: 'text', text:'NADPH output' }],
   }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
@@ -168,14 +168,14 @@ test('completion route serves identical requests from cache before calling fetch
   const originalFetch = globalThis.fetch;
   let fetchCalls = 0;
 
-  process.env.OPENAI_API_KEY = 'sk-openai-test';
-  delete process.env.ANTHROPIC_API_KEY;
+  process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
+  delete process.env.OPENAI_API_KEY;
   resetInlineCompletionRuntimeControlsForTests();
 
   globalThis.fetch = async () => {
     fetchCalls += 1;
     return new Response(JSON.stringify({
-      choices: [{ message: { content: '  - ATP synthase' } }],
+      content: [{ type: 'text', text: '  - ATP synthase' }],
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -214,12 +214,12 @@ test('completion route returns 429 after repeated burst requests from the same c
   };
   const originalFetch = globalThis.fetch;
 
-  process.env.OPENAI_API_KEY = 'sk-openai-test';
-  delete process.env.ANTHROPIC_API_KEY;
+  process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
+  delete process.env.OPENAI_API_KEY;
   resetInlineCompletionRuntimeControlsForTests();
 
   globalThis.fetch = async () => new Response(JSON.stringify({
-    choices: [{ message: { content: '  - ATP synthase' } }],
+    content: [{ type: 'text', text:'  - ATP synthase' }],
   }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
