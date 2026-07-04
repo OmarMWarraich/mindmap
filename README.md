@@ -256,7 +256,7 @@ docker run --rm -v "$PWD:/src" -w /src semgrep/semgrep \
 
 # Secret scan (full git history)
 docker run --rm -v "$PWD:/repo" -w /repo \
-  ghcr.io/gitleaks/gitleaks:latest git /repo
+  ghcr.io/gitleaks/gitleaks:latest git /repo --platform=github
 
 # Lint the GitHub Actions workflow files
 docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest -color
