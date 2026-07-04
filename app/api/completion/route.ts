@@ -1,26 +1,34 @@
 import { ZodError } from 'zod';
 
-import { auth } from '../../../auth.ts';
+import { withUser } from '../../../lib/api/guards.ts';
+import { errorResponse } from '../../../lib/api/responses.ts';
 import {
   consumeInlineCompletionRateLimit,
   createInlineCompletionCacheKey,
   getCachedInlineCompletion,
-  getInlineCompletionClientKey,
+  getInlineCompletionRateLimitKey,
   setCachedInlineCompletion,
 } from '../../../lib/completion/runtime-controls.ts';
 import { inlineCompletionRequestSchema, generateInlineCompletion } from '../../../lib/completion/service.ts';
+import { authorizeModelId } from '../../../lib/model/authorization.ts';
+import { describeError, logger } from '../../../lib/observability/logger.ts';
 
 export const runtime = 'nodejs';
 
-export const POST = auth(async (req) => {
-  if (!req.auth?.user?.id) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
+export const POST = withUser(async (req) => {
   try {
     const payload = inlineCompletionRequestSchema.parse(await req.json());
-    const clientKey = getInlineCompletionClientKey(req);
-    const rateLimit = consumeInlineCompletionRateLimit(clientKey);
+
+    if (payload.modelId) {
+      const authorization = authorizeModelId(payload.modelId, { role: 'completion' });
+
+      if (!authorization.ok) {
+        return errorResponse(authorization.reason, authorization.status);
+      }
+    }
+
+    const clientKey = getInlineCompletionRateLimitKey(req, payload);
+    const rateLimit = await consumeInlineCompletionRateLimit(clientKey);
 
     if (!rateLimit.allowed) {
       return Response.json(
@@ -46,6 +54,14 @@ export const POST = auth(async (req) => {
     const message = error instanceof Error ? error.message : 'Unexpected completion route failure.';
     const status = error instanceof ZodError ? 400 : 500;
 
-    return Response.json({ error: message }, { status });
+    if (status >= 500) {
+      logger.error('inline completion request failed', {
+        route: 'POST /api/completion',
+        status,
+        ...describeError(error),
+      });
+    }
+
+    return errorResponse(message, status);
   }
 });

@@ -1,103 +1,89 @@
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
+import { ZodError } from 'zod';
 
-import { auth } from '../../../../../auth.ts';
+import { withProject } from '../../../../../lib/api/project-guard.ts';
+import { draftUpdateSchema } from '../../../../../lib/api/projects-schema.ts';
+import { errorResponse } from '../../../../../lib/api/responses.ts';
 import { db } from '../../../../../lib/db/index.ts';
 import { projectDrafts, projects } from '../../../../../lib/db/schema.ts';
+import { describeError, logger } from '../../../../../lib/observability/logger.ts';
 
 export const runtime = 'nodejs';
 
-type RouteContext = { params: Promise<{ id: string }> };
+export const GET = withProject(async (_req, { projectId }) => {
+  try {
+    const [draft] = await db
+      .select()
+      .from(projectDrafts)
+      .where(eq(projectDrafts.projectId, projectId));
 
-export const GET = auth(async (req, ctx: RouteContext) => {
-  if (!req.auth?.user?.id) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    return Response.json(draft ?? null);
+  } catch (error) {
+    logger.error('failed to load project draft', {
+      route: 'GET /api/projects/[id]/draft',
+      status: 500,
+      ...describeError(error),
+    });
+    return errorResponse('Failed to load draft.', 500);
   }
-
-  const { id: projectId } = await ctx.params;
-  const userId = req.auth.user.id;
-
-  const [project] = await db
-    .select()
-    .from(projects)
-    .where(and(eq(projects.id, projectId), eq(projects.userId, userId)));
-
-  if (!project) {
-    return Response.json({ error: 'Not found' }, { status: 404 });
-  }
-
-  const [draft] = await db
-    .select()
-    .from(projectDrafts)
-    .where(eq(projectDrafts.projectId, projectId));
-
-  return Response.json(draft ?? null);
 });
 
-export const PUT = auth(async (req, ctx: RouteContext) => {
-  if (!req.auth?.user?.id) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export const PUT = withProject(async (req, { projectId }) => {
+  try {
+    const body = draftUpdateSchema.parse(await req.json());
 
-  const { id: projectId } = await ctx.params;
-  const userId = req.auth.user.id;
+    const [existing] = await db
+      .select()
+      .from(projectDrafts)
+      .where(eq(projectDrafts.projectId, projectId));
 
-  const [project] = await db
-    .select()
-    .from(projects)
-    .where(and(eq(projects.id, projectId), eq(projects.userId, userId)));
+    const now = new Date();
 
-  if (!project) {
-    return Response.json({ error: 'Not found' }, { status: 404 });
-  }
+    if (existing) {
+      const [updated] = await db
+        .update(projectDrafts)
+        .set({
+          outline: body.outline ?? existing.outline,
+          rawNotes: body.rawNotes ?? existing.rawNotes,
+          selectedDetailLevel: body.selectedDetailLevel ?? existing.selectedDetailLevel,
+          mindmap: body.mindmap !== undefined ? body.mindmap : existing.mindmap,
+          previewTransform:
+            body.previewTransform !== undefined ? body.previewTransform : existing.previewTransform,
+          updatedAt: now,
+        })
+        .where(eq(projectDrafts.id, existing.id))
+        .returning();
 
-  const body = (await req.json()) as Record<string, unknown>;
+      await db.update(projects).set({ updatedAt: now }).where(eq(projects.id, projectId));
 
-  const [existing] = await db
-    .select()
-    .from(projectDrafts)
-    .where(eq(projectDrafts.projectId, projectId));
+      return Response.json(updated);
+    }
 
-  const now = new Date();
-
-  if (existing) {
-    const [updated] = await db
-      .update(projectDrafts)
-      .set({
-        outline: typeof body.outline === 'string' ? body.outline : existing.outline,
-        rawNotes: typeof body.rawNotes === 'string' ? body.rawNotes : existing.rawNotes,
-        selectedDetailLevel:
-          typeof body.selectedDetailLevel === 'string'
-            ? body.selectedDetailLevel
-            : existing.selectedDetailLevel,
-        mindmap: body.mindmap !== undefined ? body.mindmap : existing.mindmap,
-        previewTransform:
-          body.previewTransform !== undefined
-            ? body.previewTransform
-            : existing.previewTransform,
-        updatedAt: now,
+    const [created] = await db
+      .insert(projectDrafts)
+      .values({
+        projectId,
+        outline: body.outline ?? '',
+        rawNotes: body.rawNotes ?? '',
+        selectedDetailLevel: body.selectedDetailLevel ?? 'standard',
+        mindmap: body.mindmap ?? null,
+        previewTransform: body.previewTransform ?? null,
       })
-      .where(eq(projectDrafts.id, existing.id))
       .returning();
 
     await db.update(projects).set({ updatedAt: now }).where(eq(projects.id, projectId));
 
-    return Response.json(updated);
+    return Response.json(created, { status: 201 });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return errorResponse(error.message, 400);
+    }
+
+    logger.error('failed to save project draft', {
+      route: 'PUT /api/projects/[id]/draft',
+      status: 500,
+      ...describeError(error),
+    });
+    return errorResponse('Failed to save draft.', 500);
   }
-
-  const [created] = await db
-    .insert(projectDrafts)
-    .values({
-      projectId,
-      outline: typeof body.outline === 'string' ? body.outline : '',
-      rawNotes: typeof body.rawNotes === 'string' ? body.rawNotes : '',
-      selectedDetailLevel:
-        typeof body.selectedDetailLevel === 'string' ? body.selectedDetailLevel : 'standard',
-      mindmap: body.mindmap ?? null,
-      previewTransform: body.previewTransform ?? null,
-    })
-    .returning();
-
-  await db.update(projects).set({ updatedAt: now }).where(eq(projects.id, projectId));
-
-  return Response.json(created, { status: 201 });
 });

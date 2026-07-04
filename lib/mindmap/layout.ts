@@ -173,19 +173,57 @@ function getMindmapCanvasPadding(mindmap: GeneratedMindmap): number {
 }
 
 function getMindmapRadialRadius(mindmap: GeneratedMindmap): number {
+  const nodeSpacing = getMindmapRadialNodeSpacing(mindmap);
   const largestNodeDiagonal = mindmap.nodes.reduce((maxDiagonal, node) => {
     const nodeWidth = node.layout.minWidth + node.layout.paddingX * 2;
     const nodeHeight = node.layout.minHeight + node.layout.paddingY * 2;
 
     return Math.max(maxDiagonal, Math.hypot(nodeWidth, nodeHeight));
   }, 0);
+  const levelCircumferenceRadius = getMindmapLevelCircumferenceRadius(mindmap, nodeSpacing);
 
   return Math.ceil(
     Math.max(
       mindmap.metadata.layout.levelGap,
-      largestNodeDiagonal + getMindmapRadialNodeSpacing(mindmap),
+      largestNodeDiagonal + nodeSpacing,
+      levelCircumferenceRadius,
     ),
   );
+}
+
+function getMindmapLevelCircumferenceRadius(
+  mindmap: GeneratedMindmap,
+  fallbackSpacing: number,
+): number {
+  const levelNodeDemand = new Map<number, { count: number; arcLength: number }>();
+
+  for (const node of mindmap.nodes) {
+    if (node.level === 0) {
+      continue;
+    }
+
+    const nodeWidth = node.layout.minWidth + node.layout.paddingX * 2;
+    const nodeHeight = node.layout.minHeight + node.layout.paddingY * 2;
+    const nodeArcLength = Math.hypot(nodeWidth, nodeHeight) + Math.max(node.layout.siblingGap, fallbackSpacing);
+    const currentDemand = levelNodeDemand.get(node.level) ?? { count: 0, arcLength: 0 };
+
+    levelNodeDemand.set(node.level, {
+      count: currentDemand.count + 1,
+      arcLength: currentDemand.arcLength + nodeArcLength,
+    });
+  }
+
+  let requiredRadius = 0;
+
+  for (const demand of levelNodeDemand.values()) {
+    if (demand.count <= 1) {
+      continue;
+    }
+
+    requiredRadius = Math.max(requiredRadius, demand.arcLength / (2 * Math.PI));
+  }
+
+  return requiredRadius;
 }
 
 function getMindmapRadialNodeSpacing(mindmap: GeneratedMindmap): number {

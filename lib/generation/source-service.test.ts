@@ -1,19 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { ModelProviderEnv } from '../config/env.ts';
+import { maxSourceTextCharacters } from './limits.ts';
 import {
   countMeaningfulNonEmptyLines,
   generateMindmapDslFromSource,
   normalizeGeneratedDsl,
 } from './source-service.ts';
 
-const testEnv: ModelProviderEnv = {
-  MODEL_PROVIDER: 'openai',
-  MODEL_API_KEY: 'test-key',
-  MODEL_BASE_URL: undefined,
-  MODEL_COMPLETION_MODEL: 'gpt-5-mini',
-  MODEL_GENERATION_MODEL: 'gpt-5',
+// The generation-role default is now an Anthropic model (claude-haiku-4-5), so
+// these tests resolve against ANTHROPIC_API_KEY and mock the anthropic-messages
+// response shape. (The explicit-model wire-format test below keeps its own env.)
+const testEnv: Record<string, string | undefined> = {
+  ANTHROPIC_API_KEY: 'test-key',
 };
 
 test('countMeaningfulNonEmptyLines ignores blank lines', () => {
@@ -35,7 +34,7 @@ test('generateMindmapDslFromSource returns validated DSL metrics for parser-safe
     {
       env: testEnv,
       fetchImpl: async () => new Response(JSON.stringify({
-        choices: [{ message: { content: JSON.stringify({
+        content: [{ type: 'text', text:JSON.stringify({
           dsl: [
             '@root: Photosynthesis',
             '- @branch: Light reactions',
@@ -50,7 +49,7 @@ test('generateMindmapDslFromSource returns validated DSL metrics for parser-safe
             '- @branch: Importance',
             '  - supports biomass + food webs',
           ].join('\n'),
-        }) } }],
+        }) }],
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -68,6 +67,60 @@ test('generateMindmapDslFromSource returns validated DSL metrics for parser-safe
   assert.deepEqual(response.validation.parserErrors, []);
 });
 
+test('generateMindmapDslFromSource dispatches an anthropic model over the Messages wire format', async () => {
+  const anthropicEnv: Record<string, string | undefined> = {
+    ANTHROPIC_API_KEY: 'sk-ant-test-key',
+  };
+  const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+  const anthropicDsl = [
+    '@root: Photosynthesis',
+    '- @branch: Light reactions',
+    '  - overview == first energy-conversion stage',
+    '  - Inputs',
+    '    - light + H2O + ADP + NADP+',
+    '  - Outputs',
+    '    - O2 + ATP + NADPH',
+    '- @branch: Calvin cycle',
+    '  - fixes CO2 => carbohydrates',
+    '  - stages == fixation + reduction + regeneration',
+    '- @branch: Importance',
+    '  - supports biomass + food webs',
+  ].join('\n');
+
+  const response = await generateMindmapDslFromSource(
+    {
+      sourceText: 'Photosynthesis\nLight reactions\nCalvin cycle\nInputs and outputs\nImportance',
+      modelId: 'claude-sonnet-4-5',
+    },
+    {
+      env: anthropicEnv,
+      fetchImpl: async (input: RequestInfo | URL, init?: RequestInit) => {
+        calls.push({
+          url: String(input),
+          body: JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>,
+        });
+        return new Response(JSON.stringify({
+          content: [{ type: 'tool_use', name: 'mindmap_source_to_dsl', input: { dsl: anthropicDsl } }],
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      },
+    },
+  );
+
+  // Routed through the anthropic-messages adapter, not the OpenAI path.
+  assert.equal(calls[0].url.endsWith('/messages'), true);
+  assert.equal(calls[0].body.model, 'claude-sonnet-4-5');
+  assert.equal(Array.isArray(calls[0].body.tools), true);
+  assert.deepEqual(calls[0].body.tool_choice, { type: 'tool', name: 'mindmap_source_to_dsl' });
+  assert.equal('response_format' in calls[0].body, false);
+
+  // The tool_use input is parsed back into the validated DSL response.
+  assert.equal(response.dsl.startsWith('@root: Photosynthesis'), true);
+  assert.deepEqual(response.validation.parserErrors, []);
+});
+
 test('generateMindmapDslFromSource rejects DSL that does not parse under the single-root app rules', async () => {
   await assert.rejects(
     () => generateMindmapDslFromSource(
@@ -77,9 +130,9 @@ test('generateMindmapDslFromSource rejects DSL that does not parse under the sin
       {
         env: testEnv,
         fetchImpl: async () => new Response(JSON.stringify({
-          choices: [{ message: { content: JSON.stringify({
+          content: [{ type: 'text', text:JSON.stringify({
             dsl: '@root: Topic A\n- @branch: Branch\n@root: Topic B',
-          }) } }],
+          }) }],
         }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
@@ -90,7 +143,7 @@ test('generateMindmapDslFromSource rejects DSL that does not parse under the sin
   );
 });
 
-test('generateMindmapDslFromSource rejects lines above the 15-word limit', async () => {
+test('generateMindmapDslFromSource rejects lines above the 35-word limit', async () => {
   await assert.rejects(
     () => generateMindmapDslFromSource(
       {
@@ -99,16 +152,16 @@ test('generateMindmapDslFromSource rejects lines above the 15-word limit', async
       {
         env: testEnv,
         fetchImpl: async () => new Response(JSON.stringify({
-          choices: [{ message: { content: JSON.stringify({
-            dsl: '@root: Photosynthesis\n- @branch: Stages\n  - this line definitely contains more than fifteen distinct words for validation failure in parser-safe testing today',
-          }) } }],
+          content: [{ type: 'text', text:JSON.stringify({
+            dsl: '@root: Photosynthesis\n- @branch: Stages\n  - this generated branch line intentionally contains far more than thirty five separate distinct words so that the per line word limit validation rule will actually trigger a rejection inside the source generation service during this particular parser safe regression test case today',
+          }) }],
         }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         }),
       },
     ),
-    /15-word per-line limit/i,
+    /35-word per-line limit/i,
   );
 });
 
@@ -128,7 +181,7 @@ test('generateMindmapDslFromSource salvages Main Topic and Sub Topic style outpu
     {
       env: testEnv,
       fetchImpl: async () => new Response(JSON.stringify({
-        choices: [{ message: { content: JSON.stringify({
+        content: [{ type: 'text', text:JSON.stringify({
           dsl: [
             'Main Topic: Aspects',
             'Sub Topic: Introduction to the Aspects',
@@ -138,7 +191,7 @@ test('generateMindmapDslFromSource salvages Main Topic and Sub Topic style outpu
             'Sub Topic: International Relations',
             'Sub Topic: Political Economy',
           ].join('\n'),
-        }) } }],
+        }) }],
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -186,7 +239,7 @@ test('generateMindmapDslFromSource retries when the first parser-safe result is 
 
         if (requestCount === 1) {
           return new Response(JSON.stringify({
-            choices: [{ message: { content: JSON.stringify({
+            content: [{ type: 'text', text:JSON.stringify({
               dsl: [
                 '@root: Aspects',
                 '- @branch: Introduction to the Aspects',
@@ -201,7 +254,7 @@ test('generateMindmapDslFromSource retries when the first parser-safe result is 
                 '- @branch: Comparative Government',
                 '- @branch: Development Studies',
               ].join('\n'),
-            }) } }],
+            }) }],
           }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
@@ -209,7 +262,7 @@ test('generateMindmapDslFromSource retries when the first parser-safe result is 
         }
 
         return new Response(JSON.stringify({
-          choices: [{ message: { content: JSON.stringify({
+          content: [{ type: 'text', text:JSON.stringify({
             dsl: [
               '@root: Aspects of Political Science',
               '- @branch: Introduction to the Aspects',
@@ -246,7 +299,7 @@ test('generateMindmapDslFromSource retries when the first parser-safe result is 
               '  - development studies explores political change in developing societies',
               '  - it links governance, growth, welfare, participation, reform, and modernization',
             ].join('\n'),
-          }) } }],
+          }) }],
         }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
@@ -272,9 +325,9 @@ test('generateMindmapDslFromSource reports below-target density when even the re
     {
       env: testEnv,
       fetchImpl: async () => new Response(JSON.stringify({
-        choices: [{ message: { content: JSON.stringify({
+        content: [{ type: 'text', text:JSON.stringify({
           dsl: '@root: Aspects\n- @branch: Political Theory\n  - studies ideas of justice\n- @branch: Public Law\n  - studies constitutional rules',
-        }) } }],
+        }) }],
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -306,7 +359,7 @@ test('generateMindmapDslFromSource retries detailed generation when the first re
 
         if (requestCount === 1) {
           return new Response(JSON.stringify({
-            choices: [{ message: { content: JSON.stringify({
+            content: [{ type: 'text', text:JSON.stringify({
               dsl: [
                 '@root: Photosynthesis',
                 '- @branch: Light reactions',
@@ -319,7 +372,7 @@ test('generateMindmapDslFromSource retries detailed generation when the first re
                 '  - Importance',
                 '  - supports glucose formation for plant growth',
               ].join('\n'),
-            }) } }],
+            }) }],
           }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
@@ -327,7 +380,7 @@ test('generateMindmapDslFromSource retries detailed generation when the first re
         }
 
         return new Response(JSON.stringify({
-          choices: [{ message: { content: JSON.stringify({
+          content: [{ type: 'text', text:JSON.stringify({
             dsl: [
               '@root: Photosynthesis',
               '- @branch: Light reactions',
@@ -340,7 +393,7 @@ test('generateMindmapDslFromSource retries detailed generation when the first re
               '  - stores solar energy in organic molecules',
               '  - sustains plant biomass and food chains',
             ].join('\n'),
-          }) } }],
+          }) }],
         }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
@@ -352,4 +405,293 @@ test('generateMindmapDslFromSource retries detailed generation when the first re
   assert.equal(requestCount, 2);
   assert.equal(response.quality.mode, 'retry');
   assert.match(response.dsl, /converts light energy into ATP and NADPH/i);
+});
+
+test('generateMindmapDslFromSource retries detailed generation when branches only reach standard-level depth', async () => {
+  let requestCount = 0;
+
+  const response = await generateMindmapDslFromSource(
+    {
+      sourceText: [
+        'Photosynthesis',
+        'Light reactions',
+        'Calvin cycle',
+      ].join('\n'),
+      detailLevel: 'detailed',
+    },
+    {
+      env: testEnv,
+      fetchImpl: async () => {
+        requestCount += 1;
+
+        if (requestCount === 1) {
+          return new Response(JSON.stringify({
+            content: [{ type: 'text', text:JSON.stringify({
+              dsl: [
+                '@root: Photosynthesis',
+                '- @branch: Light reactions',
+                '  - captures light energy in chloroplast membranes',
+                '  - releases oxygen from water splitting',
+                '- @branch: Calvin cycle',
+                '  - fixes carbon dioxide into sugars',
+                '  - uses ATP and NADPH from light reactions',
+              ].join('\n'),
+            }) }],
+          }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        return new Response(JSON.stringify({
+          content: [{ type: 'text', text:JSON.stringify({
+            dsl: [
+              '@root: Photosynthesis',
+              '- @branch: Light reactions',
+              '  - captures light energy in chloroplast membranes',
+              '  - releases oxygen from water splitting',
+              '  - produces ATP and NADPH for carbon fixation',
+              '- @branch: Calvin cycle',
+              '  - fixes carbon dioxide into sugars',
+              '  - uses ATP and NADPH from light reactions',
+              '  - regenerates RuBP to continue carbon assimilation',
+            ].join('\n'),
+          }) }],
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      },
+    },
+  );
+
+  assert.equal(requestCount, 2);
+  assert.equal(response.quality.mode, 'retry');
+  assert.match(response.dsl, /produces ATP and NADPH for carbon fixation/i);
+  assert.equal(response.quality.underdevelopedBranchCount, 0);
+});
+
+test('generateMindmapDslFromSource gives detailed mode a wider target line band than standard mode', async () => {
+  const sourceText = Array.from({ length: 16 }, (_, index) => `Topic ${index + 1}`).join('\n');
+  const denseDsl = [
+    '@root: Topic overview',
+    ...['A', 'B', 'C', 'D'].flatMap((label, branchIndex) => [
+      `- @branch: Topic cluster ${label}`,
+      ...Array.from({ length: 11 }, (_, childIndex) => `  - branch ${branchIndex + 1} detail ${childIndex + 1} explains one linked study point`),
+    ]),
+  ].join('\n');
+
+  const standardResponse = await generateMindmapDslFromSource(
+    {
+      sourceText,
+      detailLevel: 'standard',
+    },
+    {
+      env: testEnv,
+      fetchImpl: async () => new Response(JSON.stringify({
+        content: [{ type: 'text', text:JSON.stringify({ dsl: denseDsl }) }],
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    },
+  );
+
+  const detailedResponse = await generateMindmapDslFromSource(
+    {
+      sourceText,
+      detailLevel: 'detailed',
+    },
+    {
+      env: testEnv,
+      fetchImpl: async () => new Response(JSON.stringify({
+        content: [{ type: 'text', text:JSON.stringify({ dsl: denseDsl }) }],
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    },
+  );
+
+  assert.equal(standardResponse.metrics.generatedMeaningfulLineCount, 49);
+  assert.equal(standardResponse.quality.densityStatus, 'over-target');
+  assert.equal(detailedResponse.quality.densityStatus, 'target-met');
+  assert.ok(detailedResponse.metrics.targetMaxLineCount > standardResponse.metrics.targetMaxLineCount);
+  assert.ok(detailedResponse.metrics.targetMinLineCount > standardResponse.metrics.targetMinLineCount);
+});
+
+test('generateMindmapDslFromSource retries standard over-target output that detailed mode can keep', async () => {
+  const sourceText = Array.from({ length: 10 }, (_, index) => `Topic ${index + 1}`).join('\n');
+  const borderlineDenseDsl = [
+    '@root: Topic overview',
+    ...['A', 'B', 'C', 'D'].flatMap((label, branchIndex) => [
+      `- @branch: Topic cluster ${label}`,
+      ...Array.from({ length: 6 }, (_, childIndex) => `  - branch ${branchIndex + 1} detail ${childIndex + 1} explains one linked study point`),
+    ]),
+    '  - concluding comparison ties the clusters into one revision frame',
+  ].join('\n');
+  const compactRetryDsl = [
+    '@root: Topic overview',
+    ...['A', 'B', 'C', 'D'].flatMap((label, branchIndex) => [
+      `- @branch: Topic cluster ${label}`,
+      ...Array.from({ length: 5 }, (_, childIndex) => `  - branch ${branchIndex + 1} detail ${childIndex + 1} explains one linked study point`),
+    ]),
+  ].join('\n');
+
+  let standardRequestCount = 0;
+  const standardResponse = await generateMindmapDslFromSource(
+    {
+      sourceText,
+      detailLevel: 'standard',
+    },
+    {
+      env: testEnv,
+      fetchImpl: async () => {
+        standardRequestCount += 1;
+
+        return new Response(JSON.stringify({
+          content: [{ type: 'text', text:JSON.stringify({
+            dsl: standardRequestCount === 1 ? borderlineDenseDsl : compactRetryDsl,
+          }) }],
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      },
+    },
+  );
+
+  let detailedRequestCount = 0;
+  const detailedResponse = await generateMindmapDslFromSource(
+    {
+      sourceText,
+      detailLevel: 'detailed',
+    },
+    {
+      env: testEnv,
+      fetchImpl: async () => {
+        detailedRequestCount += 1;
+
+        return new Response(JSON.stringify({
+          content: [{ type: 'text', text:JSON.stringify({ dsl: borderlineDenseDsl }) }],
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      },
+    },
+  );
+
+  assert.equal(standardRequestCount, 2);
+  assert.equal(standardResponse.quality.mode, 'retry');
+  assert.equal(standardResponse.quality.densityStatus, 'target-met');
+  assert.equal(standardResponse.metrics.generatedMeaningfulLineCount, 25);
+  assert.equal(detailedRequestCount, 1);
+  assert.equal(detailedResponse.quality.mode, 'first-pass');
+  assert.equal(detailedResponse.quality.densityStatus, 'target-met');
+  assert.equal(detailedResponse.metrics.generatedMeaningfulLineCount, 30);
+});
+
+test('generateMindmapDslFromSource distills large input into a bounded outline without forcing expansion', async () => {
+  // 60 meaningful lines crosses the distillation threshold; expanding 2.3x would
+  // be nonsensical, so the pipeline must condense instead.
+  const largeSource = Array.from(
+    { length: 60 },
+    (_, index) => `Point number ${index + 1} about the subject matter`,
+  ).join('\n');
+
+  // A deliberately condensed result: 10 meaningful lines, below the distill min (12).
+  const condensedDsl = [
+    '@root: Subject Matter',
+    '- @branch: Foundations',
+    '  - core idea one',
+    '  - core idea two',
+    '- @branch: Mechanisms',
+    '  - mechanism one',
+    '  - mechanism two',
+    '- @branch: Applications',
+    '  - application one',
+    '  - application two',
+  ].join('\n');
+
+  const userPrompts: string[] = [];
+  const response = await generateMindmapDslFromSource(
+    { sourceText: largeSource },
+    {
+      env: testEnv,
+      fetchImpl: async (_url, init) => {
+        const body = JSON.parse(String(init?.body ?? '{}')) as {
+          system?: unknown;
+          messages?: Array<{ content?: unknown }>;
+        };
+        // The anthropic-messages adapter lifts the system prompt to a top-level
+        // `system` field, so check it alongside the user turns.
+        if (body.system !== undefined) {
+          userPrompts.push(String(body.system));
+        }
+        for (const message of body.messages ?? []) {
+          userPrompts.push(String(message.content));
+        }
+
+        return new Response(JSON.stringify({
+          content: [{ type: 'text', text:JSON.stringify({ dsl: condensedDsl }) }],
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      },
+    },
+  );
+
+  assert.equal(response.metrics.generationMode, 'distill');
+  assert.equal(response.metrics.targetMinLineCount, 12);
+  assert.equal(response.metrics.targetMaxLineCount, 60);
+  assert.equal(response.metrics.generatedMeaningfulLineCount, 10);
+  // Below the bound is acceptable when condensing — distill must NOT retry to expand.
+  assert.equal(response.quality.densityStatus, 'below-target');
+  assert.equal(response.quality.attemptCount, 1);
+  assert.equal(response.quality.mode, 'first-pass');
+  assert.ok(userPrompts.some((prompt) => /Condense the long source/.test(prompt)));
+});
+
+test('generateMindmapDslFromSource keeps small inputs in expand mode', async () => {
+  const response = await generateMindmapDslFromSource(
+    { sourceText: 'Photosynthesis\nLight reactions\nCalvin cycle' },
+    {
+      env: testEnv,
+      fetchImpl: async () => new Response(JSON.stringify({
+        content: [{ type: 'text', text:JSON.stringify({
+          dsl: [
+            '@root: Photosynthesis',
+            '- @branch: Light reactions',
+            '  - converts light into chemical energy',
+            '  - splits water to release O2',
+            '- @branch: Calvin cycle',
+            '  - fixes CO2 into sugars',
+            '  - runs in the stroma',
+          ].join('\n'),
+        }) }],
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    },
+  );
+
+  assert.equal(response.metrics.generationMode, 'expand');
+});
+
+test('generateMindmapDslFromSource rejects source text beyond the hard length cap', async () => {
+  await assert.rejects(
+    generateMindmapDslFromSource(
+      { sourceText: 'x'.repeat(maxSourceTextCharacters + 1) },
+      {
+        env: testEnv,
+        fetchImpl: async () => {
+          throw new Error('model should not be called for over-cap input');
+        },
+      },
+    ),
+    /too long/i,
+  );
 });

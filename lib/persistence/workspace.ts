@@ -1,6 +1,7 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import { z } from 'zod';
 
+import { previewTransformSchema } from '../api/projects-schema.ts';
 import { sourceMindmapGenerationResponseSchema } from '../generation/source-schema.ts';
 import { generatedMindmapSchema } from '../mindmap/schema.ts';
 
@@ -8,12 +9,6 @@ const workspaceDraftStoreName = 'workspace-drafts';
 const workspaceDraftKey = 'study-workspace';
 const workspaceDbName = 'mindmap-study-app';
 const workspaceDbVersion = 1;
-
-const svgPreviewTransformSchema = z.object({
-  scale: z.number().positive(),
-  translateX: z.number(),
-  translateY: z.number(),
-}).strict();
 
 export const persistedWorkspaceDraftSchema = z.object({
   version: z.literal(1),
@@ -23,7 +18,7 @@ export const persistedWorkspaceDraftSchema = z.object({
   selectedDetailLevel: z.enum(['standard', 'detailed']).optional(),
   latestDslGeneration: sourceMindmapGenerationResponseSchema.nullable().optional(),
   mindmap: generatedMindmapSchema.nullable(),
-  previewTransform: svgPreviewTransformSchema,
+  previewTransform: previewTransformSchema,
 }).strict();
 
 export type PersistedWorkspaceDraft = z.infer<typeof persistedWorkspaceDraftSchema>;

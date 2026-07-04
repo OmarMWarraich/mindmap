@@ -15,24 +15,27 @@ This project is being built MVP-first. Deterministic structure, readability, and
 
 ## Current Status
 
-The repository is currently bootstrapped with Next.js, React, and TypeScript.
+The app is no longer just a scaffold. The current build includes a public marketing site, OAuth sign-in, an authenticated study workspace, deterministic DSL parsing, AI-assisted source-to-DSL generation, mindmap preview rendering, export, and draft persistence.
 
 Implemented now:
 
-- Next.js App Router project scaffold
-- React 19 + TypeScript setup
-- ESLint configuration
-- Monaco dependency setup and smoke-test mount
-- Core runtime dependencies for layout, schema validation, export, and persistence
-- Initial project planning in [TODO.md](TODO.md)
+- Public landing page at `/`
+- Custom login page at `/login`
+- Protected workspace at `/workspace`
+- Google and GitHub OAuth via Auth.js
+- Deterministic DSL parser, validation, and AST pipeline
+- Monaco-based DSL editor and source-notes input workflow
+- AI-assisted inline completion and source-notes-to-DSL generation
+- Mindmap generation, layout, SVG preview, and PNG export
+- Local and cloud-backed draft restoration
+- Generation history and project persistence
+- Source-level smoke tests plus Node.js unit coverage across the core slices
 
 Planned next:
 
-- Study editor with Monaco
-- Deterministic DSL parser and validation
-- Inline learning-focused completions
-- Mindmap generation, layout, and SVG rendering
-- PNG export and local draft persistence
+- Stronger real-browser end-to-end coverage
+- More production hardening around auth, provider failures, and persistence edges
+- Continued iteration on generation quality and study-workflow polish
 
 ## MVP DSL Rules
 
@@ -103,20 +106,50 @@ Each document has exactly one root line, followed by one or more top-level branc
 - TypeScript 5
 - ESLint 9
 - Tailwind CSS 4
+- Auth.js 5 beta with Google and GitHub OAuth
+- Drizzle ORM with the Auth.js Drizzle adapter
+- Neon serverless Postgres driver
 - Monaco Editor via `@monaco-editor/react`
 - ELK via `elkjs`
 - Runtime schema validation via `zod`
 - PNG export via `html-to-image`
 - IndexedDB persistence via `idb`
+- Security tooling: ESLint security plugins, Semgrep, Gitleaks, CodeQL, and Dependabot (see [Security & Static Analysis](#security--static-analysis-sast))
 
-These dependencies are installed, but most of their feature-specific integration work is still ahead.
+The product mixes deterministic parsing and rendering with model-backed assistance, while keeping the DSL parser as the structural source of truth.
+
+## What The App Does
+
+- The public landing page explains the product and routes sign-in traffic to the custom login flow.
+- Signed-in users work inside a multi-panel study workspace with notes, DSL editing, preview, chat, scaling, and generation history surfaces.
+- Raw source notes can be expanded into parser-ready DSL in `standard` or `detailed` mode.
+- The DSL is parsed into a deterministic AST, then rendered into a visual mindmap preview.
+- Graph layout for both preview and PNG export runs off the main thread in a Web Worker ([workers/mindmap-layout.worker.ts](workers/mindmap-layout.worker.ts)), so large or upscaled maps stay responsive; it falls back to in-page layout where workers are unavailable (e.g. server-side rendering).
+- Drafts are restored from cloud persistence when available and fall back to local IndexedDB state.
+- The current preview can be exported as PNG.
+
+## Source input & file attachments
+
+Source Notes accepts pasted text and file attachments (via the **Attach** button), all normalized to plain text and fed through the same generate-DSL pipeline ([lib/ingestion](lib/ingestion)):
+
+- **Paste** — notes, bullets, subtitles, or a transcript.
+- **`.txt` / `.md`** — read in the browser.
+- **`.pdf`** — digital (text-based) PDFs are extracted client-side with pdf.js. Scanned/image-only PDFs are detected and rejected (image/OCR support is planned). pdf.js runs on the main thread here to avoid a Web Worker (it fails to instantiate under Turbopack in some browsers).
+
+> **Known limitation — PDF in Safari.** PDF text extraction currently works in Chrome and Firefox but fails in Safari (pdf.js errors during text extraction, even on the latest Safari). Use Chrome/Firefox for PDFs, or paste the text. Tracked as a follow-up.
 
 ## Getting Started
 
-Install dependencies if needed:
+Install dependencies:
 
 ```bash
 npm install
+```
+
+Create a local environment file:
+
+```bash
+cp .env.example .env.local
 ```
 
 Run the development server:
@@ -127,19 +160,107 @@ npm run dev
 
 Open `http://localhost:3000` in your browser.
 
+Primary routes:
+
+- `/` public landing page
+- `/login` OAuth sign-in
+- `/workspace` authenticated study workspace
+
 ## Environment Variables
 
-Next.js loads `.env*` files automatically for server-side code. Model provider settings are now defined and validated through [lib/config/env.ts](lib/config/env.ts).
+Next.js loads `.env*` files automatically for server-side code. Model provider settings are defined and validated through [lib/config/env.ts](lib/config/env.ts).
 
 Use [.env.example](.env.example) as the template for local configuration.
 
-Required variables:
+Model provider credentials (per-provider keys):
 
-- `MODEL_PROVIDER` — one of `openai`, `azure-openai`, or `openrouter`
-- `MODEL_API_KEY` — secret key for the chosen provider
-- `MODEL_BASE_URL` — optional override for provider-compatible endpoints
-- `MODEL_COMPLETION_MODEL` — model used for low-latency inline completions
-- `MODEL_GENERATION_MODEL` — model used for on-demand mindmap generation
+- `OPENAI_API_KEY` — secret key for OpenAI models (e.g. `gpt-4o-mini`, `gpt-4o`)
+- `ANTHROPIC_API_KEY` — secret key for Anthropic Claude models (e.g. `claude-haiku-4-5`, `claude-sonnet-4-5`)
+- `DEEPSEEK_API_KEY` — commented placeholder; uncomment once DeepSeek joins the model catalog
+
+Set only the providers you plan to use. Provider keys are checked for presence (and placeholder values) at boot and when deriving the list of available providers; request-time failures will still surface when a provider model is actually used. At least one provider key must be configured, or the server refuses to start (validated at boot in [instrumentation.ts](instrumentation.ts)).
+
+OAuth variables are also required for local sign-in flows when using Google and GitHub providers. Configure the standard Auth.js provider credentials in your local environment before testing authentication.
+
+## Authentication
+
+Sign-in is handled by Auth.js with the Google and GitHub OAuth providers and database-backed sessions (Drizzle adapter).
+
+### Account-linking decision: no automatic cross-provider linking
+
+Cross-provider email account linking is intentionally **disabled** (`allowDangerousEmailAccountLinking` is not set; it defaults to `false`).
+
+- **Why.** With that option enabled, an unauthenticated OAuth sign-in is merged into any existing user that has the same email address. Auth.js performs this merge on an email match alone — it does not verify that the provider confirmed the user owns that email (the default GitHub provider, for instance, selects the primary email without checking its `verified` flag). If any enabled provider returns an unverified email, that auto-link becomes an account-takeover vector. Disabling it follows Auth.js's own recommended practice.
+- **Behavior.** Each provider's sign-in works normally. If you sign in with one provider and later sign in with a *different* provider that presents an email already attached to an account, Auth.js raises `OAuthAccountNotLinked` and the [login page](app/login/page.tsx) explains it; sign in with the provider you used originally to reach that account.
+- **Where it lives.** The decision and rationale are recorded in [auth.ts](auth.ts); a source test locks it so it cannot be silently re-enabled.
+
+### Inline-completion rate limiting (optional, distributed)
+
+Inline-completion requests are rate-limited per client and provider. By default the limiter — and the short-lived completion cache — is in-memory: correct for a single instance, but per-instance on serverless. To enforce a global budget across instances, set both `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (Upstash Redis REST); the limiter then uses Redis and fails open if it is unreachable. The completion cache deliberately stays in-memory — its keys are per-user and per-cursor, so the cross-instance hit rate is negligible and a shared cache would only add latency to the ghost-text path.
+
+## Observability
+
+### Structured logging
+
+Server-side code logs through a small structured logger ([lib/observability/logger.ts](lib/observability/logger.ts)): one JSON line per event (stdout for info, stderr for warnings/errors), captured automatically by serverless log drains. The level is controlled by `LOG_LEVEL` (`debug` | `info` | `warn` | `error` | `silent`); with no value set it logs at `info` in production/development and stays silent elsewhere, so the test suite is quiet. API routes log 5xx failures — model/provider, parse, and persistence errors — with structured context (route, status, error name/message); validation 4xx responses are not logged, and stack traces are intentionally omitted.
+
+### Inline-completion telemetry
+
+Inline-completion lifecycle events (accepted / dismissed / ignored, with timing and request reason) are persisted per user to the `completion_event` table for acceptance-rate analysis. For privacy, the raw suggestion text is never stored — only its length — since suggestions can echo the user's notes. Recording is best-effort: a database failure is logged and never fails the request. Applying the table requires running the Drizzle migration (`drizzle-kit migrate` / `push`).
+
+## Security & Static Analysis (SAST)
+
+Security scanning runs in CI on every push and pull request via
+[.github/workflows/security.yml](.github/workflows/security.yml), and locally via a
+pre-commit hook. Layers:
+
+- **Dependency audit (SCA)** — an `npm audit` gate (blocks on high severity and
+  above), plus [Dependabot](.github/dependabot.yml) update PRs for the npm and
+  GitHub Actions ecosystems.
+- **Static analysis** — CodeQL (`javascript-typescript`) and Semgrep. Semgrep runs
+  a blocking set of repo-invariant rules ([.semgrep/rules.yml](.semgrep/rules.yml) —
+  DOM XSS sinks, `dangerouslySetInnerHTML`, `sql.raw`, and provider secrets in
+  client code) plus report-only community rulesets.
+- **Secret scanning** — Gitleaks over the full git history.
+- **Security linting** — `eslint-plugin-security` and `eslint-plugin-no-unsanitized`
+  wired into [eslint.config.mjs](eslint.config.mjs).
+- **Type baseline** — `tsc --noEmit`.
+
+A [Husky](.husky/pre-commit) pre-commit hook runs ESLint on staged files (via
+lint-staged) and a best-effort Gitleaks staged scan; it installs automatically on
+`npm install`.
+
+> **Note:** the CI `npm test` step is currently non-blocking pending a test-suite
+> fix (tracked in #39); `tsc`, ESLint, and the security scans are blocking.
+
+### Running the audit locally
+
+`tsc`, ESLint, and the dependency audit run natively; CodeQL runs only in CI.
+Semgrep, Gitleaks, and actionlint run via their official Docker images, so no local
+install is required (Docker must be running):
+
+```bash
+# Type check, lint, and the production dependency audit (the same gates as CI)
+npm run typecheck
+npm run lint
+npm audit --omit=dev --audit-level=high
+
+# Semgrep — blocking repo-invariant rules
+docker run --rm -v "$PWD:/src" -w /src semgrep/semgrep \
+  semgrep scan --config .semgrep/rules.yml --error
+
+# Semgrep — broad community rulesets (report-only)
+docker run --rm -v "$PWD:/src" -w /src semgrep/semgrep \
+  semgrep scan --config p/typescript --config p/react --config p/nextjs \
+  --config p/owasp-top-ten --config p/secrets
+
+# Secret scan (full git history)
+docker run --rm -v "$PWD:/repo" -w /repo \
+  ghcr.io/gitleaks/gitleaks:latest git /repo --platform=github
+
+# Lint the GitHub Actions workflow files
+docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest -color
+```
 
 ## Available Scripts
 
@@ -149,11 +270,25 @@ Required variables:
 - `npm run lint` runs ESLint.
 - `npm run test` runs the Node.js test runner and will execute discovered test files as they are added.
 - `npm run typecheck` runs TypeScript type checking without emitting build output.
+- `npm audit --omit=dev --audit-level=high` runs the production dependency audit (the CI gate blocks on high severity and above).
+- `npm run prepare` installs the Husky pre-commit hooks; it runs automatically after `npm install`.
+
+See [Security & Static Analysis](#security--static-analysis-sast) for the full set of local scan commands.
 
 ## Project Structure
 
-- [app](app) contains the Next.js App Router entrypoints.
-- [public](public) contains static assets.
+- [app](app) contains App Router routes, including landing, login, workspace, and API endpoints.
+- [components](components) contains the workspace UI, preview surfaces, and marketing sections.
+- [lib/dsl](lib/dsl) contains the deterministic parser, validation, and editor-context logic.
+- [lib/generation](lib/generation) contains AI-assisted generation and overlay services.
+- [lib/completion](lib/completion) contains inline completion prompting, normalization, and relevance logic.
+- [lib/mindmap](lib/mindmap) contains schema, AST conversion, layout, and preview generation.
+- [lib/persistence](lib/persistence) contains project, draft, and history persistence logic.
+- [workers](workers) contains the mindmap layout worker.
+- [drizzle](drizzle) contains database migrations and metadata.
+- [.github/workflows](.github/workflows) contains CI, including the security scanning pipeline.
+- [.semgrep](.semgrep) contains the custom Semgrep rules used by CI and local scans.
+- [.husky](.husky) contains the pre-commit hook (lint-staged + secret scan).
 - [TODO.md](TODO.md) tracks the phased implementation plan.
 
 ## Development Direction
@@ -167,17 +302,12 @@ This app is intentionally not a generic note editor. The completion system is me
 
 The parser will remain the source of truth for structure. AI should enrich the writing experience, not invent the hierarchy.
 
+## Testing
+
+- `npm run test` runs the Node.js test suite for parsing, generation, completion, layout, export, persistence, and app-risk smoke coverage.
+- `npm run lint` runs ESLint.
+- `npm run typecheck` runs TypeScript in no-emit mode.
+
 ## Roadmap
 
-The execution plan is tracked in [TODO.md](TODO.md). The current build order is:
-
-1. Foundation and app shell
-2. DSL and shared data contracts
-3. Deterministic parsing and validation
-4. Editor workflow
-5. Deterministic mindmap generation
-6. Layout and rendering
-7. Inline completion service
-8. AI-assisted mindmap generation
-9. Export and persistence
-10. Hardening and release readiness
+The execution plan remains tracked in [TODO.md](TODO.md), but the current emphasis is no longer foundational scaffolding. The remaining work is mostly hardening, deeper test coverage, and continued quality improvements to the study workflow and generation behavior.

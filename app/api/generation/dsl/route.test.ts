@@ -5,10 +5,10 @@ process.env.DATABASE_URL = 'postgresql://test:test@localhost/test';
 
 mock.module('../../../../auth.ts', {
   namedExports: {
-    auth: (handler: Function) => (req: Request) => {
+    auth: (handler: (req: Request) => unknown) => (req: Request) => {
       const userId = req.headers.get('x-test-user-id');
       if (userId) {
-        (req as any).auth = { user: { id: userId } };
+        (req as Request & { auth?: unknown }).auth = { user: { id: userId } };
       }
       return handler(req);
     },
@@ -21,14 +21,11 @@ test('dsl generation route returns validated DSL output for a valid request', as
   const originalEnv = { ...process.env };
   const originalFetch = globalThis.fetch;
 
-  process.env.MODEL_PROVIDER = 'openai';
-  process.env.MODEL_API_KEY = 'test-key';
-  process.env.MODEL_COMPLETION_MODEL = 'gpt-5-mini';
-  process.env.MODEL_GENERATION_MODEL = 'gpt-5';
-  delete process.env.MODEL_BASE_URL;
+  process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
+  delete process.env.OPENAI_API_KEY;
 
   globalThis.fetch = async () => new Response(JSON.stringify({
-    choices: [{ message: { content: JSON.stringify({
+    content: [{ type: 'text', text: JSON.stringify({
       dsl: [
         '@root: Photosynthesis',
         '- @branch: Light reactions',
@@ -43,7 +40,7 @@ test('dsl generation route returns validated DSL output for a valid request', as
         '- @branch: Importance',
         '  - supports biomass + food webs',
       ].join('\n'),
-    }) } }],
+    }) }],
   }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
@@ -93,16 +90,13 @@ test('dsl generation route surfaces model output validation failures', async () 
   const originalEnv = { ...process.env };
   const originalFetch = globalThis.fetch;
 
-  process.env.MODEL_PROVIDER = 'openai';
-  process.env.MODEL_API_KEY = 'test-key';
-  process.env.MODEL_COMPLETION_MODEL = 'gpt-5-mini';
-  process.env.MODEL_GENERATION_MODEL = 'gpt-5';
-  delete process.env.MODEL_BASE_URL;
+  process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
+  delete process.env.OPENAI_API_KEY;
 
   globalThis.fetch = async () => new Response(JSON.stringify({
-    choices: [{ message: { content: JSON.stringify({
+    content: [{ type: 'text', text: JSON.stringify({
       dsl: '@root: Topic A\n- @branch: Branch\n@root: Topic B',
-    }) } }],
+    }) }],
   }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },

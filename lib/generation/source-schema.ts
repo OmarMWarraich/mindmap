@@ -4,12 +4,22 @@ import {
   mindmapValidationErrorSchema,
   mindmapValidationWarningSchema,
 } from '../dsl/validation.ts';
+import { knownModelIdSchema } from '../model/catalog.ts';
+import { parseStructuredModelJson } from '../model/json-parse.ts';
+import { maxSourceTextCharacters } from './limits.ts';
+
+// Re-exported for backward compatibility; the source of truth is ./limits.ts.
+export { maxSourceTextCharacters };
 
 const requiredString = z.string().trim().min(1);
 
 export const sourceMindmapGenerationRequestSchema = z.object({
-  sourceText: requiredString,
+  sourceText: requiredString.max(
+    maxSourceTextCharacters,
+    'Source text is too long to process. Please shorten it and try again.',
+  ),
   detailLevel: z.enum(['standard', 'detailed']).optional(),
+  modelId: knownModelIdSchema.optional(),
 }).strict();
 
 export const sourceMindmapModelResponseSchema = z.object({
@@ -23,6 +33,9 @@ export const sourceMindmapGenerationMetricsSchema = z.object({
   targetMinLineCount: z.number().int().nonnegative(),
   targetMaxLineCount: z.number().int().nonnegative(),
   maxWordsPerLine: z.number().int().positive(),
+  // Which pipeline path produced this result: expand small inputs, distill large
+  // ones. Optional so previously persisted drafts (which predate it) still parse.
+  generationMode: z.enum(['expand', 'distill']).optional(),
 }).strict();
 
 export const sourceMindmapGenerationValidationSchema = z.object({
@@ -63,5 +76,5 @@ export const sourceMindmapModelResponseJsonSchema = {
 } as const;
 
 export function parseSourceMindmapModelResponse(value: string): SourceMindmapModelResponse {
-  return sourceMindmapModelResponseSchema.parse(JSON.parse(value));
+  return sourceMindmapModelResponseSchema.parse(parseStructuredModelJson(value));
 }

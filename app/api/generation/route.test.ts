@@ -7,10 +7,10 @@ process.env.DATABASE_URL = 'postgresql://test:test@localhost/test';
 
 mock.module('../../../auth.ts', {
   namedExports: {
-    auth: (handler: Function) => (req: Request) => {
+    auth: (handler: (req: Request) => unknown) => (req: Request) => {
       const userId = req.headers.get('x-test-user-id');
       if (userId) {
-        (req as any).auth = { user: { id: userId } };
+        (req as Request & { auth?: unknown }).auth = { user: { id: userId } };
       }
       return handler(req);
     },
@@ -23,14 +23,11 @@ test('generation route returns a validated overlay for a valid request', async (
   const originalEnv = { ...process.env };
   const originalFetch = globalThis.fetch;
 
-  process.env.MODEL_PROVIDER = 'openai';
-  process.env.MODEL_API_KEY = 'test-key';
-  process.env.MODEL_COMPLETION_MODEL = 'gpt-5-mini';
-  process.env.MODEL_GENERATION_MODEL = 'gpt-5';
-  delete process.env.MODEL_BASE_URL;
+  process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
+  delete process.env.OPENAI_API_KEY;
 
   globalThis.fetch = async () => new Response(JSON.stringify({
-    choices: [{ message: { content: JSON.stringify({
+    content: [{ type: 'text', text:JSON.stringify({
       title: 'Photosynthesis',
       labelRewrites: [{
         nodeId: 'branch-1-overview',
@@ -43,7 +40,7 @@ test('generation route returns a validated overlay for a valid request', async (
         label: 'Energy cost',
         reason: 'Students usually need the ATP and NADPH requirement here.',
       }],
-    }) } }],
+    }) }],
   }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
@@ -114,14 +111,11 @@ test('generation route falls back to the deterministic mindmap when the model ou
   const originalEnv = { ...process.env };
   const originalFetch = globalThis.fetch;
 
-  process.env.MODEL_PROVIDER = 'openai';
-  process.env.MODEL_API_KEY = 'test-key';
-  process.env.MODEL_COMPLETION_MODEL = 'gpt-5-mini';
-  process.env.MODEL_GENERATION_MODEL = 'gpt-5';
-  delete process.env.MODEL_BASE_URL;
+  process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
+  delete process.env.OPENAI_API_KEY;
 
   globalThis.fetch = async () => new Response(JSON.stringify({
-    choices: [{ message: { content: 'not valid json' } }],
+    content: [{ type: 'text', text: 'not valid json' }],
   }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },

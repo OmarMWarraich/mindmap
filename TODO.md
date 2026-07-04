@@ -282,3 +282,304 @@ Purpose: Makes the project easier to run, review, and hand off to other engineer
 
 - [ ] Run a final manual QA pass across typing, generation, layout, export, and persistence
 Purpose: Confirms the major user journey works end to end before the MVP is shared or demoed.
+
+---
+
+## UI Redesign — MindFlow AI Workspace
+
+The goal is to convert the current single-page layout into the multi-column SaaS shell shown in the mockup. Work through the phases in order; each phase ships a self-contained, visible improvement.
+
+### Phase A — Design Tokens and Tailwind Theme
+
+- [x] Define the "Cognitive Flow" color palette in `app/globals.css` (`@theme` block — Tailwind v4 CSS-first config)
+  Added `primary` (dark blue-grey), `accent` (bright blue), `tertiary` (dark teal), `accent2` (red) as 11-step scales. Neutral uses the built-in zinc scale.
+  Purpose: Gives every future component a consistent color vocabulary so the app matches the design system.
+
+- [x] Add Inter as the primary font via `next/font`
+  Replaced Geist Sans with Inter in `app/layout.tsx`. `--font-inter` CSS variable wired into the `@theme` `--font-sans` slot. Geist Mono kept for code blocks.
+  Purpose: Establishes the typographic tone shown in the mockup.
+
+- [x] Add global CSS resets and base styles matching the mockup
+  `html` and `body` set to `height: 100%`; `body` gets `overflow: hidden` and `background-color: #f8fafc`. Updated `app/globals.css`.
+  Purpose: Required baseline for a fixed full-viewport layout.
+
+### Phase B — App Shell Layout
+
+- [x] Create `components/AppShell.tsx` — the fixed full-viewport wrapper
+  Three-zone layout via `flex flex-col`: `<header>` (`h-14 shrink-0`), then a `flex min-h-0 flex-1` row with `<aside>` (`w-60 shrink-0`) and `<main>` (`flex-1 overflow-y-auto`). Accepts `nav`, `sidebar`, and `children` props so Phases C and D can slot components in without touching the layout.
+  Purpose: Replaces the current `<main className="min-h-screen px-6 py-12">` wrapper with the shell all other panels plug into.
+
+- [x] Replace `app/page.tsx` layout with `AppShell`
+  Removed the hero section (title, description, MVP badge). Sign-out form and model provider badge live in a temporary `nav` placeholder (will be replaced by `<NavBar>` in Phase C). Sidebar is `null` until Phase D. `<StudyWorkspace>` renders in the `children` slot.
+  Purpose: Wires the new shell into the Next.js page so the layout change is visible.
+
+### Phase C — Top Navigation Bar
+
+- [x] Create `components/NavBar.tsx`
+  Left: MindFlow SVG icon + wordmark. Center: Workspace / Library / Helpdesk / History `<Link>` tabs with `usePathname` active state. Right: "Model Preview" pill, "Trained Notes" badge, disabled Download icon button, user avatar with initials.
+  Purpose: Establishes the global navigation visible in the mockup header.
+
+- [x] Add active-tab routing in `NavBar`
+  `usePathname()` drives the active highlight. Workspace (`/`) exact-matches; others use `startsWith`. `href: '#'` tabs are never marked active. Library, Helpdesk, History link to `#` placeholders.
+  Purpose: Makes the nav feel interactive without requiring full route build-out.
+
+- [x] Move the sign-out action into the NavBar user-avatar dropdown
+  Removed the sign-out form from `app/page.tsx`. A `handleSignOut` Server Action is defined in page.tsx and passed as `signOutAction` prop to `<NavBar>`. Avatar button opens a dropdown with the user's email and a Sign out `<form>`.
+  Purpose: Keeps the header clean and places auth actions where the mockup shows them.
+
+### Phase D — Left Sidebar
+
+- [x] Create `components/Sidebar.tsx`
+  Top section: project name ("Project Alpha") + subtitle ("Strategy Map"), "Generate Branch" CTA button (accent blue, full width). Navigation list: Notes, Chat, Guides, History — each with an icon and active highlight. Bottom: Settings link and Support link with icons.
+  Purpose: Builds the persistent left-panel navigation shown in the mockup.
+
+- [x] Connect sidebar nav items to workspace panel state
+  Clicking Notes → show Source Notes panel. Clicking History → open generation history drawer. Chat and Guides can be placeholders for now.
+  Purpose: Makes the sidebar functional so the core workflow is navigable.
+
+- [x] Show active project name and subtitle in the sidebar header
+  Pull the project name from the existing `projectId` state. Use a placeholder name ("Untitled Project") until a rename feature exists.
+  Purpose: Gives the sidebar its contextual header matching the mockup.
+
+### Phase E — Source Notes Panel
+
+- [x] Extract source-notes UI into `components/SourceNotesPanel.tsx`
+  Pull the raw-notes textarea, detail-level toggle (Standard / Detailed), Generate DSL button, Clear button, and quality badges out of `StudyWorkspace.tsx` into a standalone component that accepts props and callbacks.
+  Purpose: Isolates the notes panel into its own file so layout and state concerns separate cleanly.
+
+- [x] Style `SourceNotesPanel` to match the mockup center column
+  White card background, "Source Notes" heading with action icons (search, add-user placeholder), full-height textarea with placeholder text, "Generate Branch" / "Clear" buttons at the bottom of the panel.
+  Purpose: Makes the center panel look like the mockup rather than the current sky-blue card.
+
+- [x] Show DSL generation quality feedback inside the panel
+  Keep the density status and quality badges but move them to a subtle footer row inside the panel rather than a separate card.
+  Purpose: Reduces visual noise while keeping the status information accessible.
+
+### Phase F — DSL Editor Panel
+
+- [x] Extract the Monaco editor into `components/DslEditorPanel.tsx`
+  Move the Monaco `<Editor>` block, inline-completion registration, and the Generate mindmap / Reset DSL buttons out of `StudyWorkspace.tsx` into this component.
+  Purpose: Gives the editor its own component boundary matching the "DSL Editor" panel in the mockup.
+
+- [x] Add a panel header to `DslEditorPanel` matching the mockup
+  "DSL Editor" title on the left, icon buttons on the right (edit, expand/fullscreen placeholder, copy). Use `border-b` to visually separate the header from the editor surface.
+  Purpose: Reproduces the panel chrome visible in the mockup.
+
+- [x] Style the DSL editor panel as a dark-bordered card occupying the upper-right quadrant
+  The mockup shows the editor filling roughly the top two-thirds of the right column. Constrain height so the Expert Scaling panel fits below it.
+  Purpose: Achieves the two-row right column layout.
+
+### Phase G — Expert Scaling Panel
+
+- [x] Extract export controls into `components/ExpertScalingPanel.tsx`
+  Move the six scale sliders (`nodeWidthScale`, `nodeHeightScale`, `nodePaddingScale`, `siblingGapScale`, `levelGapScale`, `fontScale`) and the Reset Scaling button out of `StudyWorkspace.tsx` into this component.
+  Purpose: Gives the scaling UI its own panel with the "Expert Scaling" header shown in the mockup.
+
+- [x] Style `ExpertScalingPanel` to match the mockup
+  Right-aligned value labels next to each slider, thin separator lines between rows, "Reset Scaling" button at the bottom, panel header "Expert Scaling" with a collapse icon.
+  Purpose: Makes the scaling panel visually match the mockup.
+
+- [x] Add a bottom action row: Generate DSL | Clear | Quick Export
+  Add a sticky footer row inside the right column containing the three action buttons as shown at the bottom of the mockup's right panel.
+  Purpose: Puts the primary CTA buttons at the bottom of the panel rather than scattered across multiple cards.
+
+### Phase H — Mindmap Preview Integration
+
+- [x] Decide where the mindmap preview lives in the new layout
+  The mockup does not show a preview panel in the main workspace view — it appears to be behind the "Model Preview: Flexible" toggle in the top nav. Add a toggleable preview drawer or a `/preview` sub-route that slides in over the right panels.
+  Purpose: Resolves the layout question before implementing the container.
+
+- [x] Integrate `MindmapSvgPreview` into the chosen preview surface
+  Move the existing `<MindmapSvgPreview>` usage from the current StudyWorkspace render into the new preview panel. Keep pan/zoom and loading/error states.
+  Purpose: Preserves all existing preview functionality in the new UI location.
+
+### Phase I — Generation History Panel
+
+- [x] Convert history from an inline drawer to a sidebar panel
+  When the user clicks History in the sidebar nav, replace the Source Notes panel with a history list panel showing the existing `historyEntries` data.
+  Purpose: Matches the mockup which shows history as a first-class navigation destination.
+
+- [x] Style history entries to match the mockup list style
+  Each entry: timestamp, detail level badge, density status badge, node count, Restore button. Use the same card style as the rest of the app.
+  Purpose: Gives the history panel a consistent look.
+
+### Phase J — Chat / Feedback Section
+
+- [x] Create `components/ChatPanel.tsx` as a placeholder
+  A minimal panel with a message list and a text input at the bottom. This matches the bottom section of the right panel in the mockup. Wire no AI calls yet — just local message state.
+  Purpose: Puts the chat surface in the layout so the full mockup shape is present.
+
+- [x] Integrate the chat panel into the bottom of the right column
+  Show it below the Expert Scaling panel or toggle it from the sidebar Chat nav item.
+  Purpose: Completes the right-column layout.
+
+### Phase K — Cleanup and Consistency
+
+- [x] Remove old layout wrappers from `StudyWorkspace.tsx`
+  After all sub-panels are extracted, `StudyWorkspace.tsx` becomes a thin coordinator that holds state and passes props. Remove any remaining container markup that belongs to the extracted components.
+  Purpose: Eliminates duplicated layout logic.
+
+- [x] Audit all Tailwind classes for zinc/sky/emerald overrides
+  Replace lingering `bg-sky-*`, `border-sky-*`, `bg-emerald-*` classes with the new design-token utilities defined in Phase A.
+  Purpose: Makes the color system consistent across all panels.
+
+- [x] Run `npm run typecheck` and `npm run lint` to confirm no regressions
+  Purpose: Validates that the component refactoring did not introduce type errors or lint violations.
+
+- [x] Run existing tests to confirm generation, parsing, and persistence logic is unchanged
+  Purpose: Confirms that extracting UI components did not accidentally break any logic that moved with the JSX.
+
+---
+
+## Issue #15 — Multiple Model Providers with User-Selectable Provider/Model
+
+Shift from a deploy-time single provider to request-time model selection backed by multiple server-side credentials. The client sends only an opaque `modelId`; the server resolves provider, base URL, key, and wire format. Initial providers: OpenAI and Anthropic (Claude, native Messages API). Designed so DeepSeek/Kimi can be added later as catalog rows.
+Reference: https://github.com/OmarMWarraich/mindmap/issues/15
+
+### Phase 1 — Model Catalog and Adapter Abstraction (no behavior change)
+
+- [x] Add `lib/model/catalog.ts` as the single source of truth for supported models
+  Each entry: `id`, `provider`, `wireFormat`, `label`, `roles` (`completion`/`generation`), `capabilities` (e.g. `structuredOutput: 'response_format' | 'tool' | 'prompt'`, `contextWindow`), and `defaults` (`temperature`, `maxTokens`).
+  Implemented `modelCatalogEntrySchema` (`.strict()`, derived types via `z.infer`) plus enum constants/schemas for provider, wire format, role, and structured-output strategy. `MODEL_CATALOG` is frozen and self-validates at load via `modelCatalogSchema.parse` (rejects duplicate ids). Seeded OpenAI (`gpt-4o-mini`, `gpt-4o`) and Anthropic (`claude-haiku-4-5`, `claude-sonnet-4-5`) entries. Exposed lookups: `getModelById`, `isKnownModelId`, `listModels`, `listModelsForRole`, `listModelsForProvider`, and `knownModelIdSchema`. Typecheck, lint, and a runtime load check all pass.
+  Purpose: Drives the UI dropdown, validates incoming `modelId`, and tells the service how to request structured output.
+
+- [x] Define a `ModelAdapter` interface keyed by wire format
+  `buildRequest(opts): { url; init }` and `parseResponse(payload): string`. Adapters are selected by `wireFormat`, not vendor name.
+  Added `lib/model/adapter.ts` with the `ModelAdapter` interface (`readonly wireFormat`, `buildRequest(request): ModelHttpRequest`, `parseResponse(payload: unknown): string`) plus wire-format-neutral request types: `ModelChatMessage`, `ModelAdapterCredentials` (server-only `apiKey`/`baseUrl`), `ModelStructuredOutput` (discriminated `json_object` | `json_schema` so each adapter maps to `response_format`/tool/prompt later), and `ModelChatCompletionRequest`. `ModelAdapterRegistry` is `Partial<Record<ModelWireFormat, ModelAdapter>>`; `resolveModelAdapter(registry, wireFormat)` selects by wire format and throws on a missing adapter. Typecheck and lint pass; no existing code touched.
+  Purpose: Decouples request/response shape from individual providers so new vendors reuse existing adapters.
+
+- [x] Move `lib/completion/provider.ts` into `lib/model/` and refactor it into the `openai-compatible` adapter
+  Preserve current OpenAI/Azure/OpenRouter behavior exactly. Update imports in `lib/completion/service.ts`, `lib/generation/service.ts`, and `lib/generation/source-service.ts`.
+  `git mv`d `provider.ts` → `lib/model/openai-compatible-adapter.ts` and `provider.test.ts` → `lib/model/openai-compatible-adapter.test.ts`. Kept the env-based exports (`requestModelProviderChatCompletion`, `buildModelProviderChatCompletionRequest`, `extractAssistantText`, plus the option/message types) byte-for-byte identical so the three services keep their exact behavior — only their import paths changed. Added `openaiCompatibleAdapter` implementing the `ModelAdapter` interface (`buildRequest`/`parseResponse`) for the Bearer protocol, mapping neutral `ModelStructuredOutput` → OpenAI `response_format`. Both the env path and the adapter share one `buildChatCompletionRequestBody` helper to avoid drift. Typecheck and lint clean; the relocated adapter test + all completion tests pass (42/42). (Note: two unrelated `source-*` word-limit tests were already failing on HEAD before this change — 15 vs 35 words — and are untouched here.)
+  Purpose: Establishes the shared model home and proves the abstraction with zero behavior change.
+
+- [x] Move hardcoded temperature/max-token defaults out of the provider into per-model catalog defaults
+  Removed the magic `temperature ?? 0.2` / `maxCompletionTokens ?? 72` literals from `buildModelProviderChatCompletionRequest`. The catalog is now the single source of truth: added `resolveModelDefaults(modelId)` plus a frozen `FALLBACK_MODEL_DEFAULTS` (`{ temperature: 0.2, maxTokens: 72 }`) to `lib/model/catalog.ts`. The provider resolves the requested model first, then sources `temperature`/`maxCompletionTokens` from that model's catalog `defaults`, falling back to `FALLBACK_MODEL_DEFAULTS` for ids not yet in the catalog (e.g. the current env model `gpt-5-mini`, Azure deployment names, OpenRouter slugs). Behavior is unchanged: the env completion model isn't a catalog id so it still resolves to 0.2/72, and the generation/source services keep passing their explicit per-request budgets (800 and 2200/3200). Typecheck and lint clean; adapter + completion tests pass (42/42).
+  Purpose: Lets each model carry its own sensible defaults instead of a single global value.
+
+- [x] Keep all existing provider/service tests green after the refactor
+  Verified the full suite after Phase 1: 161/163 pass. Every provider and service test that was green before the refactor is still green — the relocated `openai-compatible-adapter.test.ts`, all `lib/completion/*` tests, and the `lib/generation/*` service tests pass. The only 2 reds are `source-prompt`/`source-service` word-limit assertions (expect "15 words" while the committed prompt says "35 words"); they were already failing on HEAD before this issue's work began and the refactor touches neither the prompt text nor that logic, so they are pre-existing and unrelated — not regressions.
+  Purpose: Guarantees the abstraction introduction is behavior-preserving.
+
+### Phase 2 — Anthropic Adapter and Multi-Provider Credentials
+
+- [x] Implement the `anthropic-messages` adapter
+  `x-api-key` + `anthropic-version` headers, top-level `system`, `messages` (user/assistant only), `max_tokens`, and `content[]` response parsing.
+  Added `lib/model/anthropic-messages-adapter.ts` exporting `anthropicMessagesAdapter` (`wireFormat: 'anthropic-messages'`). `buildRequest` posts to `{baseUrl}/messages` (default `https://api.anthropic.com/v1`) with `x-api-key`, `anthropic-version: 2023-06-01`, and `Content-Type` headers; it lifts all `system` turns into the top-level `system` string (joined by blank lines, omitted when absent) and keeps only `user`/`assistant` turns in `messages`, alongside `model`, `max_tokens`, and `temperature`. Neutral `ModelStructuredOutput` maps to Anthropic's idiomatic forced tool call (`tools` + `tool_choice: { type: 'tool' }`) — `json_schema` → a named tool with `input_schema`/`strict`, `json_object` → a permissive `json_output` tool. `parseResponse` (via exported `extractAnthropicText`) concatenates `text` content blocks, or returns a `tool_use` block's `input` as a JSON string so callers parse it exactly like the OpenAI path. Verified against the live Anthropic Messages API reference. Typecheck and lint clean; 9/9 new adapter tests pass.
+  Purpose: Adds first-class native Claude support beyond the OpenAI-compatibility shim.
+
+- [x] Replace single-key env with per-provider credentials validated lazily
+  Add `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` (and a commented `DEEPSEEK_API_KEY` placeholder). Validate a provider's key only when one of its models is used. Update `lib/config/env.ts`.
+  Added a per-provider credential layer to `lib/config/env.ts` alongside the still-active legacy `MODEL_*` path (migrated away in Phase 3). A `PROVIDER_API_KEY_ENV_VARS` map (`openai → OPENAI_API_KEY`, `anthropic → ANTHROPIC_API_KEY`) uses `satisfies Record<ModelProvider, string>` so adding a catalog provider forces a mapping entry; a comment documents the OpenAI-compatible `DEEPSEEK_API_KEY` placeholder for the later catalog row. Three new exports: `getProviderApiKeyEnvVarName(provider)`, `isProviderConfigured(provider, env?)` (non-throwing, for deriving availability), and `getProviderCredentials(provider, env?): ModelAdapterCredentials` which validates the key lazily — only when that provider's model is requested — reusing the existing `requiredValue` placeholder/blank guard and throwing a `Set <VAR> to use <provider> models` error otherwise. The `env` params accept a plain record so callers (and tests) can pass partial environments. New `lib/config/env.test.ts` covers mapping, configured/placeholder/blank/missing detection, trimmed-key resolution, the descriptive throw, and per-provider laziness (6/6 pass). Typecheck and lint clean.
+  Purpose: Lets the server hold multiple providers' credentials without forcing every key to be set.
+
+- [x] Derive provider availability from configured keys
+  A provider is "available" only when its key is present; `catalog × configured providers` = the models the UI may show.
+  Added `lib/model/availability.ts` bridging the static catalog with the per-provider key checks from Phase 2's `isProviderConfigured`. Exports: `listConfiguredProviders(env?)` (filters `MODEL_PROVIDERS` to those with a configured key), `listAvailableModels(env?)` and `listAvailableModelsForRole(role, env?)` (catalog × configured providers), and `isModelAvailable(modelId, env?)` (model exists in the catalog *and* its provider is configured; unknown ids → false). All accept an optional env record defaulting to `process.env`, so routes and the upcoming `/api/models` endpoint can compute the offerable model list without exposing keys. The module sits in `lib/model/` (not the pure-data `catalog.ts`) to keep the catalog free of env imports — no cycle: availability → env (types only) → catalog. New `lib/model/availability.test.ts` covers configured-provider filtering, catalog intersection, role+provider filtering, the all-keys and no-keys cases, and unknown-id rejection (7/7 pass). Typecheck and lint clean.
+  Purpose: Prevents offering models the server cannot actually call.
+
+- [x] Update `.env.example` and document the new per-provider variables
+  Restructured [.env.example](.env.example) into a "Model provider credentials" block: `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` are now first-class entries with a comment explaining lazy per-provider validation, followed by the commented `DEEPSEEK_API_KEY` placeholder. The legacy `MODEL_*` vars are grouped under a "Legacy single-provider model config (transitional)" comment (kept commented, still consumed until request-time selection lands). Removed the duplicate per-provider keys that had been appended at the bottom of the file. Updated [README.md](README.md) Environment Variables section with a per-provider-keys subsection (which key maps to which catalog models, lazy validation, unconfigured providers being hidden) plus the legacy block marked transitional.
+  Purpose: Keeps onboarding accurate after the env schema change.
+
+### Phase 3 — Thread `modelId` Through the Request Contract
+
+- [x] Add optional `modelId` to the completion, generation, and source `.strict()` request schemas
+  Added `modelId: knownModelIdSchema.optional()` to `inlineCompletionRequestSchema` ([lib/completion/service.ts](lib/completion/service.ts)), `generationRequestSchema` ([lib/generation/service.ts](lib/generation/service.ts)), and `sourceMindmapGenerationRequestSchema` ([lib/generation/source-schema.ts](lib/generation/source-schema.ts)), importing `knownModelIdSchema` from the catalog in each. Reusing the catalog schema means an unknown id is rejected at the contract boundary while omission stays valid (backward-compatible); provider-configured + allow-list checks come in the next item. All three keep `.strict()`. New [lib/model/request-model-id.test.ts](lib/model/request-model-id.test.ts) asserts the omitted case still validates, known catalog ids (`gpt-4o-mini`, `claude-sonnet-4-5`, `gpt-4o`) are accepted, and unknown ids are rejected across all three schemas (3/3 pass). Typecheck and lint clean; completion/generation suites 62/63 (the lone failure is the pre-existing unrelated 35-word-limit test).
+  Purpose: Lets the client express a model choice while staying backward-compatible.
+
+- [x] Validate and authorize `modelId` server-side in each route
+  Added [lib/model/authorization.ts](lib/model/authorization.ts) with `authorizeModelId(modelId, { role?, env? })`, which runs four server-side gates and returns a discriminated `{ ok: true; modelId } | { ok: false; status: 400 | 403; reason }`: (1) catalog existence via `getModelById` (defense-in-depth behind the schema's `knownModelIdSchema`) → 400 for an unknown id; (2) role support (`entry.roles.includes(role)`) so a generation-only model cannot be used on the completion route → 403; (3) an ops-controlled allow-list (`isModelAllowListed`/`getModelAllowList`) read from the optional comma-separated `MODEL_ALLOWLIST` env var, defaulting to all catalog ids when unset/blank → 403 when disallowed; (4) provider-configured via `isModelAvailable` → 403 when the provider key is missing. Wired into all three AI routes ([app/api/completion/route.ts](app/api/completion/route.ts) with `role: 'completion'`, [app/api/generation/route.ts](app/api/generation/route.ts) and [app/api/generation/dsl/route.ts](app/api/generation/dsl/route.ts) with `role: 'generation'`): after schema parse, when `payload.modelId` is present the route authorizes it and short-circuits with `Response.json({ error: reason }, { status })` on failure before dispatching. Omitted `modelId` is untouched (per-role default fallback is the next item). New [lib/model/authorization.test.ts](lib/model/authorization.test.ts) covers accept, unknown→400, provider-not-configured→403, unsupported-role→403, `MODEL_ALLOWLIST` enforcement, and allow-list helpers (7/7 pass). Typecheck and lint clean.
+  Purpose: Prevents clients from invoking arbitrary or disallowed models.
+
+- [x] Resolve credentials and adapter server-side from the validated `modelId`
+  Added [lib/model/resolve.ts](lib/model/resolve.ts) with `resolveModel(modelId, { env?, registry? }): ResolvedModel`, the server-side bridge from a validated catalog id to a dispatchable request. It looks up the catalog entry (`getModelById`), selects the wire-format adapter via `resolveModelAdapter` against a `defaultModelAdapterRegistry` that maps `openai-compatible` → `openaiCompatibleAdapter` and `anthropic-messages` → `anthropicMessagesAdapter` (keyed by wire format, not vendor), and resolves the provider's `ModelAdapterCredentials` through `getProviderCredentials(entry.provider, env)` — so keys and base URLs come only from server env, never the client request, and are never returned to it. `ResolvedModel` exposes `{ entry, adapter, credentials }`, giving callers the model name, defaults, and capabilities (from `entry`) plus the adapter and creds needed for the upcoming dispatch rewire. Throws for an unknown id, an unregistered wire format, or a missing provider key (the last surfaced by `getProviderCredentials`). The optional `env`/`registry` params keep it injectable for tests. New [lib/model/resolve.test.ts](lib/model/resolve.test.ts) covers OpenAI + Anthropic resolution, the unknown-id throw, the missing-key throw, the empty-registry throw, and the default registry mapping (6/6 pass). Typecheck and lint clean.
+  Purpose: Ensures keys and base URLs are never accepted from or exposed to the client.
+
+- [x] Fall back to a per-role default model when `modelId` is absent
+  Added a frozen `DEFAULT_MODEL_IDS` map to [lib/model/catalog.ts](lib/model/catalog.ts) (`completion → gpt-4o-mini`, `generation → gpt-4o` — both OpenAI, so they resolve whenever `OPENAI_API_KEY` is set; completion favors a cheap/fast model, generation a stronger one), guarded by a module-load invariant that throws if a default isn't a known catalog id (fail-fast on a typo instead of a runtime "unknown model id" on the first defaulted request). Exposed `getDefaultModelIdForRole(role)` and the pure `selectModelIdForRole(role, requestedModelId?)` (= `requestedModelId ?? default`, no env/credentials so it can also key caches/logs by the effective model — used by the next cache-key item). Added `resolveModelForRole(role, requestedModelId, options?)` to [lib/model/resolve.ts](lib/model/resolve.ts), which feeds `selectModelIdForRole` into `resolveModel` so callers never special-case the "no model chosen" path. No running service was rewired, so current behavior and existing tests are unchanged — this only supplies the default-selection layer the dispatch path will adopt. New [lib/model/role-defaults.test.ts](lib/model/role-defaults.test.ts) covers default validity, per-role defaults, fallback vs. explicit selection, and `resolveModelForRole` resolving both the default and a requested id (6/6 pass; resolve suite 12/12 together). Typecheck and lint clean.
+  Purpose: Preserves current behavior and keeps existing tests passing.
+
+- [x] Include `modelId` in `createInlineCompletionCacheKey` (`lib/completion/runtime-controls.ts`)
+  Prepended the effective model id to the cache-key tuple in [lib/completion/runtime-controls.ts](lib/completion/runtime-controls.ts) via `selectModelIdForRole('completion', request.modelId)`, so a completion cached for one model is never served for another. Resolving the per-role default here (rather than keying on the raw optional `modelId`) means an omitted `modelId` and an explicit default-equal id collapse to the same entry — correct, since they dispatch to the same model — while distinct models get distinct keys. Extended [lib/completion/runtime-controls.test.ts](lib/completion/runtime-controls.test.ts) with two cases: different `modelId`s on identical context produce different keys, and an omitted `modelId` matches the `gpt-4o-mini` completion default (6/6 pass). Typecheck and lint clean.
+  Purpose: Stops one model's cached completion from being served for another model.
+
+### Phase 4 — Capability-Aware Structured Output
+
+- [x] Select the structured-output strategy from catalog capabilities
+  Added a shared capability-aware dispatcher [lib/model/dispatch.ts](lib/model/dispatch.ts) — `requestStructuredModelCompletion({ role, modelId?, messages, maxTokens, temperature?, structuredOutput?, env?, registry?, fetchImpl? })`. It resolves the model via `resolveModelForRole` (honoring an explicit `modelId` or the role default), reads `entry.capabilities.structuredOutput`, and applies the neutral `structuredOutput` intent **only** when the strategy is native (`response_format`/`tool`); for `prompt`-capability models it omits it so the caller leans on prompt instructions + a robust parse (next item). The wire-format adapter then translates the neutral intent to the provider's mechanism — `openaiCompatibleAdapter` → OpenAI `response_format`, `anthropicMessagesAdapter` → Anthropic `tools` + `tool_choice` — and `parseResponse` normalizes the reply, so a provider swap can't silently break or degrade DSL generation. Returns `{ text, modelId, structuredOutputStrategy }`. Rewired both generation services off the legacy single-provider env path: [lib/generation/service.ts](lib/generation/service.ts) `generateMindmapOverlay` and [lib/generation/source-service.ts](lib/generation/source-service.ts) `generateDslAttempt` now call the dispatcher with `role: 'generation'` and thread the request's `modelId` + an env record (dropping `getModelProviderEnv()`/`MODEL_GENERATION_MODEL`); their options `env` type changed from `ModelProviderEnv` to `Record<string, string | undefined>`. Behavior for the default path is preserved (generation default `gpt-4o` is OpenAI/`response_format`, same request body + `choices[]` parsing). New [lib/model/dispatch.test.ts](lib/model/dispatch.test.ts) asserts the OpenAI path emits `response_format` (no `tools`) and parses `choices`, the Anthropic path emits `tools`/`tool_choice` (no `response_format`) and parses `tool_use` input, and the role-default fallback (3/3 pass). Updated [lib/generation/source-service.test.ts](lib/generation/source-service.test.ts) to the per-provider `{ OPENAI_API_KEY }` env. Typecheck and lint clean; model + generation + completion suites 110/111 (the lone red is the pre-existing, unrelated 35-word-limit test that was already failing on HEAD).
+  Purpose: Ensures a provider swap does not silently break or degrade DSL generation.
+
+- [x] Add a robust JSON parse fallback for prompt-only structured output
+  Added [lib/model/json-parse.ts](lib/model/json-parse.ts) exporting `parseStructuredModelJson(text): unknown`, which tries three candidates in priority order: (1) a direct `JSON.parse` of the trimmed text (the fast path for native `response_format`/tool output), (2) the contents of the first Markdown code fence (```` ```json ```` or bare ```` ``` ````), and (3) the first balanced `{...}`/`[...]` region extracted by a string-aware scanner that tracks brace depth while ignoring braces inside string literals and honoring `\\` escapes. It returns the first candidate that parses and otherwise throws `Model response did not contain parseable JSON` (with the underlying parser detail). Wired it into both model-response parsers — `parseMindmapGenerationOverlay` ([lib/generation/service.ts](lib/generation/service.ts)) and `parseSourceMindmapModelResponse` ([lib/generation/source-schema.ts](lib/generation/source-schema.ts)) — replacing the bare `JSON.parse`, so the schema-validated path now tolerates fenced/prose-wrapped JSON from `prompt`-capability models (which the dispatcher intentionally sends without a native structured-output mechanism) while staying byte-identical for clean native output (direct parse wins first). New [lib/model/json-parse.test.ts](lib/model/json-parse.test.ts) covers clean JSON, ```` ```json ```` and bare ```` ``` ```` fences, prose-embedded objects, braces inside strings, escaped quotes, top-level arrays, and the descriptive no-JSON throw (8/8 pass); source-service suite still green except the documented pre-existing 35-word-limit test. Typecheck and lint clean.
+  Purpose: Supports models lacking native structured-output features.
+
+### Phase 5 — UI Selector and Persistence
+
+- [x] Add a `/api/models` endpoint returning catalog metadata filtered to configured providers
+  Added a client-safe projection layer in [lib/model/public-catalog.ts](lib/model/public-catalog.ts): `PublicModel` (`id`, `provider`, `label`, `roles`, `capabilities` `{ structuredOutput, contextWindow }`, `defaults` `{ temperature, maxTokens }`) and `toPublicModel(entry)` which maps the catalog entry **field-by-field** (never spreads) so a future catalog field can't silently leak; it deliberately omits internal routing detail (`wireFormat`) and there are no secrets in a catalog entry to begin with (keys/base URLs live only in server env). `listPublicModels({ role?, env? })` composes the existing availability + allow-list gates — it starts from `listAvailableModels`/`listAvailableModelsForRole` (catalog × configured providers from Phase 2) and further filters by `isModelAllowListed` (the Phase 3 `MODEL_ALLOWLIST` ops gate) before projecting, so the dropdown only ever shows models the server can actually call and is permitted to use. New GET route [app/api/models/route.ts](app/api/models/route.ts) (`runtime = 'nodejs'`, wrapped in `auth()`, 401 when unauthenticated) reads an optional `?role=` query param, validates it with `modelRoleSchema.safeParse` (400 on an invalid role), and returns `{ models: PublicModel[] }` scoped to that role (or all roles when omitted). New [lib/model/public-catalog.test.ts](lib/model/public-catalog.test.ts) asserts the public shape exposes only the six non-secret keys (no `wireFormat`/`apiKey`/`baseUrl`), `roles` is a defensive copy, all-configured returns the full catalog, a single key hides the other provider's models, no keys → empty, role narrowing, and `MODEL_ALLOWLIST` enforcement (7/7 pass). Typecheck and lint clean.
+  Expose only non-secret fields; never return keys or base URLs.
+  Purpose: Lets the client render the dropdown without hardcoding the model list or seeing secrets.
+
+- [x] Add a reusable provider-grouped `ModelSelector` component
+  Added a presentational [components/ModelSelector.tsx](components/ModelSelector.tsx) (`'use client'`) — a controlled, provider-grouped model dropdown that takes `{ models: PublicModel[], value, onChange, id?, label?, disabled?, loading?, placeholder?, className? }` and renders a native `<select>` with one `<optgroup>` per provider (native grouping = accessible + keyboard-friendly with zero deps). It stays purely declarative by delegating grouping to a new pure helper [lib/model/group-models.ts](lib/model/group-models.ts): `groupModelsByProvider(models)` returns `{ provider, label, models }[]` preserving first-seen provider order (and model order within each group), and `formatProviderLabel(provider)` maps known providers to display names via a `satisfies Record<ModelProvider, string>` map (forces a label when a provider is added) with a capitalize fallback for unexpected values. The component handles three states through one disabled placeholder `<option>`: `loading` → "Loading models…", empty (`models` resolved but none available) → "No models available", otherwise the `placeholder`; `value` binds to `''` when unset so the placeholder shows, and selecting an option calls `onChange(modelId)`. Styling reuses the Phase A design tokens (`border-zinc-200`, `focus:border-accent-400`/`focus:ring-accent-400`, `disabled:bg-zinc-50`) plus a custom chevron via `appearance-none`, matching the existing panels. It receives `models` as a prop (no fetching here) so the next item can wire it to `/api/models` for both the completion and generation selectors. Imports from `lib` use the extension-less relative style the other components use. New [lib/model/group-models.test.ts](lib/model/group-models.test.ts) covers known/unknown provider labels, grouping, first-seen order preservation, and the empty case (5/5 pass). Typecheck and lint clean.
+  Purpose: Provides the shared UI control for picking a provider/model.
+
+- [x] Wire separate completion-model and generation-model selections into the workspace
+  Wired both per-role selections through [components/StudyWorkspace.tsx](components/StudyWorkspace.tsx) (the coordinator). It now fetches the offerable catalog once on mount from `/api/models`, stores it in `models`/`modelsLoading` state, and derives `completionModels`/`generationModels` via `useMemo` by filtering on `model.roles` (so a model that supports both roles appears in both selectors). Two new `ModelSelector`s render: a **Generation model** selector above Source Notes in the left column, and a **Completion model** selector above the DSL editor in the right column, each driven by its own `generationModelId`/`completionModelId` state (both default `undefined` → the server applies the per-role default). The generation selection is threaded into the DSL request at `requestMindmapDslGenerationFromApi({ sourceText, detailLevel, modelId: generationModelId })`. The completion selection is harder because the Monaco inline-completion provider is registered **once** globally, not per-render: I extended [lib/completion/monaco-inline-provider.ts](lib/completion/monaco-inline-provider.ts) with an optional 4th `getModelId?: () => string | undefined` param and a conditional spread (`...(modelId ? { modelId } : {})`) so the request shape is byte-identical when no model is selected (existing tests stay green), and [components/DslEditorPanel.tsx](components/DslEditorPanel.tsx) bridges React state to the global provider via a module-level `activeCompletionModelId` holder that a `useEffect` keeps in sync with the new `completionModelId` prop, while the provider factory reads it lazily on each request. No new UI tests (this repo doesn't unit-test `.tsx`; the testable grouping logic is already covered by `group-models.test.ts`); the provider change is covered by the existing `monaco-inline-provider.test.ts` (8/8 pass). Typecheck clean; lint problem count unchanged from baseline (no new issues).
+  Purpose: Allows a cheap/fast model for inline completion and a stronger model for generation.
+
+- [x] Persist the user's model choices
+  Added a `localStorage`-backed persistence layer in [lib/model/model-choice-storage.ts](lib/model/model-choice-storage.ts): `loadModelChoices(storage?)` / `saveModelChoices(choices, storage?)` keyed by `mindmap:model-choices`, plus a `modelChoicesSchema` whose per-field `knownModelIdSchema.optional().catch(undefined)` validates each stored id against the live catalog — a retired/unknown id (or corrupt/non-object JSON) degrades to `undefined` (and is independent per field, so one bad id never discards the other), and the whole object `.catch`es to empty on any structural failure. Both functions resolve storage defensively (`try/catch` around `localStorage` access for disabled-cookie/sandboxed contexts), `save` omits `undefined` fields and `removeItem`s the key when both are cleared, and an injectable `StorageLike` keeps it unit-testable. Wired into [components/StudyWorkspace.tsx](components/StudyWorkspace.tsx): a mount effect restores choices client-side (wrapped in the file's async-IIFE pattern so seeding stays off the synchronous effect body — no cascading-render lint error, and reading `localStorage` only post-hydration avoids an SSR mismatch), a guarded setState-during-render block drops a restored id the server no longer offers for its role (provider key removed → fall back to the per-role default), and a persist effect (gated on a `modelChoicesRestoredRef` so it can't clobber storage with empty state before restore) saves on every change. New [lib/model/model-choice-storage.test.ts](lib/model/model-choice-storage.test.ts) covers the empty case, round-trip, undefined-field omission, key removal when cleared, dropping retired ids, and corrupt/non-object JSON tolerance (7/7 pass; model suite 79/79). Typecheck clean; lint problem count unchanged from baseline (no new issues).
+  localStorage for MVP; later user/project settings via the existing persistence layer.
+  Purpose: Keeps the selection across reloads and (eventually) across devices.
+
+### Phase 6 — Extensibility Validation and Hardening
+
+- [ ] Add DeepSeek and Kimi as catalog rows (OpenAI-compatible)
+  Purpose: Proves a new model requires only a catalog entry plus a key.
+
+- [x] Add per-wire-format adapter tests and per-provider service tests
+  Extend `lib/completion/provider.test.ts` and `lib/generation/source-service.test.ts`.
+  Purpose: Locks in correct request/response handling for each wire format.
+  Note: `provider.test.ts` was renamed to `lib/model/openai-compatible-adapter.test.ts`
+  in Phase 1, so the real targets were the adapter test files plus the service test.
+  Added direct `openaiCompatibleAdapter` object tests (wireFormat, Bearer-auth
+  `/chat/completions` request, custom base-URL trailing-slash stripping, `json_schema`
+  and `json_object` -> `response_format` mapping, `parseResponse` extraction + empty/
+  undefined-payload tolerance) in `lib/model/openai-compatible-adapter.test.ts`; the
+  `anthropic-messages` adapter already had matching per-wire-format coverage (9 tests).
+  Added a per-provider service test in `lib/generation/source-service.test.ts` that
+  dispatches a `claude-sonnet-4-5` generation with `ANTHROPIC_API_KEY` and asserts the
+  outgoing request hits `/messages` with `tools`/`tool_choice` (no `response_format`)
+  and that the `tool_use` input is parsed back into validated DSL; the OpenAI
+  `response_format`/`choices` path was already covered. Also fixed a real bug surfaced
+  here: the line-length guard threw "15-word per-line limit" while the constant is 35,
+  and the matching test's sample line only had 16 words so it never tripped the 35-word
+  rule — corrected the message to "35-word per-line limit" and lengthened the sample
+  line past 35 words. Suite now 36/36 (was 35 with one long-standing red). Typecheck and
+  lint clean (lint unchanged at the 21-problem baseline).
+
+- [x] Consider per-provider rate limiting
+  Purpose: Avoids one provider's limits affecting another and controls cost.
+  Note: Implemented. The inline-completion limiter was keyed only on client IP, so a
+  burst (or upstream 429s) against one provider consumed the shared budget for every
+  provider. Added `getInlineCompletionProvider` (resolves the effective completion
+  model's provider via `selectModelIdForRole` + `getModelById`) and
+  `getInlineCompletionRateLimitKey` (composite `client:provider` key, e.g.
+  `203.0.113.7:openai` vs `203.0.113.7:anthropic`) in
+  `lib/completion/runtime-controls.ts`, and switched `app/api/completion/route.ts` to
+  use it. The 30s/18-request window now applies per provider per client, so exhausting
+  the OpenAI budget no longer blocks Anthropic and vice versa. Added four
+  `runtime-controls.test.ts` cases (provider resolution incl. default fallback,
+  composite-key shape, and starvation isolation). Suite 9/9; typecheck and lint clean
+  (lint unchanged at the 21-problem baseline).
+
+- [ ] Rotate the OpenAI key currently in `.env.local` and confirm `.env.local` is gitignored
+  Purpose: Removes a committed secret and prevents future leakage.
+
+### Out of Scope (for this issue)
+
+- Streaming responses.
+- Per-org/per-user bring-your-own API keys.
+- Provider-specific advanced features beyond chat + structured output.

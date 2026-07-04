@@ -78,13 +78,13 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
 
   if (!layoutResult && layoutStatus === 'loading') {
     return (
-      <div className="grid min-h-[460px] place-items-center rounded-2xl border border-sky-200 bg-sky-50/60 p-6 text-center">
+      <div className="grid min-h-[460px] place-items-center rounded-2xl border border-accent-200 bg-accent-50/60 p-6 text-center">
         <div className="grid max-w-sm gap-3">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-sky-700 shadow-sm">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-accent-700 shadow-sm">
             <span className="text-2xl">◌</span>
           </div>
-          <h3 className="text-lg font-semibold text-sky-950">Computing layout</h3>
-          <p className="text-sm leading-6 text-sky-900/80">
+          <h3 className="text-lg font-semibold text-accent-950">Computing layout</h3>
+          <p className="text-sm leading-6 text-accent-900/80">
             The preview is translating the latest outline into radial positions and routed edges.
           </p>
         </div>
@@ -134,7 +134,7 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
   return (
     <div className="relative overflow-hidden rounded-[28px] border border-zinc-200 bg-[radial-gradient(circle_at_top,_rgba(251,191,36,0.14),_transparent_28%),linear-gradient(180deg,_#fffef8_0%,_#ffffff_55%,_#f8fafc_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
       {layoutStatus === 'loading' ? (
-        <div className="absolute left-4 top-4 z-10 rounded-full border border-sky-200 bg-white/90 px-3 py-2 text-xs font-medium text-sky-900 shadow-sm backdrop-blur">
+        <div className="absolute left-4 top-4 z-10 rounded-full border border-accent-200 bg-white/90 px-3 py-2 text-xs font-medium text-accent-900 shadow-sm backdrop-blur">
           Updating layout...
         </div>
       ) : null}
