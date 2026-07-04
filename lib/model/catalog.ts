@@ -220,8 +220,8 @@ export function resolveModelDefaults(modelId: string): ModelDefaults {
 // OpenAI models, so they resolve whenever `OPENAI_API_KEY` is configured: inline
 // completion favors a cheap/fast model, generation favors a stronger one.
 export const DEFAULT_MODEL_IDS = Object.freeze({
-  completion: 'gpt-4o-mini',
-  generation: 'gpt-4o',
+  completion: 'claude-haiku-4-5',
+  generation: 'claude-haiku-4-5',
 }) satisfies Record<ModelRole, string>;
 
 // Fail fast on a typo'd default rather than surfacing it as a runtime "unknown
