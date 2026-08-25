@@ -13,12 +13,15 @@ export { maxSourceTextCharacters };
 
 const requiredString = z.string().trim().min(1);
 
+export const readabilityModeSchema = z.enum(['compact', 'plain', 'detailed']).default('compact');
+
 export const sourceMindmapGenerationRequestSchema = z.object({
   sourceText: requiredString.max(
     maxSourceTextCharacters,
     'Source text is too long to process. Please shorten it and try again.',
   ),
   detailLevel: z.enum(['standard', 'detailed']).optional(),
+  readabilityMode: readabilityModeSchema.optional(),
   modelId: knownModelIdSchema.optional(),
 }).strict();
 

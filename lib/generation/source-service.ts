@@ -62,6 +62,7 @@ export async function generateMindmapDslFromSource(
     targetMinLineCount,
     targetMaxLineCount,
     detailLevel,
+    readabilityMode: validatedRequest.readabilityMode,
     minimumChildrenPerBranch,
     mode: generationMode,
   });
@@ -88,6 +89,7 @@ export async function generateMindmapDslFromSource(
       targetMinLineCount,
       targetMaxLineCount,
       detailLevel,
+      readabilityMode: validatedRequest.readabilityMode,
       minimumChildrenPerBranch,
       mode: generationMode,
       previousDslAttempt: attempt.dsl,

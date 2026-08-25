@@ -35,6 +35,22 @@ test('createSourceMindmapGenerationPrompt injects source density targets', () =>
   );
 });
 
+test('createSourceMindmapGenerationPrompt prefers plain-language labels when readabilityMode is plain', () => {
+  const prompt = createSourceMindmapGenerationPrompt({
+    sourceText: 'Growth\nCompliance\nInclusion',
+    sourceMeaningfulLineCount: 3,
+    targetMinLineCount: 8,
+    targetMaxLineCount: 12,
+    detailLevel: 'detailed',
+    readabilityMode: 'plain',
+  });
+
+  assert.match(prompt.user, /prefer plain-language labels/i);
+  assert.match(prompt.user, /avoid symbols such as =, \+, =>, and ->/i);
+  assert.match(prompt.user, /add rich explanatory child lines/i);
+  assert.match(prompt.user, /Detail preference: detailed: prefer the upper half of the target range/i);
+});
+
 test('createSourceMindmapGenerationPrompt includes retry guidance when revising a sparse attempt', () => {
   const prompt = createSourceMindmapGenerationPrompt({
     sourceText: 'Main Topic: Aspects\nSub Topic: Political Theory',
