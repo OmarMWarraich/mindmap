@@ -342,7 +342,7 @@ export default function SourceNotesPanel({
                                 : selectedDetailLevel === 'plain'
                                   ? 'plain'
                                   : 'standard'
-                          } DSL`};
+                          } DSL`}
         </button>
         <button
           aria-label="Attach a .txt, .md, or .pdf file"
