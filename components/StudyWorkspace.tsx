@@ -543,7 +543,19 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
     });
 
     try {
-      const response = await requestMindmapDslGenerationFromApi({ sourceText, detailLevel, modelId: generationModelId });
+      const readabilityMode = detailLevel === 'plain'
+        ? 'plain'
+        : detailLevel === 'compact'
+          ? 'compact'
+          : detailLevel === 'detailed'
+            ? 'detailed'
+            : 'compact';
+      const response = await requestMindmapDslGenerationFromApi({
+        sourceText,
+        detailLevel,
+        readabilityMode,
+        modelId: generationModelId,
+      });
 
       dslEditorRef.current?.setValue(response.dsl);
       dslEditorRef.current?.focus();

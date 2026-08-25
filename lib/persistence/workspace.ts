@@ -15,7 +15,7 @@ export const persistedWorkspaceDraftSchema = z.object({
   updatedAt: z.string(),
   outline: z.string(),
   rawNotes: z.string().optional(),
-  selectedDetailLevel: z.enum(['standard', 'detailed']).optional(),
+  selectedDetailLevel: z.enum(['standard', 'detailed', 'compact', 'plain']).optional(),
   latestDslGeneration: sourceMindmapGenerationResponseSchema.nullable().optional(),
   mindmap: generatedMindmapSchema.nullable(),
   previewTransform: previewTransformSchema,
