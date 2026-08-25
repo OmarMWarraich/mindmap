@@ -9,7 +9,7 @@ const fileInputAccept = acceptedIngestionExtensions.map((extension) => `.${exten
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
-export type SourceGenerationDetailLevel = 'standard' | 'detailed';
+export type SourceGenerationDetailLevel = 'standard' | 'detailed' | 'compact' | 'plain';
 
 type StatusTone = 'idle' | 'progress' | 'success' | 'error';
 
@@ -177,6 +177,40 @@ export default function SourceNotesPanel({
         >
           Detailed
         </button>
+
+        <button
+          aria-pressed={selectedDetailLevel === 'plain'}
+          className={[
+            'rounded-full px-3 py-1 text-xs font-medium transition',
+            selectedDetailLevel === 'plain'
+              ? 'bg-accent-600 text-white'
+              : 'text-zinc-600 hover:bg-zinc-100',
+          ].join(' ')}
+          disabled={isGenerating}
+          onClick={() => {
+            onDetailLevelChange('plain');
+          }}
+          type="button"
+        >
+          Plain
+        </button>
+
+        <button
+          aria-pressed={selectedDetailLevel === 'compact'}
+          className={[
+            'rounded-full px-3 py-1 text-xs font-medium transition',
+            selectedDetailLevel === 'compact'
+              ? 'bg-accent-600 text-white'
+              : 'text-zinc-600 hover:bg-zinc-100',
+          ].join(' ')}
+          disabled={isGenerating}
+          onClick={() => {
+            onDetailLevelChange('compact');
+          }}
+          type="button"
+        >
+          Compact
+        </button>
       </div>
 
       {/* ── Textarea ──────────────────────────────────────────────── */}
@@ -300,7 +334,15 @@ export default function SourceNotesPanel({
         >
           {isGenerating
             ? 'Generating…'
-            : `Generate ${selectedDetailLevel === 'detailed' ? 'detailed' : 'standard'} DSL`}
+            : `Generate ${
+                            selectedDetailLevel === 'detailed'
+                              ? 'detailed'
+                              : selectedDetailLevel === 'compact'
+                                ? 'compact'
+                                : selectedDetailLevel === 'plain'
+                                  ? 'plain'
+                                  : 'standard'
+                          } DSL`};
         </button>
         <button
           aria-label="Attach a .txt, .md, or .pdf file"

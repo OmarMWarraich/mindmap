@@ -22,7 +22,7 @@ export const previewTransformSchema = z
 export const draftUpdateSchema = z.object({
   outline: z.string().optional(),
   rawNotes: z.string().optional(),
-  selectedDetailLevel: z.enum(['standard', 'detailed']).optional(),
+  selectedDetailLevel: z.enum(['standard', 'detailed', 'compact', 'plain']).optional(),
   mindmap: generatedMindmapSchema.nullable().optional(),
   previewTransform: previewTransformSchema.nullable().optional(),
 });

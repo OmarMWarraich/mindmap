@@ -5,7 +5,7 @@ export interface SourceMindmapGenerationPromptInput {
   sourceMeaningfulLineCount: number;
   targetMinLineCount: number;
   targetMaxLineCount: number;
-  detailLevel?: 'standard' | 'detailed';
+  detailLevel?: 'standard' | 'detailed' | 'compact' | 'plain';
   readabilityMode?: SourceMindmapReadabilityMode;
   minimumChildrenPerBranch?: number;
   // 'expand' (default): enrich smaller sources toward a density target.
