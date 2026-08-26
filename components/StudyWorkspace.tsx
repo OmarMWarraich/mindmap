@@ -614,7 +614,44 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
 
   return (
     <div className="grid gap-6 p-5 xl:grid-cols-2">
-        {/* Left column: Source Notes + Validation (or History panel) */}
+        {/* Left column: DSL Editor + Validation */}
+        <div className="flex flex-col gap-4">
+          <ModelSelector
+            id="completion-model"
+            label="Completion model"
+            loading={modelsLoading}
+            models={completionModels}
+            onChange={setCompletionModelId}
+            placeholder="Default completion model"
+            value={completionModelId}
+          />
+          {/* 480px below xl (the editor's pre-swap height); fills the column on xl like the notes slot it replaced. */}
+          <div className="h-[480px] xl:flex-1">
+            <DslEditorPanel
+              ref={dslEditorRef}
+              completionModelId={completionModelId}
+              defaultValue={mindmapDslStarterOutline}
+              onChange={setOutline}
+              onGenerateMindmap={handleGenerateMindmapFromDsl}
+              onResetDsl={handleResetDsl}
+            />
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <ValidationPanel
+              issues={parseResult.errors}
+              tone="error"
+              title={`Errors (${parseResult.errors.length})`}
+            />
+            <ValidationPanel
+              issues={parseResult.warnings}
+              tone="warning"
+              title={`Warnings (${parseResult.warnings.length})`}
+            />
+          </div>
+        </div>
+
+        {/* Right column: Source Notes (or History/Chat) + Preview/Export */}
         <div className="flex flex-col gap-4">
           {activePanel === 'history' ? (
             <GenerationHistoryPanel
@@ -638,56 +675,23 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
                 placeholder="Default generation model"
                 value={generationModelId}
               />
-              <SourceNotesPanel
-                generationStatus={generationStatus}
-                latestDslGeneration={latestDslGeneration}
-                onClearNotes={handleClearNotes}
-                onDetailLevelChange={setSelectedDetailLevel}
-                onGenerateDsl={(detailLevel) => {
-                  void handleGenerateDsl(detailLevel);
-                }}
-                onRawNotesChange={setRawNotes}
-                rawNotes={rawNotes}
-                selectedDetailLevel={selectedDetailLevel}
-              />
-
-              <div className="grid gap-4 lg:grid-cols-2">
-                <ValidationPanel
-                  issues={parseResult.errors}
-                  tone="error"
-                  title={`Errors (${parseResult.errors.length})`}
-                />
-                <ValidationPanel
-                  issues={parseResult.warnings}
-                  tone="warning"
-                  title={`Warnings (${parseResult.warnings.length})`}
+              {/* Fixed height carried over from the editor slot this panel replaced. */}
+              <div className="h-[480px]">
+                <SourceNotesPanel
+                  generationStatus={generationStatus}
+                  latestDslGeneration={latestDslGeneration}
+                  onClearNotes={handleClearNotes}
+                  onDetailLevelChange={setSelectedDetailLevel}
+                  onGenerateDsl={(detailLevel) => {
+                    void handleGenerateDsl(detailLevel);
+                  }}
+                  onRawNotesChange={setRawNotes}
+                  rawNotes={rawNotes}
+                  selectedDetailLevel={selectedDetailLevel}
                 />
               </div>
             </>
           )}
-        </div>
-
-        {/* Right column: DSL Editor (upper) + Preview/Export (lower) */}
-        <div className="flex flex-col gap-4">
-          <ModelSelector
-            id="completion-model"
-            label="Completion model"
-            loading={modelsLoading}
-            models={completionModels}
-            onChange={setCompletionModelId}
-            placeholder="Default completion model"
-            value={completionModelId}
-          />
-          <div className="h-[480px]">
-            <DslEditorPanel
-              ref={dslEditorRef}
-              completionModelId={completionModelId}
-              defaultValue={mindmapDslStarterOutline}
-              onChange={setOutline}
-              onGenerateMindmap={handleGenerateMindmapFromDsl}
-              onResetDsl={handleResetDsl}
-            />
-          </div>
 
           <MindmapSvgPreview
             ref={previewRef}
