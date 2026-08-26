@@ -1,3 +1,5 @@
+import type { MindmapInlineSegment } from '../dsl/inline-formatting.ts';
+import { parseMindmapInlineSegments } from '../dsl/inline-formatting.ts';
 import type { MindmapLayoutResult } from './layout.ts';
 import type {
   GeneratedMindmap,
@@ -18,6 +20,7 @@ export interface SvgPreviewNode {
   kind: MindmapNodeKind;
   label: string;
   lines: string[];
+  lineSegments: MindmapInlineSegment[][];
   fontSize: number;
   lineHeight: number;
   lineStartY: number;
@@ -303,6 +306,7 @@ function createSvgPreviewNode(
     kind: sourceNode.kind,
     label: sourceNode.label,
     lines: typography.lines,
+    lineSegments: typography.lineSegments,
     fontSize: typography.fontSize,
     lineHeight: typography.lineHeight,
     lineStartY: typography.lineStartY,
@@ -448,15 +452,35 @@ export function createSvgPreviewSnapshot(
     text.setAttribute('font-family', 'ui-sans-serif, system-ui, sans-serif');
     text.setAttribute('font-size', String(node.fontSize));
     text.setAttribute('font-weight', node.kind === 'root' ? '800' : '700');
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('dominant-baseline', 'hanging');
 
-    for (const [index, line] of node.lines.entries()) {
-      const tspan = document.createElementNS(svgNs, 'tspan');
-      tspan.setAttribute('x', String(node.width / 2));
-      tspan.setAttribute('y', String(node.lineStartY + index * node.lineHeight));
-      tspan.setAttribute('text-anchor', 'middle');
-      tspan.setAttribute('dominant-baseline', 'hanging');
-      tspan.textContent = line;
-      text.append(tspan);
+    for (const [index, segments] of node.lineSegments.entries()) {
+      for (const [segmentIndex, segment] of segments.entries()) {
+        const tspan = document.createElementNS(svgNs, 'tspan');
+
+        // Only the first tspan of a line is positioned; the rest flow in the
+        // same text chunk so the whole styled line centers as one unit.
+        if (segmentIndex === 0) {
+          tspan.setAttribute('x', String(node.width / 2));
+          tspan.setAttribute('y', String(node.lineStartY + index * node.lineHeight));
+        }
+
+        if (segment.bold) {
+          tspan.setAttribute('font-weight', '900');
+        }
+
+        if (segment.italic) {
+          tspan.setAttribute('font-style', 'italic');
+        }
+
+        if (segment.underline) {
+          tspan.setAttribute('text-decoration', 'underline');
+        }
+
+        tspan.textContent = segment.text;
+        text.append(tspan);
+      }
     }
 
     nodeWrapper.append(text);
@@ -516,17 +540,20 @@ function createNodeTypography(
   metrics: SvgPreviewRenderMetrics,
   profile: SvgPreviewRenderProfile,
   targetFontSize?: number,
-): Pick<SvgPreviewNode, 'lines' | 'fontSize' | 'lineHeight' | 'lineStartY'> {
+): Pick<SvgPreviewNode, 'lines' | 'lineSegments' | 'fontSize' | 'lineHeight' | 'lineStartY'> {
   const baseFontSize = sourceNode.kind === 'root' ? metrics.rootFontSize : metrics.nodeFontSize;
   const baseLineStartY = sourceNode.kind === 'root' ? metrics.rootLineStartY : metrics.nodeLineStartY;
   const availableWidth = Math.max(64, layoutNode.width - sourceNode.layout.paddingX * 2);
 
   if (profile !== 'export') {
+    const wrapped = wrapFormattedMindmapLabel(
+      sourceNode.label,
+      Math.max(8, Math.floor(availableWidth / metrics.approxCharacterWidth)),
+    );
+
     return {
-      lines: wrapMindmapLabel(
-        sourceNode.label,
-        Math.max(8, Math.floor(availableWidth / metrics.approxCharacterWidth)),
-      ),
+      lines: wrapped.lines,
+      lineSegments: wrapped.lineSegments,
       fontSize: baseFontSize,
       lineHeight: metrics.lineHeight,
       lineStartY: baseLineStartY,
@@ -670,7 +697,7 @@ function measureNodeTypography(
   metrics: SvgPreviewRenderMetrics,
   baseFontSize: number,
   baseLineStartY: number,
-): Pick<SvgPreviewNode, 'lines' | 'fontSize' | 'lineHeight' | 'lineStartY'> {
+): Pick<SvgPreviewNode, 'lines' | 'lineSegments' | 'fontSize' | 'lineHeight' | 'lineStartY'> {
   const scale = fontSize / baseFontSize;
   const approxCharacterWidth = Math.max(1, metrics.approxCharacterWidth * scale);
   const lineHeight = Math.max(fontSize * 1.18, metrics.lineHeight * scale);
@@ -678,9 +705,14 @@ function measureNodeTypography(
     fontSize * 1.35,
     Math.min(baseLineStartY * scale, metrics.accentInsetY + metrics.accentHeight + fontSize * 0.72),
   );
+  const wrapped = wrapFormattedMindmapLabel(
+    label,
+    Math.max(8, Math.floor(availableWidth / approxCharacterWidth)),
+  );
 
   return {
-    lines: wrapMindmapLabel(label, Math.max(8, Math.floor(availableWidth / approxCharacterWidth))),
+    lines: wrapped.lines,
+    lineSegments: wrapped.lineSegments,
     fontSize,
     lineHeight,
     lineStartY,
@@ -720,6 +752,92 @@ function createSingleCurveControlPoint(
     x: midpoint.x - (deltaY / length) * curveStrength,
     y: midpoint.y + (deltaX / length) * curveStrength,
   };
+}
+
+export function wrapFormattedMindmapLabel(
+  label: string,
+  maxCharsPerLine: number,
+): { lines: string[]; lineSegments: MindmapInlineSegment[][] } {
+  const segments = parseMindmapInlineSegments(label);
+  const plainLabel = segments.map((segment) => segment.text).join('');
+  const lines = wrapMindmapLabel(plainLabel, maxCharsPerLine);
+  const styledChars = segments.flatMap((segment) =>
+    [...segment.text].map((ch) => ({
+      ch,
+      bold: segment.bold,
+      italic: segment.italic,
+      underline: segment.underline,
+    })),
+  );
+
+  // Wrapping only collapses/removes whitespace, so non-space characters map
+  // 1:1 onto the styled character stream in order.
+  let cursor = 0;
+  const lineSegments = lines.map((line) => {
+    const lineChars: Array<{ ch: string } & Omit<MindmapInlineSegment, 'text'>> = [];
+
+    for (const ch of line) {
+      if (/\s/.test(ch)) {
+        const style = styledChars[cursor];
+
+        while (cursor < styledChars.length && /\s/.test(styledChars[cursor]!.ch)) {
+          cursor += 1;
+        }
+
+        lineChars.push({
+          ch,
+          bold: style?.bold ?? false,
+          italic: style?.italic ?? false,
+          underline: style?.underline ?? false,
+        });
+        continue;
+      }
+
+      while (cursor < styledChars.length && /\s/.test(styledChars[cursor]!.ch)) {
+        cursor += 1;
+      }
+
+      const style = styledChars[cursor];
+      lineChars.push({
+        ch,
+        bold: style?.bold ?? false,
+        italic: style?.italic ?? false,
+        underline: style?.underline ?? false,
+      });
+
+      if (style) {
+        cursor += 1;
+      }
+    }
+
+    return mergeStyledLineChars(line, lineChars);
+  });
+
+  return { lines, lineSegments };
+}
+
+function mergeStyledLineChars(
+  line: string,
+  chars: Array<{ ch: string } & Omit<MindmapInlineSegment, 'text'>>,
+): MindmapInlineSegment[] {
+  const merged: MindmapInlineSegment[] = [];
+
+  for (const { ch, bold, italic, underline } of chars) {
+    const last = merged.at(-1);
+
+    if (last && last.bold === bold && last.italic === italic && last.underline === underline) {
+      last.text += ch;
+      continue;
+    }
+
+    merged.push({ text: ch, bold, italic, underline });
+  }
+
+  if (merged.length === 0) {
+    return [{ text: line, bold: false, italic: false, underline: false }];
+  }
+
+  return merged;
 }
 
 export function wrapMindmapLabel(label: string, maxCharsPerLine: number): string[] {

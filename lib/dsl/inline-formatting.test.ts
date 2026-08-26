@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { toggleMindmapDslInlineFormatting } from './inline-formatting.ts';
+import {
+  parseMindmapInlineSegments,
+  stripMindmapInlineFormatting,
+  toggleMindmapDslInlineFormatting,
+} from './inline-formatting.ts';
 
 test('wraps a selection in bold markers', () => {
   assert.equal(toggleMindmapDslInlineFormatting('Krebs cycle', 'bold'), '**Krebs cycle**');
@@ -35,4 +39,41 @@ test('empty selection produces an empty marker pair for caret placement', () => 
 
 test('single marker character selection is wrapped rather than unwrapped', () => {
   assert.equal(toggleMindmapDslInlineFormatting('_', 'italic'), '___');
+});
+
+test('parseMindmapInlineSegments returns one plain segment for unmarked text', () => {
+  assert.deepEqual(parseMindmapInlineSegments('Krebs cycle'), [
+    { text: 'Krebs cycle', bold: false, italic: false, underline: false },
+  ]);
+});
+
+test('parseMindmapInlineSegments splits marked text into styled segments', () => {
+  assert.deepEqual(parseMindmapInlineSegments('**Krebs** _cycle_ <u>loop</u>'), [
+    { text: 'Krebs', bold: true, italic: false, underline: false },
+    { text: ' ', bold: false, italic: false, underline: false },
+    { text: 'cycle', bold: false, italic: true, underline: false },
+    { text: ' ', bold: false, italic: false, underline: false },
+    { text: 'loop', bold: false, italic: false, underline: true },
+  ]);
+});
+
+test('parseMindmapInlineSegments combines flags for nested markers', () => {
+  assert.deepEqual(parseMindmapInlineSegments('**bold _both_**'), [
+    { text: 'bold ', bold: true, italic: false, underline: false },
+    { text: 'both', bold: true, italic: true, underline: false },
+  ]);
+});
+
+test('parseMindmapInlineSegments keeps unmatched markers as literal text', () => {
+  assert.deepEqual(parseMindmapInlineSegments('**alpha'), [
+    { text: '**alpha', bold: false, italic: false, underline: false },
+  ]);
+});
+
+test('stripMindmapInlineFormatting removes all format markers', () => {
+  assert.equal(
+    stripMindmapInlineFormatting('**Krebs** _cycle_ <u>loop</u>'),
+    'Krebs cycle loop',
+  );
+  assert.equal(stripMindmapInlineFormatting('****'), '');
 });

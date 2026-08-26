@@ -3,6 +3,9 @@ import type {
   MindmapDocumentAst,
   MindmapLeafAstNode,
 } from "../dsl/ast.ts";
+import {
+  stripMindmapInlineFormatting,
+} from "../dsl/inline-formatting.ts";
 import type {
   MindmapValidationError,
   MindmapValidationWarning,
@@ -254,7 +257,8 @@ function createNodeLayout(
         : antiCramLayoutDefaults.branchHeightHint + 12;
   const targetCharsPerLine =
     kind === 'root' ? 28 : kind === 'branch' ? 24 : 22;
-  const wrappedLines = wrapLabelForLayout(label, targetCharsPerLine);
+  // Size boxes from the visible text so formatting markers don't inflate nodes.
+  const wrappedLines = wrapLabelForLayout(stripMindmapInlineFormatting(label), targetCharsPerLine);
   const longestLineLength = wrappedLines.reduce(
     (longest, line) => Math.max(longest, line.length),
     0,

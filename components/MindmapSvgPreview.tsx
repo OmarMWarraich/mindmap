@@ -255,23 +255,28 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
                     y={previewMetrics.accentInsetY}
                   />
                   <text
+                    dominantBaseline="hanging"
                     fill={node.style.text}
                     fontFamily="ui-sans-serif, system-ui, sans-serif"
                     fontSize={node.fontSize}
                     fontWeight={node.kind === 'root' ? 800 : 700}
+                    textAnchor="middle"
                     x={node.width / 2}
                   >
-                    {node.lines.map((line, index) => (
-                      <tspan
-                        dominantBaseline="hanging"
-                        key={`${node.id}-${index}`}
-                        textAnchor="middle"
-                        x={node.width / 2}
-                        y={node.lineStartY + index * node.lineHeight}
-                      >
-                        {line}
-                      </tspan>
-                    ))}
+                    {node.lineSegments.flatMap((segments, lineIndex) =>
+                      segments.map((segment, segmentIndex) => (
+                        <tspan
+                          fontStyle={segment.italic ? 'italic' : undefined}
+                          fontWeight={segment.bold ? 900 : undefined}
+                          key={`${node.id}-${lineIndex}-${segmentIndex}`}
+                          textDecoration={segment.underline ? 'underline' : undefined}
+                          x={segmentIndex === 0 ? node.width / 2 : undefined}
+                          y={segmentIndex === 0 ? node.lineStartY + lineIndex * node.lineHeight : undefined}
+                        >
+                          {segment.text}
+                        </tspan>
+                      )),
+                    )}
                   </text>
                 </g>
               );
