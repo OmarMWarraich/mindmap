@@ -24,6 +24,28 @@ test('isIgnorableMonacoCancellation accepts Monaco canceled errors with exact me
   );
 });
 
+test('isIgnorableMonacoCancellation accepts browser AbortError cancellations', () => {
+  assert.equal(
+    isIgnorableMonacoCancellation({
+      name: 'AbortError',
+      message: 'The operation was aborted.',
+      stack: 'at fetch (<anonymous>)',
+    }),
+    true,
+  );
+});
+
+test('isIgnorableMonacoCancellation accepts generic aborted request messages', () => {
+  assert.equal(
+    isIgnorableMonacoCancellation({
+      name: 'Error',
+      message: 'signal is aborted',
+      stack: 'at app.js:10:2',
+    }),
+    true,
+  );
+});
+
 test('isIgnorableMonacoCancellation rejects unrelated errors', () => {
   assert.equal(
     isIgnorableMonacoCancellation({

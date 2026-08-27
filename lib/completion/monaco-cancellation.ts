@@ -54,10 +54,21 @@ function buildCancellationDetails(
   const normalizedMessage = message.trim();
   const normalizedName = name.trim();
   const normalizedStack = stack.trim();
+  const lowerName = normalizedName.toLowerCase();
+  const lowerMessage = normalizedMessage.toLowerCase();
   const isCanceled =
-    normalizedName === 'Canceled' ||
+    lowerName === 'canceled' ||
+    lowerName === 'cancelled' ||
+    lowerName === 'aborterror' ||
     normalizedMessage === 'Canceled' ||
-    normalizedMessage.startsWith('Canceled:');
+    normalizedMessage === 'Cancelled' ||
+    normalizedMessage === 'AbortError' ||
+    normalizedMessage.startsWith('Canceled:') ||
+    normalizedMessage.startsWith('Cancelled:') ||
+    normalizedMessage.startsWith('AbortError:') ||
+    lowerMessage.includes('aborted') ||
+    lowerMessage.includes('canceled') ||
+    lowerMessage.includes('cancelled');
 
   return {
     name: normalizedName,
