@@ -28,6 +28,11 @@ import {
 } from '../lib/mindmap/layout';
 import { getMindmapLayoutClient } from '../lib/mindmap/layout-client';
 import {
+  applyMindmapNodePositionOverrides,
+  pruneMindmapNodePositionOverrides,
+  type MindmapNodePositionOverrides,
+} from '../lib/mindmap/node-overrides';
+import {
   createSvgPreviewSnapshot,
   createDefaultSvgPreviewTransform,
   type SvgPreviewTransform,
@@ -68,6 +73,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
   const [previewTransform, setPreviewTransform] = useState<SvgPreviewTransform>(
     createDefaultSvgPreviewTransform,
   );
+  const [nodePositionOverrides, setNodePositionOverrides] = useState<MindmapNodePositionOverrides>({});
   const [exportStatus, setExportStatus] = useState<{
     tone: 'idle' | 'progress' | 'success' | 'error';
     message: string;
@@ -239,6 +245,14 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
   const effectiveMindmap = generatedMindmap
     ?? (latestMindmapSnapshotOutline === outline ? latestMindmapSnapshot : null);
 
+  const displayLayoutResult = useMemo(() => {
+    if (!layoutResult || !effectiveMindmap) {
+      return layoutResult;
+    }
+
+    return applyMindmapNodePositionOverrides(effectiveMindmap, layoutResult, nodePositionOverrides);
+  }, [effectiveMindmap, layoutResult, nodePositionOverrides]);
+
   const effectiveLayoutStatus = layoutStatus;
   const effectiveLayoutError = layoutError;
   const effectiveLayoutDiagnostics = layoutDiagnostics;
@@ -269,6 +283,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
           setLatestMindmapSnapshot(cloudDraft.mindmap);
           setLatestMindmapSnapshotOutline(cloudDraft.outline);
           setPreviewTransform(cloudDraft.previewTransform);
+          setNodePositionOverrides(cloudDraft.nodePositionOverrides ?? {});
           setDraftStatus({
             tone: 'success',
             message: 'Restored saved project from the cloud.',
@@ -291,6 +306,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
           setLatestMindmapSnapshot(localDraft.mindmap);
           setLatestMindmapSnapshotOutline(localDraft.outline);
           setPreviewTransform(localDraft.previewTransform);
+          setNodePositionOverrides(localDraft.nodePositionOverrides ?? {});
           setDraftStatus({
             tone: 'success',
             message: 'Restored the saved draft and preview state.',
@@ -425,6 +441,10 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
         latestDslGeneration,
         mindmap: latestMindmapSnapshot,
         previewTransform,
+        nodePositionOverrides: pruneMindmapNodePositionOverrides(
+          nodePositionOverrides,
+          latestMindmapSnapshot,
+        ),
       };
 
       void saveWorkspaceDraft(draft)
@@ -457,7 +477,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [latestDslGeneration, latestMindmapSnapshot, outline, previewTransform, projectId, rawNotes, selectedDetailLevel]);
+  }, [latestDslGeneration, latestMindmapSnapshot, nodePositionOverrides, outline, previewTransform, projectId, rawNotes, selectedDetailLevel]);
 
   async function handleDownloadPng(): Promise<void> {
     if (!effectiveMindmap) {
@@ -481,7 +501,15 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
       // Off the main thread via the layout client (falls back to in-page ELK if
       // the worker is unavailable), so the upscaled export layout cannot jank the UI.
       const { result: exportLayout } = await getMindmapLayoutClient().layout(exportMindmap);
-      const snapshot = createSvgPreviewSnapshot(exportMindmap, exportLayout, {
+      // Drag offsets are stored in preview-layout units; rescale them into the
+      // export layout's coordinate space so the PNG matches the preview.
+      const exportLayoutWithOverrides = layoutResult
+        ? applyMindmapNodePositionOverrides(exportMindmap, exportLayout, nodePositionOverrides, {
+            scaleX: layoutResult.width > 0 ? exportLayout.width / layoutResult.width : 1,
+            scaleY: layoutResult.height > 0 ? exportLayout.height / layoutResult.height : 1,
+          })
+        : exportLayout;
+      const snapshot = createSvgPreviewSnapshot(exportMindmap, exportLayoutWithOverrides, {
         profile: 'export',
         renderScale: exportControls.fontScale,
       });
@@ -696,9 +724,11 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
           <MindmapSvgPreview
             ref={previewRef}
             layoutError={effectiveLayoutError}
-            layoutResult={layoutResult}
+            layoutResult={displayLayoutResult}
             layoutStatus={effectiveLayoutStatus}
             mindmap={effectiveMindmap}
+            nodePositionOverrides={nodePositionOverrides}
+            onNodePositionOverridesChange={setNodePositionOverrides}
             onTransformChange={setPreviewTransform}
             transform={previewTransform}
           />
@@ -716,7 +746,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
           <MindmapPreviewDrawer
             ref={previewRef}
             layoutError={effectiveLayoutError}
-            layoutResult={layoutResult}
+            layoutResult={displayLayoutResult}
             layoutStatus={effectiveLayoutStatus}
             mindmap={effectiveMindmap}
             onClose={() => {
