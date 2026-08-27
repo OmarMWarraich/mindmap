@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { previewTransformSchema } from '../api/projects-schema.ts';
 import { sourceMindmapGenerationResponseSchema } from '../generation/source-schema.ts';
+import { mindmapNodePositionOverridesSchema } from '../mindmap/node-overrides.ts';
 import { generatedMindmapSchema } from '../mindmap/schema.ts';
 
 const workspaceDraftStoreName = 'workspace-drafts';
@@ -19,6 +20,7 @@ export const persistedWorkspaceDraftSchema = z.object({
   latestDslGeneration: sourceMindmapGenerationResponseSchema.nullable().optional(),
   mindmap: generatedMindmapSchema.nullable(),
   previewTransform: previewTransformSchema,
+  nodePositionOverrides: mindmapNodePositionOverridesSchema.optional(),
 }).strict();
 
 export type PersistedWorkspaceDraft = z.infer<typeof persistedWorkspaceDraftSchema>;
@@ -152,6 +154,7 @@ export async function loadCloudDraft(projectId: string): Promise<PersistedWorksp
     latestDslGeneration: null,
     mindmap: raw.mindmap ?? null,
     previewTransform: raw.previewTransform ?? { scale: 1, translateX: 0, translateY: 0 },
+    nodePositionOverrides: raw.nodePositionOverrides ?? undefined,
   });
 }
 
@@ -168,6 +171,7 @@ export async function saveCloudDraft(
       selectedDetailLevel: draft.selectedDetailLevel ?? 'standard',
       mindmap: draft.mindmap,
       previewTransform: draft.previewTransform,
+      nodePositionOverrides: draft.nodePositionOverrides ?? null,
     }),
   });
 
