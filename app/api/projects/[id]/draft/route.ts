@@ -49,6 +49,10 @@ export const PUT = withProject(async (req, { projectId }) => {
           mindmap: body.mindmap !== undefined ? body.mindmap : existing.mindmap,
           previewTransform:
             body.previewTransform !== undefined ? body.previewTransform : existing.previewTransform,
+          nodePositionOverrides:
+            body.nodePositionOverrides !== undefined
+              ? body.nodePositionOverrides
+              : existing.nodePositionOverrides,
           updatedAt: now,
         })
         .where(eq(projectDrafts.id, existing.id))
@@ -68,6 +72,7 @@ export const PUT = withProject(async (req, { projectId }) => {
         selectedDetailLevel: body.selectedDetailLevel ?? 'standard',
         mindmap: body.mindmap ?? null,
         previewTransform: body.previewTransform ?? null,
+        nodePositionOverrides: body.nodePositionOverrides ?? null,
       })
       .returning();
 
