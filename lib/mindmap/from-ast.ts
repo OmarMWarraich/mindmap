@@ -36,8 +36,8 @@ const antiCramLayoutDefaults: MindmapLayoutDefaults = {
   leafHeightHint: 60,
 };
 
-const maxDirectBranchChildrenBeforeGrouping = 6;
-const overflowGroupChunkSize = 4;
+const maxDirectBranchChildrenBeforeGrouping = 18;
+const overflowGroupChunkSize = 6;
 const estimatedCharWidthPx = 8;
 const estimatedLineHeightPx = 20;
 
@@ -248,15 +248,18 @@ function createNodeLayout(
       ? antiCramLayoutDefaults.branchWidthHint
       : kind === "leaf"
         ? antiCramLayoutDefaults.leafWidthHint
-        : antiCramLayoutDefaults.branchWidthHint + 28;
+        : antiCramLayoutDefaults.branchWidthHint + 48;
   const baseHeight =
     kind === "branch"
       ? antiCramLayoutDefaults.branchHeightHint
       : kind === "leaf"
         ? antiCramLayoutDefaults.leafHeightHint
-        : antiCramLayoutDefaults.branchHeightHint + 12;
+        : antiCramLayoutDefaults.branchHeightHint + 18;
+
+  // Use a wider wrap target for root nodes and tighter wrapping for branches
+  // and leaves so text remains readable without making the boxes too large.
   const targetCharsPerLine =
-    kind === 'root' ? 28 : kind === 'branch' ? 24 : 22;
+    kind === 'root' ? 48 : kind === 'branch' ? 24 : 22;
   // Size boxes from the visible text so formatting markers don't inflate nodes.
   const wrappedLines = wrapLabelForLayout(stripMindmapInlineFormatting(label), targetCharsPerLine);
   const longestLineLength = wrappedLines.reduce(

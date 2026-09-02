@@ -15,7 +15,7 @@ import {
 const minimumExpansionRatio = 2.3;
 const maximumExpansionRatio = 2.7;
 const detailedMaximumExpansionRatio = 3.2;
-const maxWordsPerLine = 35;
+const maxWordsPerLine = 45;
 
 // Above either threshold the source is large enough that *expanding* it 2.3×+ is
 // nonsensical (and risks the context limit); we switch to condensing it into a
@@ -364,7 +364,7 @@ async function generateDslAttempt(
     : false;
 
   if (!lineWordLimitSatisfied) {
-    throw new Error('Generated DSL exceeded the 35-word per-line limit.');
+    throw new Error('Generated DSL exceeded the 45-word per-line limit.');
   }
 
   return {
