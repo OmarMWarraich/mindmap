@@ -40,6 +40,134 @@ test('ingestFile reads a PNG image with OCR-backed text extraction when the file
   assert.equal(result.meta.mimeType, 'image/png');
 });
 
+test('image ingestion prefers the LLM vision route before falling back to OCR', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = 'test-key';
+  globalThis.fetch = async () => new Response(JSON.stringify({ text: 'Main Topic: Sociology\n\nSub Topic: Social relationships' }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  try {
+    const adapter = createImageIngestionAdapter();
+    const result = await adapter.read(makeFile('photo.png', 'binary', 'image/png'));
+
+    assert.equal(result.text, 'Main Topic: Sociology\n\nSub Topic: Social relationships');
+    assert.equal(result.meta.fileName, 'photo.png');
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalKey === undefined) {
+      delete process.env.OPENAI_API_KEY;
+    } else {
+      process.env.OPENAI_API_KEY = originalKey;
+    }
+  }
+});
+
+test('image ingestion requires an OpenAI key before using the vision path', async () => {
+  const originalKey = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+
+  try {
+    const adapter = createImageIngestionAdapter();
+    await assert.rejects(
+      adapter.read(makeFile('photo.png', 'binary', 'image/png')),
+      (error) => error instanceof IngestionError && /OPENAI_API_KEY/.test(error.message),
+    );
+  } finally {
+    if (originalKey === undefined) {
+      delete process.env.OPENAI_API_KEY;
+    } else {
+      process.env.OPENAI_API_KEY = originalKey;
+    }
+  }
+});
+
+test('image ingestion normalizes noisy vision output into Source Notes format', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = 'test-key';
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    choices: [{
+      message: {
+        content: [
+          { type: 'text', text: [
+            ': 21',
+            'i ntroduction 10 Sociology',
+            ': O SOCIOLOG £2',
+            'oy 301 : INTRODUCTION x me :',
+            'E30 1. Introductory Words iol ones',
+            '2 rea an society, Te Sines',
+            'sociology is the scientific study of human society,',
+            'social relationships, and group behaviour.',
+            'Auguste Comte',
+            'According to Comte, sociology is the scientific study of society.',
+            'Emile Durkheim',
+            'Durkheim defined sociology as the study of social facts.',
+          ].join('\n') },
+        ],
+      },
+    }],
+  }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  try {
+    const adapter = createImageIngestionAdapter();
+    const result = await adapter.read(makeFile('photo.png', 'binary', 'image/png'));
+
+    assert.match(result.text, /^Main Topic: Introduction to Sociology/);
+    assert.match(result.text, /Sub Topic: Concept of Sociology/);
+    assert.match(result.text, /Sub sub Topic: Auguste Comte/);
+    assert.match(result.text, /Examples:/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalKey === undefined) {
+      delete process.env.OPENAI_API_KEY;
+    } else {
+      process.env.OPENAI_API_KEY = originalKey;
+    }
+  }
+});
+
+test('image ingestion reads nested output_text payloads from the latest OpenAI response shape', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = 'test-key';
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    output: [{
+      type: 'message',
+      content: [{
+        type: 'output_text',
+        text: [{
+          type: 'text',
+          text: 'Main Topic: Biology\n\nSub Topic: Photosynthesis',
+        }],
+      }],
+    }],
+  }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  try {
+    const adapter = createImageIngestionAdapter();
+    const result = await adapter.read(makeFile('photo.png', 'binary', 'image/png'));
+
+    assert.match(result.text, /^Main Topic: Biology/);
+    assert.match(result.text, /Sub Topic: Photosynthesis/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalKey === undefined) {
+      delete process.env.OPENAI_API_KEY;
+    } else {
+      process.env.OPENAI_API_KEY = originalKey;
+    }
+  }
+});
+
 test('ingestFile rejects an empty file', async () => {
   await assert.rejects(
     ingestFile(makeFile('blank.txt', '   \n  ', 'text/plain')),
@@ -127,6 +255,34 @@ test('convertNormalizedTextSourceNotesFormat structures OCR text into Source Not
     '- water is split into oxygen and protons',
     '- ATP and NADPH are produced',
   ].join('\n'));
+});
+
+test('convertNormalizedTextSourceNotesFormat cleans noisy OCR chapter pages into structured Source Notes', () => {
+  const noisyOcr = [
+    ': 21',
+    'i ntroduction 10 Sociology',
+    ': O SOCIOLOG £2',
+    'oy 301 : INTRODUCTION x me :',
+    'E30 1. Introductory Words iol ones',
+    '2 rea an society, Te Sines',
+    'soiology is the scientific study of hum 1 pe ga Ve:',
+    'Sociolog f behavior. It explores A a',
+    'Concept of Sociology',
+    'Sociology is the scientific study of human society,',
+    'social relationships, and group behaviour.',
+    'Auguste Comte',
+    'According to Comte, sociology is the scientific study of society.',
+    'Emile Durkheim',
+    'Durkheim defined sociology as the study of social facts.',
+  ].join('\n');
+
+  const result = convertNormalizedTextSourceNotesFormat(noisyOcr);
+
+  assert.match(result, /^Main Topic: Introduction to Sociology/);
+  assert.match(result, /Sub Topic: Concept of Sociology/);
+  assert.match(result, /Sub sub Topic: Auguste Comte/);
+  assert.match(result, /Sub sub sub Topic: Emile Durkheim/);
+  assert.match(result, /Examples:/);
 });
 
 test('ingestFiles with empty array returns empty result without errors', async () => {

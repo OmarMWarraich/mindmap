@@ -15,6 +15,11 @@ interface AnthropicContentBlock {
   text?: string;
   name?: string;
   input?: unknown;
+  source?: {
+    type: 'base64';
+    media_type: string;
+    data: string;
+  };
 }
 
 interface AnthropicMessagesResponse {
@@ -79,11 +84,43 @@ function extractSystemPrompt(messages: ModelChatMessage[]): string {
 
 function toAnthropicConversation(
   messages: ModelChatMessage[],
-): Array<{ role: 'user' | 'assistant'; content: string }> {
+): Array<{ role: 'user' | 'assistant'; content: string | AnthropicContentBlock[] }> {
   return messages
     .filter((message): message is ModelChatMessage & { role: 'user' | 'assistant' } =>
       message.role === 'user' || message.role === 'assistant')
-    .map((message) => ({ role: message.role, content: message.content }));
+    .map((message) => {
+      if (typeof message.content === 'string') {
+        return { role: message.role, content: message.content };
+      }
+
+      return {
+        role: message.role,
+        content: message.content.flatMap((part) => {
+          if (part.type === 'text') {
+            return [{ type: 'text', text: part.text }];
+          }
+
+          if (part.type === 'image_url') {
+            const url = part.image_url.url;
+            const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=]+)$/.exec(url);
+            if (!match) {
+              return [{ type: 'text', text: url }];
+            }
+
+            return [{
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: match[1],
+                data: match[2],
+              },
+            }];
+          }
+
+          return [];
+        }),
+      };
+    });
 }
 
 function toAnthropicTool(structuredOutput: ModelStructuredOutput): AnthropicTool {

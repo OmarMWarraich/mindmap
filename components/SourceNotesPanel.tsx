@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import type { SourceMindmapGenerationResponse } from '../lib/generation/source-schema';
-import { acceptedIngestionExtensions, ingestFiles } from '../lib/ingestion';
+import { acceptedIngestionExtensions } from '../lib/ingestion';
 
 const fileInputAccept = acceptedIngestionExtensions.map((extension) => `.${extension}`).join(',');
 
@@ -86,33 +86,66 @@ export default function SourceNotesPanel({
 
     setIsReading(true);
     setAttachStatus({ tone: 'progress', message: 'Reading file…' });
-    const result = await ingestFiles(files);
-    setIsReading(false);
 
-    // Append (never overwrite) so an attachment adds to whatever is already there.
-    // Read from ref so we always append to the latest textarea content, even if the
-    // user typed while the file was being read.
-    if (result.text) {
-      const current = rawNotesRef.current;
-      const separator = current.trim().length > 0 ? '\n\n' : '';
-      onRawNotesChange(current + separator + result.text);
-    }
+    try {
+      const formData = new FormData();
+      for (const file of files) {
+        formData.append('files', file);
+      }
 
-    if (result.ingested.length > 0 && result.errors.length === 0) {
-      const names = result.ingested.map((item) => item.meta.fileName).join(', ');
-      setAttachStatus({ tone: 'success', message: `Loaded ${names}.` });
-    } else if (result.ingested.length > 0) {
+      const response = await fetch('/api/ingest', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const payload = await response.json() as {
+        text?: string;
+        ingested?: Array<{ meta: { fileName: string } }>;
+        errors?: Array<{ fileName: string; message: string }>;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.errors?.[0]?.message || payload.error || 'Upload failed.');
+      }
+
+      const result = {
+        text: payload.text ?? '',
+        ingested: payload.ingested ?? [],
+        errors: payload.errors ?? [],
+      };
+
+      // Append (never overwrite) so an attachment adds to whatever is already there.
+      // Read from ref so we always append to the latest textarea content, even if the
+      // user typed while the file was being read.
+      if (result.text) {
+        const current = rawNotesRef.current;
+        const separator = current.trim().length > 0 ? '\n\n' : '';
+        onRawNotesChange(current + separator + result.text);
+      }
+
+      if (result.ingested.length > 0 && result.errors.length === 0) {
+        const names = result.ingested.map((item) => item.meta.fileName).join(', ');
+        setAttachStatus({ tone: 'success', message: `Loaded ${names}.` });
+      } else if (result.ingested.length > 0) {
+        setAttachStatus({
+          tone: 'error',
+          message: `Loaded ${result.ingested.length} file(s); skipped others — ${result.errors
+            .map((error) => error.message)
+            .join(' ')}`,
+        });
+      } else {
+        setAttachStatus({
+          tone: 'error',
+          message: result.errors.map((error) => error.message).join(' ') || 'No file could be read.',
+        });
+      }
+    } catch (error) {
       setAttachStatus({
         tone: 'error',
-        message: `Loaded ${result.ingested.length} file(s); skipped others — ${result.errors
-          .map((error) => error.message)
-          .join(' ')}`,
+        message: error instanceof Error ? error.message : 'Could not read the uploaded file.',
       });
-    } else {
-      setAttachStatus({
-        tone: 'error',
-        message: result.errors.map((error) => error.message).join(' ') || 'No file could be read.',
-      });
+    } finally {
+      setIsReading(false);
     }
   }
 

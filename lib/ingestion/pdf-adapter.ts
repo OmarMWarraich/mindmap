@@ -1,5 +1,6 @@
 import type * as Pdfjs from 'pdfjs-dist';
 
+import { convertNormalizedTextSourceNotesFormat } from './ocr-normalizer.ts';
 import { IngestionError, type IngestedFile, type IngestionAdapter } from './types.ts';
 
 // Extracts the text of each page of a PDF. Injected so the adapter's logic
@@ -21,6 +22,29 @@ export const maxPdfBytes = 25 * 1024 * 1024;
 
 function normalizeExtractedText(text: string): string {
   return text.replace(/\r\n?/gu, '\n').replace(/[ \t]+\n/gu, '\n').trim();
+}
+
+function looksLikeRawOcrNoise(text: string): boolean {
+  const normalized = text.replace(/\r\n?/gu, '\n').trim();
+  if (!normalized) {
+    return false;
+  }
+
+  if (/^(?:main topic|sub topic|sub sub topic|sub sub sub topic|examples)\s*:/i.test(normalized)) {
+    return false;
+  }
+
+  const lines = normalized
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  return lines.some((line) => {
+    const pageNoise = /^page\s+\d+/i.test(line) || /^\d+$/.test(line);
+    const artifactNoise = /[£§]/.test(line);
+    const weirdSpacing = /\b[a-z]\s+[a-z]\b/i.test(line) || /\b[a-z]{1,3}\s+[a-z]{1,3}\b/i.test(line);
+    return pageNoise || artifactNoise || weirdSpacing;
+  });
 }
 
 export function shouldPolyfillPdfjsReadableStreams(
@@ -235,8 +259,12 @@ export function createPdfIngestionAdapter(
           );
         }
 
+        const structuredOcrText = looksLikeRawOcrNoise(ocrText)
+          ? (convertNormalizedTextSourceNotesFormat(ocrText) || ocrText)
+          : ocrText;
+
         return {
-          text: ocrText,
+          text: structuredOcrText,
           meta: {
             fileName: file.name,
             sizeBytes: file.size,
