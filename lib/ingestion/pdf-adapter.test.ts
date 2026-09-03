@@ -48,13 +48,15 @@ test('PDF adapter accepts a short single-page PDF with real text', async () => {
   assert.equal(result.meta.pageCount, 1);
 });
 
-test('PDF adapter detects a scanned/image-only PDF (no extractable text)', async () => {
-  const adapter = createPdfIngestionAdapter(extractorReturning(['', '   ', '\n']));
+test('PDF adapter OCRs a scanned/image-only PDF when no text layer exists', async () => {
+  const adapter = createPdfIngestionAdapter(extractorReturning(['', '   ', '\n']), {
+    ocrPageText: async () => 'Lecture notes\n\nKey ideas and takeaways',
+  });
 
-  await assert.rejects(
-    adapter.read(pdfFile('scanned.pdf')),
-    (error) => error instanceof IngestionError && /scanned or image-only/.test(error.message),
-  );
+  const result = await adapter.read(pdfFile('scanned.pdf'));
+
+  assert.equal(result.text, 'Lecture notes\n\nKey ideas and takeaways');
+  assert.equal(result.meta.pageCount, 3);
 });
 
 test('PDF adapter flags a multi-page PDF whose only text is sparse headers as scanned', async () => {

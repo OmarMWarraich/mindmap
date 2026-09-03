@@ -25,6 +25,7 @@
     "pdfjs-dist": "^6.1.200",
     "react": "19.2.7",
     "react-dom": "19.2.7",
+    "tesseract.js": "^7.0.0",
     "web-streams-polyfill": "^4.3.0",
     "zod": "^4.4.3"
   },

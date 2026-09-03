@@ -6,12 +6,22 @@ import { IngestionError, type IngestedFile, type IngestionAdapter } from './type
 // (page-join, scanned detection, page cap) is unit-testable without pdf.js —
 // mirroring how the mindmap layout client injects its worker factory.
 export type PdfPageExtractor = (data: ArrayBuffer) => Promise<string[]>;
+export type PdfOcrPageExtractor = (pageNumber: number, fileName: string, data: ArrayBuffer) => Promise<string>;
+
+export interface PdfIngestionAdapterOptions {
+  /** OCR fallback for image-only or scanned PDFs. Chosen path: Tesseract.js now; a vision model stays a future upgrade. */
+  ocrPageText?: PdfOcrPageExtractor;
+}
 
 export const maxPdfPages = 80;
 
 // 25 MiB — PDFs carry binary overhead (fonts, figures) well beyond their text, so
 // they warrant a higher pre-read ceiling than the shared default.
 export const maxPdfBytes = 25 * 1024 * 1024;
+
+function normalizeExtractedText(text: string): string {
+  return text.replace(/\r\n?/gu, '\n').replace(/[ \t]+\n/gu, '\n').trim();
+}
 
 export function shouldPolyfillPdfjsReadableStreams(
   userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '',
@@ -101,15 +111,66 @@ async function defaultExtractPdfPages(data: ArrayBuffer): Promise<string[]> {
   }
 }
 
+async function defaultOcrPdfPageText(
+  pageNumber: number,
+  fileName: string,
+  data: ArrayBuffer,
+): Promise<string> {
+  if (typeof document === 'undefined') {
+    throw new IngestionError(
+      `"${fileName}" has no extractable text — it looks scanned or image-only. Please upload a clearer scan or paste the notes manually.`,
+    );
+  }
+
+  const [pdfjsModule] = await Promise.all([
+    import('pdfjs-dist/legacy/build/pdf.mjs'),
+    import('pdfjs-dist/legacy/build/pdf.worker.min.mjs'),
+  ]);
+  const pdfjs = pdfjsModule as typeof Pdfjs;
+  const loadingTask = pdfjs.getDocument({ data, disableFontFace: true });
+
+  try {
+    const doc = await loadingTask.promise;
+    const page = await doc.getPage(pageNumber);
+    const viewport = page.getViewport({ scale: 1.8 });
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (!context) {
+      throw new IngestionError(
+        `"${fileName}" has no extractable text — it looks scanned or image-only. Please upload a clearer scan or paste the notes manually.`,
+      );
+    }
+
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+
+    await page.render({ canvasContext: context, viewport }).promise;
+
+    const { createWorker } = await import('tesseract.js');
+    const worker = await createWorker('eng');
+    try {
+      const result = await worker.recognize(canvas);
+      return normalizeExtractedText(result.data.text);
+    } finally {
+      await worker.terminate();
+    }
+  } finally {
+    await loadingTask.destroy();
+  }
+}
+
 /**
- * Ingestion adapter for digital (text-based) PDFs. Extracts text client-side and
- * hands it to the existing generation pipeline. Scanned/image-only PDFs are out
- * of scope here — they are detected and rejected with a message pointing at the
- * future image/OCR path.
+ * Ingestion adapter for PDF files. Digital PDFs are extracted directly with
+ * pdf.js. Scanned or image-only PDFs fall back to OCR (Tesseract.js now), while
+ * a vision model remains a later upgrade if quality issues justify the extra
+ * token cost.
  */
 export function createPdfIngestionAdapter(
   extractPages: PdfPageExtractor = defaultExtractPdfPages,
+  options: PdfIngestionAdapterOptions = {},
 ): IngestionAdapter {
+  const ocrPageText = options.ocrPageText ?? ((pageNumber, fileName, data) => defaultOcrPdfPageText(pageNumber, fileName, data));
+
   return {
     id: 'pdf',
     extensions: ['pdf'],
@@ -140,14 +201,49 @@ export function createPdfIngestionAdapter(
         );
       }
 
-      const text = pages.join('\n\n').trim();
+      const text = normalizeExtractedText(pages.join('\n\n'));
 
-      // Average extractable text per page — see minCharsPerPage.
+      // Average extractable text per page — see minCharsPerPage. If the PDF is
+      // truly scanned or image-only, fall back to OCR page-by-page and continue
+      // through the same Source Notes generation flow.
       if (text.replace(/\s/gu, '').length < minCharsPerPage * Math.max(1, pages.length)) {
-        throw new IngestionError(
-          `"${file.name}" has no extractable text — it looks scanned or image-only. `
-            + 'Image/OCR support is coming; for now use a text-based PDF or paste the text.',
-        );
+        const ocrPages: string[] = [];
+        for (let pageNumber = 1; pageNumber <= pages.length; pageNumber += 1) {
+          try {
+            const pageText = normalizeExtractedText(await ocrPageText(pageNumber, file.name, data));
+            if (pageText && pageText !== ocrPages.at(-1)) {
+              ocrPages.push(pageText);
+            }
+          } catch (error) {
+            if (error instanceof IngestionError) {
+              throw error;
+            }
+            throw new IngestionError(
+              `"${file.name}" could not be OCRed. Please upload a clearer scan or paste the notes manually.`,
+              { cause: error },
+            );
+          }
+        }
+
+        const ocrText = normalizeExtractedText(ocrPages.join('\n\n'));
+        if (
+          !ocrText
+          || ocrText.replace(/\s/gu, '').length < minCharsPerPage * Math.max(1, ocrPages.length)
+        ) {
+          throw new IngestionError(
+            `"${file.name}" has no extractable text — it looks scanned or image-only. Please upload a clearer scan or paste the notes manually.`,
+          );
+        }
+
+        return {
+          text: ocrText,
+          meta: {
+            fileName: file.name,
+            sizeBytes: file.size,
+            mimeType: file.type,
+            pageCount: pages.length,
+          },
+        };
       }
 
       return {

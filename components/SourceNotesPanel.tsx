@@ -345,13 +345,13 @@ export default function SourceNotesPanel({
                           } DSL`}
         </button>
         <button
-          aria-label="Attach a .txt, .md, or .pdf file"
+          aria-label="Attach a .txt, .md, .pdf, or image file"
           className="rounded-lg border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
           disabled={isGenerating || isReading}
           onClick={() => {
             fileInputRef.current?.click();
           }}
-          title="Attach a .txt, .md, or .pdf file"
+          title="Attach a .txt, .md, .pdf, or image file"
           type="button"
         >
           Attach
