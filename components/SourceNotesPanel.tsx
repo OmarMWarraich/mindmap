@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { SourceMindmapGenerationResponse } from '../lib/generation/source-schema';
 import { acceptedIngestionExtensions } from '../lib/ingestion';
+import { MAX_FILES_PER_UPLOAD, MAX_TOTAL_UPLOAD_BYTES, prepareFilesForUpload } from '../lib/ingestion/upload-constraints.ts';
 
 const fileInputAccept = acceptedIngestionExtensions.map((extension) => `.${extension}`).join(',');
 
@@ -84,12 +85,31 @@ export default function SourceNotesPanel({
       return;
     }
 
+    if (files.length > MAX_FILES_PER_UPLOAD) {
+      setAttachStatus({
+        tone: 'error',
+        message: `You can upload up to ${MAX_FILES_PER_UPLOAD} files at a time.`,
+      });
+      return;
+    }
+
     setIsReading(true);
-    setAttachStatus({ tone: 'progress', message: 'Reading file…' });
+    setAttachStatus({ tone: 'progress', message: 'Preparing files…' });
 
     try {
+      const preparedFiles = await prepareFilesForUpload(files, {
+        maxFiles: MAX_FILES_PER_UPLOAD,
+        maxTotalBytes: MAX_TOTAL_UPLOAD_BYTES,
+      });
+
+      if (preparedFiles.length === 0) {
+        throw new Error('No readable files remained after resizing. Try smaller attachments or fewer images.');
+      }
+
+      setAttachStatus({ tone: 'progress', message: 'Reading file…' });
+
       const formData = new FormData();
-      for (const file of files) {
+      for (const file of preparedFiles) {
         formData.append('files', file);
       }
 
