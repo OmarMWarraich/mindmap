@@ -13,6 +13,17 @@ export const maxPdfPages = 80;
 // they warrant a higher pre-read ceiling than the shared default.
 export const maxPdfBytes = 25 * 1024 * 1024;
 
+export function shouldPolyfillPdfjsReadableStreams(
+  userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '',
+): boolean {
+  if (!userAgent) {
+    return false;
+  }
+
+  return /Safari\//.test(userAgent)
+    && !/(Chrome|CriOS|Chromium|Edg|EdgiOS|OPR|FxiOS|SamsungBrowser)/.test(userAgent);
+}
+
 // A digital PDF yields substantial text per page; a scanned/image-only PDF yields
 // almost none (no text layer). Flag as scanned when the average extractable text
 // per page falls below this — catches both an empty single page and multi-page
@@ -35,6 +46,16 @@ const minCharsPerPage = 24;
 // during SSR or the Node test runner. Extraction is a bounded, one-shot op, so
 // the brief main-thread cost is acceptable.
 async function defaultExtractPdfPages(data: ArrayBuffer): Promise<string[]> {
+  // Safari has a known `ReadableStream`/`getTextContent()` bug in pdf.js; the
+  // polyfill must be loaded before pdf.js initializes so it uses the compatible
+  // stream implementation instead of Safari's broken native one.
+  if (
+    typeof navigator !== 'undefined'
+    && shouldPolyfillPdfjsReadableStreams(navigator.userAgent)
+  ) {
+    await import('web-streams-polyfill/polyfill');
+  }
+
   const [pdfjsModule] = await Promise.all([
     import('pdfjs-dist/legacy/build/pdf.mjs'),
     import('pdfjs-dist/legacy/build/pdf.worker.min.mjs'),

@@ -5,6 +5,7 @@ import {
   createPdfIngestionAdapter,
   maxPdfBytes,
   maxPdfPages,
+  shouldPolyfillPdfjsReadableStreams,
   type PdfPageExtractor,
 } from './pdf-adapter.ts';
 import { IngestionError } from './types.ts';
@@ -92,6 +93,17 @@ test('PDF adapter normalizes an extractor failure into a clean IngestionError', 
       // Original error preserved for debugging.
       && error.cause instanceof Error
       && /PasswordException/.test((error.cause as Error).message),
+  );
+});
+
+test('PDF adapter opts into a ReadableStream polyfill in Safari', () => {
+  assert.equal(
+    shouldPolyfillPdfjsReadableStreams('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.4 Safari/605.1.15'),
+    true,
+  );
+  assert.equal(
+    shouldPolyfillPdfjsReadableStreams('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'),
+    false,
   );
 });
 
