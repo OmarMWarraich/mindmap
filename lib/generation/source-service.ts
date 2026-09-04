@@ -15,7 +15,6 @@ import {
 const minimumExpansionRatio = 2.3;
 const maximumExpansionRatio = 2.7;
 const detailedMaximumExpansionRatio = 3.2;
-const maxWordsPerLine = 35;
 
 // Above either threshold the source is large enough that *expanding* it 2.3×+ is
 // nonsensical (and risks the context limit); we switch to condensing it into a
@@ -25,6 +24,7 @@ const distillSourceWordThreshold = 500;
 const distillTargetMinLineCount = 12;
 const distillTargetMaxLineCountStandard = 60;
 const distillTargetMaxLineCountDetailed = 90;
+const maxWordsPerLine = 35;
 
 type EnvRecord = Record<string, string | undefined>;
 

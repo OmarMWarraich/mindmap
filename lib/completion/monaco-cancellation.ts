@@ -9,7 +9,18 @@ export function isIgnorableMonacoCancellation(reason: unknown): boolean {
     return true;
   }
 
-  return details.name === 'Canceled';
+  return (
+    details.name === 'Canceled'
+    || details.name === 'Cancelled'
+    || details.name === 'AbortError'
+    || details.message === 'Canceled'
+    || details.message === 'Cancelled'
+    || details.message === 'AbortError'
+    || details.message.startsWith('Canceled:')
+    || details.message.startsWith('Cancelled:')
+    || details.message.startsWith('AbortError:')
+    || /aborted|canceled|cancelled|signal is aborted/i.test(details.message)
+  );
 }
 
 function getCancellationDetails(reason: unknown): {

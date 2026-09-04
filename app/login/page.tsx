@@ -7,6 +7,16 @@ export const metadata = {
   title: 'Sign in — MindFlow AI',
 };
 
+async function signInWithGitHub() {
+  'use server';
+  await signIn('github', { redirectTo: '/workspace' });
+}
+
+async function signInWithGoogle() {
+  'use server';
+  await signIn('google', { redirectTo: '/workspace' });
+}
+
 function MindFlowIcon() {
   return (
     <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 20 20" width="20">
@@ -97,12 +107,7 @@ export default async function LoginPage({
             </p>
 
             <div className="grid gap-3">
-              <form
-                action={async () => {
-                  'use server';
-                  await signIn('github', { redirectTo: '/workspace' });
-                }}
-              >
+              <form action={signInWithGitHub}>
                 <button
                   className="w-full rounded-xl bg-primary-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-primary-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-900"
                   type="submit"
@@ -111,12 +116,7 @@ export default async function LoginPage({
                 </button>
               </form>
 
-              <form
-                action={async () => {
-                  'use server';
-                  await signIn('google', { redirectTo: '/workspace' });
-                }}
-              >
+              <form action={signInWithGoogle}>
                 <button
                   className="w-full rounded-xl border border-zinc-200 bg-white px-5 py-3 text-sm font-medium text-zinc-950 transition hover:border-accent-200 hover:bg-accent-50/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
                   type="submit"

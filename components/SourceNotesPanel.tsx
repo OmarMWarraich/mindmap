@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 
 import type { SourceMindmapGenerationResponse } from '../lib/generation/source-schema';
-import { acceptedIngestionExtensions, ingestFiles } from '../lib/ingestion';
+import { acceptedIngestionExtensions } from '../lib/ingestion/accepted-extensions.ts';
+import { MAX_FILES_PER_UPLOAD, MAX_TOTAL_UPLOAD_BYTES, prepareFilesForUpload } from '../lib/ingestion/upload-constraints.ts';
 
 const fileInputAccept = acceptedIngestionExtensions.map((extension) => `.${extension}`).join(',');
 
@@ -84,35 +85,88 @@ export default function SourceNotesPanel({
       return;
     }
 
-    setIsReading(true);
-    setAttachStatus({ tone: 'progress', message: 'Reading file…' });
-    const result = await ingestFiles(files);
-    setIsReading(false);
-
-    // Append (never overwrite) so an attachment adds to whatever is already there.
-    // Read from ref so we always append to the latest textarea content, even if the
-    // user typed while the file was being read.
-    if (result.text) {
-      const current = rawNotesRef.current;
-      const separator = current.trim().length > 0 ? '\n\n' : '';
-      onRawNotesChange(current + separator + result.text);
+    if (files.length > MAX_FILES_PER_UPLOAD) {
+      setAttachStatus({
+        tone: 'error',
+        message: `You can upload up to ${MAX_FILES_PER_UPLOAD} files at a time.`,
+      });
+      return;
     }
 
-    if (result.ingested.length > 0 && result.errors.length === 0) {
-      const names = result.ingested.map((item) => item.meta.fileName).join(', ');
-      setAttachStatus({ tone: 'success', message: `Loaded ${names}.` });
-    } else if (result.ingested.length > 0) {
+    setIsReading(true);
+    setAttachStatus({ tone: 'progress', message: 'Preparing files…' });
+
+    try {
+      const preparedFiles = await prepareFilesForUpload(files, {
+        maxFiles: MAX_FILES_PER_UPLOAD,
+        maxTotalBytes: MAX_TOTAL_UPLOAD_BYTES,
+      });
+
+      if (preparedFiles.length === 0) {
+        throw new Error('No readable files remained after resizing. Try smaller attachments or fewer images.');
+      }
+
+      setAttachStatus({ tone: 'progress', message: 'Reading file…' });
+
+      const formData = new FormData();
+      for (const file of preparedFiles) {
+        formData.append('files', file);
+      }
+
+      const response = await fetch('/api/ingest', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const payload = await response.json() as {
+        text?: string;
+        ingested?: Array<{ meta: { fileName: string } }>;
+        errors?: Array<{ fileName: string; message: string }>;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.errors?.[0]?.message || payload.error || 'Upload failed.');
+      }
+
+      const result = {
+        text: payload.text ?? '',
+        ingested: payload.ingested ?? [],
+        errors: payload.errors ?? [],
+      };
+
+      // Append (never overwrite) so an attachment adds to whatever is already there.
+      // Read from ref so we always append to the latest textarea content, even if the
+      // user typed while the file was being read.
+      if (result.text) {
+        const current = rawNotesRef.current;
+        const separator = current.trim().length > 0 ? '\n\n' : '';
+        onRawNotesChange(current + separator + result.text);
+      }
+
+      if (result.ingested.length > 0 && result.errors.length === 0) {
+        const names = result.ingested.map((item) => item.meta.fileName).join(', ');
+        setAttachStatus({ tone: 'success', message: `Loaded ${names}.` });
+      } else if (result.ingested.length > 0) {
+        setAttachStatus({
+          tone: 'error',
+          message: `Loaded ${result.ingested.length} file(s); skipped others — ${result.errors
+            .map((error) => error.message)
+            .join(' ')}`,
+        });
+      } else {
+        setAttachStatus({
+          tone: 'error',
+          message: result.errors.map((error) => error.message).join(' ') || 'No file could be read.',
+        });
+      }
+    } catch (error) {
       setAttachStatus({
         tone: 'error',
-        message: `Loaded ${result.ingested.length} file(s); skipped others — ${result.errors
-          .map((error) => error.message)
-          .join(' ')}`,
+        message: error instanceof Error ? error.message : 'Could not read the uploaded file.',
       });
-    } else {
-      setAttachStatus({
-        tone: 'error',
-        message: result.errors.map((error) => error.message).join(' ') || 'No file could be read.',
-      });
+    } finally {
+      setIsReading(false);
     }
   }
 
@@ -345,13 +399,13 @@ export default function SourceNotesPanel({
                           } DSL`}
         </button>
         <button
-          aria-label="Attach a .txt, .md, or .pdf file"
+          aria-label="Attach a .txt, .md, .pdf, or image file"
           className="rounded-lg border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
           disabled={isGenerating || isReading}
           onClick={() => {
             fileInputRef.current?.click();
           }}
-          title="Attach a .txt, .md, or .pdf file"
+          title="Attach a .txt, .md, .pdf, or image file"
           type="button"
         >
           Attach

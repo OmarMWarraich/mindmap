@@ -104,6 +104,31 @@ test('openaiCompatibleAdapter maps json_object structured output to response_for
   assert.deepEqual(body.response_format, { type: 'json_object' });
 });
 
+test('openaiCompatibleAdapter supports vision-style image_url content blocks', () => {
+  const request = openaiCompatibleAdapter.buildRequest({
+    model: 'gpt-4o',
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'text', text: 'Read the notes in this image.' },
+        { type: 'image_url', image_url: { url: 'data:image/png;base64,abc123' } },
+      ],
+    }],
+    maxTokens: 900,
+    temperature: 0.2,
+    credentials: { apiKey: 'key' },
+  });
+
+  const body = JSON.parse(String(request.init.body));
+  assert.deepEqual(body.messages, [{
+    role: 'user',
+    content: [
+      { type: 'text', text: 'Read the notes in this image.' },
+      { type: 'image_url', image_url: { url: 'data:image/png;base64,abc123' } },
+    ],
+  }]);
+});
+
 test('openaiCompatibleAdapter.parseResponse extracts assistant content and tolerates empty payloads', () => {
   assert.equal(
     openaiCompatibleAdapter.parseResponse({
