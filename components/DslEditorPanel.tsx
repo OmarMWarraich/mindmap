@@ -45,6 +45,7 @@ export interface DslEditorPanelHandle {
 
 interface DslEditorPanelProps {
   defaultValue: string;
+  value?: string;
   onChange: (value: string) => void;
   onGenerateMindmap: () => void;
   onResetDsl: () => void;
@@ -118,7 +119,7 @@ const editorLoadingFallback = (
 );
 
 const DslEditorPanel = forwardRef<DslEditorPanelHandle, DslEditorPanelProps>(
-  function DslEditorPanel({ defaultValue, onChange, onGenerateMindmap, onResetDsl, completionModelId }, ref) {
+  function DslEditorPanel({ defaultValue, value, onChange, onGenerateMindmap, onResetDsl, completionModelId }, ref) {
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
     const editorDisposablesRef = useRef<Array<{ dispose(): void }>>([]);
     const ghostTextDecorationIdsRef = useRef<string[]>([]);
@@ -126,6 +127,14 @@ const DslEditorPanel = forwardRef<DslEditorPanelHandle, DslEditorPanelProps>(
       position: { lineNumber: number; column: number };
       suggestionText: string;
     } | null>(null);
+
+    useEffect(() => {
+      const nextValue = value ?? defaultValue;
+      const currentValue = editorRef.current?.getValue() ?? '';
+      if (editorRef.current && currentValue !== nextValue) {
+        editorRef.current.setValue(nextValue);
+      }
+    }, [defaultValue, value]);
 
     useImperativeHandle(ref, () => ({
       setValue(value) {
@@ -274,6 +283,7 @@ const DslEditorPanel = forwardRef<DslEditorPanelHandle, DslEditorPanelProps>(
             onChange={(value) => {
               onChange(value ?? '');
             }}
+            value={value ?? defaultValue}
             onMount={(monacoEditor, monaco) => {
               editorDisposablesRef.current.forEach((d) => d.dispose());
               editorDisposablesRef.current = [];

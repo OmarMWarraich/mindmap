@@ -625,19 +625,51 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
     setDebouncedOutline(currentOutline);
   }
 
+  function persistDraftSnapshot(nextOutline: string, nextRawNotes: string): void {
+    const draft = {
+      version: 1 as const,
+      updatedAt: new Date().toISOString(),
+      outline: nextOutline,
+      rawNotes: nextRawNotes,
+      selectedDetailLevel,
+      latestDslGeneration,
+      mindmap: latestMindmapSnapshot,
+      previewTransform,
+      nodePositionOverrides: pruneMindmapNodePositionOverrides(
+        nodePositionOverrides,
+        latestMindmapSnapshot,
+      ),
+    };
+
+    void saveWorkspaceDraft(draft).catch((error) => {
+      setDraftStatus({
+        tone: 'error',
+        message: error instanceof Error ? error.message : 'Local draft save failed.',
+      });
+    });
+
+    if (projectId) {
+      void saveCloudDraft(projectId, draft);
+    }
+  }
+
   function handleResetDsl(): void {
-    dslEditorRef.current?.setValue(mindmapDslStarterOutline);
-    setOutline(mindmapDslStarterOutline);
-    setDebouncedOutline(mindmapDslStarterOutline);
+    const nextOutline = mindmapDslStarterOutline;
+    dslEditorRef.current?.setValue(nextOutline);
+    setOutline(nextOutline);
+    setDebouncedOutline(nextOutline);
+    persistDraftSnapshot(nextOutline, rawNotes);
   }
 
   function handleClearNotes(): void {
-    setRawNotes('');
+    const nextRawNotes = '';
+    setRawNotes(nextRawNotes);
     setLatestDslGeneration(null);
     setGenerationStatus({
       tone: 'idle',
       message: 'Paste raw notes, then generate parser-ready DSL into the editor.',
     });
+    persistDraftSnapshot(outline, nextRawNotes);
   }
 
   return (
@@ -659,6 +691,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
               ref={dslEditorRef}
               completionModelId={completionModelId}
               defaultValue={mindmapDslStarterOutline}
+              value={outline}
               onChange={setOutline}
               onGenerateMindmap={handleGenerateMindmapFromDsl}
               onResetDsl={handleResetDsl}

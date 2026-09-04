@@ -117,6 +117,13 @@ test('editor ref wiring for history restore and generation stays intact', () => 
   assert.match(workspaceSource, /onRestore=\{handleRestoreFromHistory\}/);
 });
 
+test('dsl editor hydrates app state after a refresh restore', () => {
+  const editorSource = readSource('../components/DslEditorPanel.tsx');
+
+  assert.match(editorSource, /value=\{value \?\? defaultValue\}/);
+  assert.match(editorSource, /nextValue = value \?\? defaultValue/);
+});
+
 test('model selectors stay paired with their swapped panels', () => {
   const workspaceSource = readSource('../components/StudyWorkspace.tsx');
   const completionIndex = workspaceSource.indexOf('id="completion-model"');
