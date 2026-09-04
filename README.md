@@ -15,7 +15,7 @@ This project is being built MVP-first. Deterministic structure, readability, and
 
 ## Current Status
 
-The app is no longer just a scaffold. The current build includes a public marketing site, OAuth sign-in, an authenticated study workspace, deterministic DSL parsing, AI-assisted source-to-DSL generation, mindmap preview rendering, export, and draft persistence.
+The app is no longer just a scaffold. The current build includes a public marketing site, OAuth sign-in, an authenticated study workspace, deterministic DSL parsing, AI-assisted source-to-DSL generation, mindmap preview rendering, theming with AI restyling, export, and draft persistence.
 
 Implemented now:
 
@@ -27,7 +27,9 @@ Implemented now:
 - Monaco-based DSL editor and source-notes input workflow
 - AI-assisted inline completion and source-notes-to-DSL generation
 - Mindmap generation, layout, SVG preview, and PNG export
-- Local and cloud-backed draft restoration
+- Mindmap theming: built-in presets, AI-generated themes, and AI-generated background images
+- Artistic AI export that repaints the mindmap as an illustrated poster (clearly labeled as non-faithful)
+- Local and cloud-backed draft restoration, including the selected theme
 - Generation history and project persistence
 - Source-level smoke tests plus Node.js unit coverage across the core slices
 
@@ -125,8 +127,9 @@ The product mixes deterministic parsing and rendering with model-backed assistan
 - Raw source notes can be expanded into parser-ready DSL in `standard` or `detailed` mode.
 - The DSL is parsed into a deterministic AST, then rendered into a visual mindmap preview.
 - Graph layout for both preview and PNG export runs off the main thread in a Web Worker ([workers/mindmap-layout.worker.ts](workers/mindmap-layout.worker.ts)), so large or upscaled maps stay responsive; it falls back to in-page layout where workers are unavailable (e.g. server-side rendering).
+- The preview and export are themeable: presets, AI-generated themes, and AI-generated backgrounds all apply live and persist with the draft.
 - Drafts are restored from cloud persistence when available and fall back to local IndexedDB state.
-- The current preview can be exported as PNG.
+- The current preview can be exported as PNG, or repainted by an image model via Artistic Export.
 
 ## Source input & file attachments
 
@@ -140,6 +143,26 @@ Source Notes accepts pasted text and file attachments (via the **Attach** button
 > **OCR choice and privacy.** The app uses Tesseract.js now as the supported OCR path for scanned PDFs and note photos. A vision model remains a future upgrade only if OCR quality issues justify the higher token cost. Uploaded images are processed in the browser; the app keeps only the extracted text for the generation pipeline and does not retain the original image payload beyond the in-memory OCR step.
 
 > **Known limitation — PDF in Safari.** PDF text extraction currently works in Chrome and Firefox but fails in Safari (pdf.js errors during text extraction, even on the latest Safari). Use Chrome/Firefox for PDFs, or paste the text. Tracked as a follow-up.
+
+## Theming & AI restyling
+
+The mindmap preview and PNG export share a validated theme model ([lib/mindmap/theme.ts](lib/mindmap/theme.ts)) covering backgrounds (grid, solid, gradient, or image), typography scales, per-tier node styling, a frost layer for readability over photos, and edge styling. Node text is always vector-rendered — restyling never corrupts the study content.
+
+The Theme panel in the workspace offers three levels of styling:
+
+- **Presets** — Classic, Forest, Dark, Blueprint, and Pastel ([lib/mindmap/theme-presets.ts](lib/mindmap/theme-presets.ts)), applied instantly.
+- **Restyle with AI** — describe a style ("dark academia", "ocean blues") and a language model returns a theme as schema-validated JSON via `/api/styling/theme` ([lib/styling/theme-service.ts](lib/styling/theme-service.ts)). Invalid model output triggers one guided retry and can never break the render.
+- **AI background** — an image model generates a subtle, text-free background texture via `/api/styling/background` ([lib/styling/background-service.ts](lib/styling/background-service.ts)). It is embedded as a data URI (so exports cannot hit canvas CORS taint), capped at 3MB, and applied with a dark overlay plus node frosting for legibility.
+
+The selected theme persists with the draft — locally in IndexedDB and in the cloud draft — and is restored on reload.
+
+### Artistic Export (AI)
+
+Next to the faithful **Quick Export**, **Artistic Export (AI)** sends a bounded-size render of the current mindmap to an image model (`/api/styling/artistic-export`, [lib/styling/artistic-export-service.ts](lib/styling/artistic-export-service.ts)) that repaints it as an illustrated poster while preserving the layout.
+
+> **Accuracy disclaimer.** Artistic Export is AI-stylized — node text and fine details may be inaccurate. It is intended for covers, sharing, and motivation, not studying; use Quick Export for faithful output. The UI states this next to the button and in the result message.
+
+AI background generation and Artistic Export call the OpenAI Images API and require `OPENAI_API_KEY` (model overridable via `OPENAI_IMAGE_MODEL_ID`, default `gpt-image-1`).
 
 ## Getting Started
 
@@ -177,8 +200,9 @@ Use [.env.example](.env.example) as the template for local configuration.
 
 Model provider credentials (per-provider keys):
 
-- `OPENAI_API_KEY` — secret key for OpenAI models (e.g. `gpt-4o-mini`, `gpt-4o`)
+- `OPENAI_API_KEY` — secret key for OpenAI models (e.g. `gpt-4o-mini`, `gpt-4o`); also required for AI background generation and Artistic Export (OpenAI Images API)
 - `ANTHROPIC_API_KEY` — secret key for Anthropic Claude models (e.g. `claude-haiku-4-5`, `claude-sonnet-4-5`)
+- `OPENAI_IMAGE_MODEL_ID` — optional override for the image-generation model (defaults to `gpt-image-1`)
 - `DEEPSEEK_API_KEY` — commented placeholder; uncomment once DeepSeek joins the model catalog
 
 Set only the providers you plan to use. Provider keys are checked for presence (and placeholder values) at boot and when deriving the list of available providers; request-time failures will still surface when a provider model is actually used. At least one provider key must be configured, or the server refuses to start (validated at boot in [instrumentation.ts](instrumentation.ts)).
@@ -284,8 +308,9 @@ See [Security & Static Analysis](#security--static-analysis-sast) for the full s
 - [components](components) contains the workspace UI, preview surfaces, and marketing sections.
 - [lib/dsl](lib/dsl) contains the deterministic parser, validation, and editor-context logic.
 - [lib/generation](lib/generation) contains AI-assisted generation and overlay services.
+- [lib/styling](lib/styling) contains AI theme generation, background image generation, and the artistic export service.
 - [lib/completion](lib/completion) contains inline completion prompting, normalization, and relevance logic.
-- [lib/mindmap](lib/mindmap) contains schema, AST conversion, layout, and preview generation.
+- [lib/mindmap](lib/mindmap) contains schema, AST conversion, layout, theming, and preview generation.
 - [lib/persistence](lib/persistence) contains project, draft, and history persistence logic.
 - [workers](workers) contains the mindmap layout worker.
 - [drizzle](drizzle) contains database migrations and metadata.
@@ -307,7 +332,7 @@ The parser will remain the source of truth for structure. AI should enrich the w
 
 ## Testing
 
-- `npm run test` runs the Node.js test suite for parsing, generation, completion, layout, export, persistence, and app-risk smoke coverage.
+- `npm run test` runs the Node.js test suite for parsing, generation, styling, completion, layout, export, persistence, and app-risk smoke coverage.
 - `npm run lint` runs ESLint.
 - `npm run typecheck` runs TypeScript in no-emit mode.
 
