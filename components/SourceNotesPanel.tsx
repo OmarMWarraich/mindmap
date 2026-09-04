@@ -85,6 +85,79 @@ export default function SourceNotesPanel({
   }, [rawNotes]);
   const [isReading, setIsReading] = useState(false);
   const [attachStatus, setAttachStatus] = useState<{ tone: StatusTone; message: string } | null>(null);
+  // Camera shots stage here so vision inference runs once per chapter batch,
+  // not per photo.
+  const [pendingPhotos, setPendingPhotos] = useState<Array<{ id: string; file: File; previewUrl: string }>>([]);
+
+  useEffect(() => {
+    return () => {
+      for (const photo of pendingPhotos) {
+        URL.revokeObjectURL(photo.previewUrl);
+      }
+    };
+    // Revoke only on unmount; URLs for removed photos are revoked at removal time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function stagePhotos(files: File[]): void {
+    if (files.length === 0) {
+      return;
+    }
+
+    setPendingPhotos((current) => {
+      const remaining = MAX_FILES_PER_UPLOAD - current.length;
+      if (remaining <= 0) {
+        setAttachStatus({
+          tone: 'error',
+          message: `You can stage up to ${MAX_FILES_PER_UPLOAD} photos per batch. Process or discard this batch first.`,
+        });
+        return current;
+      }
+
+      const staged = files.slice(0, remaining).map((file) => ({
+        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        file,
+        previewUrl: URL.createObjectURL(file),
+      }));
+
+      setAttachStatus({
+        tone: 'idle',
+        message: `${current.length + staged.length} photo(s) staged. Take more or press Process when the chapter is complete.`,
+      });
+
+      return [...current, ...staged];
+    });
+  }
+
+  function removePendingPhoto(id: string): void {
+    setPendingPhotos((current) => {
+      const removed = current.find((photo) => photo.id === id);
+      if (removed) {
+        URL.revokeObjectURL(removed.previewUrl);
+      }
+      return current.filter((photo) => photo.id !== id);
+    });
+  }
+
+  function discardPendingPhotos(): void {
+    setPendingPhotos((current) => {
+      for (const photo of current) {
+        URL.revokeObjectURL(photo.previewUrl);
+      }
+      return [];
+    });
+    setAttachStatus(null);
+  }
+
+  async function processPendingPhotos(): Promise<void> {
+    const files = pendingPhotos.map((photo) => photo.file);
+    if (files.length === 0) {
+      return;
+    }
+
+    await handleFilesSelected(files);
+    discardPendingPhotos();
+  }
 
   async function handleFilesSelected(files: File[]): Promise<void> {
     if (files.length === 0) {
@@ -358,6 +431,60 @@ export default function SourceNotesPanel({
         </div>
       ) : null}
 
+      {/* ── Staged camera photos (buffer before vision inference) ──── */}
+      {pendingPhotos.length > 0 ? (
+        <div className="shrink-0 border-t border-zinc-100 px-4 py-2">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-medium text-zinc-600">
+              {pendingPhotos.length} photo(s) staged — not sent yet
+            </span>
+            <div className="flex gap-1.5">
+              <button
+                className="rounded-md bg-accent-500 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-accent-600 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={isReading || isGenerating}
+                onClick={() => {
+                  void processPendingPhotos();
+                }}
+                type="button"
+              >
+                {isReading ? 'Processing…' : `Process ${pendingPhotos.length} photo(s)`}
+              </button>
+              <button
+                className="rounded-md border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-500 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={isReading}
+                onClick={discardPendingPhotos}
+                type="button"
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {pendingPhotos.map((photo) => (
+              <div className="relative shrink-0" key={photo.id}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  alt={photo.file.name}
+                  className="h-14 w-14 rounded-md border border-zinc-200 object-cover"
+                  src={photo.previewUrl}
+                />
+                <button
+                  aria-label={`Remove ${photo.file.name}`}
+                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-zinc-200 bg-white text-xs text-zinc-500 shadow-sm transition hover:text-zinc-800"
+                  disabled={isReading}
+                  onClick={() => {
+                    removePendingPhoto(photo.id);
+                  }}
+                  type="button"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       {/* ── Attachment status ─────────────────────────────────────── */}
       {attachStatus ? (
         <div className="flex shrink-0 items-center gap-2 border-t border-zinc-100 px-4 py-2">
@@ -384,7 +511,8 @@ export default function SourceNotesPanel({
           ref={fileInputRef}
           type="file"
         />
-        {/* Camera-only input: `capture` opens the rear camera directly on mobile. */}
+        {/* Camera-only input: `capture` opens the rear camera directly on mobile.
+            Shots stage locally; vision inference waits for Process. */}
         <input
           accept="image/*"
           capture="environment"
@@ -392,7 +520,7 @@ export default function SourceNotesPanel({
           onChange={(event) => {
             const files = event.target.files ? Array.from(event.target.files) : [];
             event.target.value = '';
-            void handleFilesSelected(files);
+            stagePhotos(files);
           }}
           ref={cameraInputRef}
           type="file"
@@ -432,7 +560,7 @@ export default function SourceNotesPanel({
         <button
           aria-label="Take a photo of your notes"
           className="rounded-lg border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={isGenerating || isReading}
+          disabled={isGenerating || isReading || pendingPhotos.length >= MAX_FILES_PER_UPLOAD}
           onClick={() => {
             cameraInputRef.current?.click();
           }}
