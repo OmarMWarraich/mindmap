@@ -1,8 +1,11 @@
-import type * as Pdfjs from 'pdfjs-dist';
+import * as Pdfjs from 'pdfjs-dist';
+import type { PDFPageProxy }from 'pdfjs-dist';
 
 import { requestVisionExtraction, toVisionDataUrl } from './image-adapter.ts';
 import { convertNormalizedTextSourceNotesFormat } from './ocr-normalizer.ts';
 import { IngestionError, type IngestedFile, type IngestionAdapter } from './types.ts';
+
+
 
 // Extracts the text of each page of a PDF. Injected so the adapter's logic
 // (page-join, scanned detection, page cap) is unit-testable without pdf.js —
@@ -14,6 +17,9 @@ export interface PdfIngestionAdapterOptions {
   /** OCR fallback for image-only or scanned PDFs. Chosen path: Tesseract.js now; a vision model stays a future upgrade. */
   ocrPageText?: PdfOcrPageExtractor;
 }
+
+type PdfViewport = ReturnType<PDFPageProxy['getViewport']>;
+type PdfRenderOptions = Parameters<PDFPageProxy['render']>[0];
 
 export const maxPdfPages = 80;
 
@@ -145,12 +151,21 @@ async function defaultExtractPdfPages(data: ArrayBuffer): Promise<string[]> {
   }
 }
 
-async function renderPdfPageToBuffer(page: { render: (options: Record<string, unknown>) => { promise: Promise<void> } }, viewport: { width: number; height: number }): Promise<Buffer> {
+async function renderPdfPageToBuffer(
+  page: PDFPageProxy,
+  viewport: PdfViewport,
+): Promise<Buffer> {
   const { createCanvas } = await import('@napi-rs/canvas');
   const canvas = createCanvas(viewport.width, viewport.height);
   const context = canvas.getContext('2d');
 
-  await page.render({ canvas, canvasContext: context, viewport }).promise;
+  const renderTask = page.render({
+    canvas: canvas as unknown as HTMLCanvasElement,
+    canvasContext: context as unknown as CanvasRenderingContext2D,
+    viewport,
+  });
+
+  await renderTask.promise;
   return canvas.toBuffer('image/png');
 }
 

@@ -8,15 +8,20 @@ import { acceptedIngestionExtensions, ingestFile, ingestFiles } from './ingest.t
 import { convertNormalizedTextSourceNotesFormat, normalizeOCTText } from './ocr-normalizer.ts';
 import { IngestionError } from './types.ts';
 
-function pngSignatureBytes(): Uint8Array {
-  return Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52]);
+function pngSignatureBytes(): Uint8Array<ArrayBuffer> {
+  return new Uint8Array([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+    0x49, 0x48, 0x44, 0x52,
+  ]) as Uint8Array<ArrayBuffer>;
 }
 
-function jpegSignatureBytes(): Uint8Array {
-  return Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01]);
+function jpegSignatureBytes(): Uint8Array<ArrayBuffer> {
+  return new Uint8Array([
+    0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01,
+  ]) as Uint8Array<ArrayBuffer>;
 }
 
-function makeImageFile(name: string, type: string, signature: Uint8Array): File {
+function makeImageFile(name: string, type: string, signature: Uint8Array<ArrayBuffer>): File {
   return new File([signature], name, { type });
 }
 

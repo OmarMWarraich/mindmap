@@ -14,7 +14,7 @@ function escapePdfText(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
 }
 
-function buildMinimalPdf(value: string): Uint8Array {
+function buildMinimalPdf(value: string): Uint8Array<ArrayBuffer> {
   const stream = `BT\n/F1 18 Tf\n50 80 Td\n(${escapePdfText(value)}) Tj\nET`;
   const objects = [
     '<< /Type /Catalog /Pages 2 0 R >>',
@@ -38,7 +38,10 @@ function buildMinimalPdf(value: string): Uint8Array {
   }
   pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
 
-  return new TextEncoder().encode(pdf);
+  const encoded = new TextEncoder().encode(pdf);
+  const bytes = new Uint8Array(encoded.length);
+  bytes.set(encoded);
+  return bytes as Uint8Array<ArrayBuffer>;
 }
 
 function pdfFile(name = 'doc.pdf', text = 'Photosynthesis'): File {
