@@ -70,6 +70,7 @@ export default function SourceNotesPanel({
 }: SourceNotesPanelProps) {
   const isGenerating = generationStatus.tone === 'progress';
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
   // Mirror the latest rawNotes into a ref so the async file-append uses the most
   // recent textarea content (avoids stale-closure bugs after await). Updated in an
   // effect, not during render, so it doesn't violate the rules of hooks.
@@ -378,6 +379,19 @@ export default function SourceNotesPanel({
           ref={fileInputRef}
           type="file"
         />
+        {/* Camera-only input: `capture` opens the rear camera directly on mobile. */}
+        <input
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={(event) => {
+            const files = event.target.files ? Array.from(event.target.files) : [];
+            event.target.value = '';
+            void handleFilesSelected(files);
+          }}
+          ref={cameraInputRef}
+          type="file"
+        />
         <button
           className="flex-1 rounded-lg bg-accent-500 px-3 py-2 text-sm font-medium text-white transition hover:bg-accent-600 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={isGenerating}
@@ -409,6 +423,18 @@ export default function SourceNotesPanel({
           type="button"
         >
           Attach
+        </button>
+        <button
+          aria-label="Take a photo of your notes"
+          className="rounded-lg border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={isGenerating || isReading}
+          onClick={() => {
+            cameraInputRef.current?.click();
+          }}
+          title="Take a photo of your notes"
+          type="button"
+        >
+          Camera
         </button>
         {latestDslGeneration?.quality.densityStatus === 'below-target' ? (
           <button
