@@ -1,4 +1,9 @@
 import type {
+  ArtisticExportRequest,
+  ArtisticExportResponse,
+} from './artistic-export-service.ts';
+import { artisticExportResponseSchema } from './artistic-export-service.ts';
+import type {
   MindmapBackgroundGenerationRequest,
   MindmapBackgroundGenerationResponse,
 } from './background-service.ts';
@@ -78,6 +83,37 @@ export async function requestMindmapBackgroundFromApi(
 
   if (!parsed.success) {
     throw new Error('Background generation returned an invalid response payload.');
+  }
+
+  return parsed.data;
+}
+
+export async function requestArtisticExportFromApi(
+  request: ArtisticExportRequest,
+  options: {
+    fetchImpl?: typeof fetch;
+    signal?: AbortSignal;
+  } = {},
+): Promise<ArtisticExportResponse> {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const response = await fetchImpl('/api/styling/artistic-export', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+    signal: options.signal,
+  });
+
+  if (!response.ok) {
+    const payload = await parseErrorPayload(response);
+    throw new Error(payload.error ?? `Artistic export failed with status ${response.status}.`);
+  }
+
+  const parsed = artisticExportResponseSchema.safeParse(await response.json());
+
+  if (!parsed.success) {
+    throw new Error('Artistic export returned an invalid response payload.');
   }
 
   return parsed.data;

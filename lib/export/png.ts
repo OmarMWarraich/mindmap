@@ -101,8 +101,7 @@ async function renderSvgNodeToBlob(
   node: SVGSVGElement,
   dimensions: PngExportDimensions,
   backgroundColor = '#ffffff',
-): Promise<Blob | null> {
-  const serializedSvg = serializeSvgForExport(node, dimensions.sourceWidth, dimensions.sourceHeight);
+): Promise<Blob | null> {  const serializedSvg = serializeSvgForExport(node, dimensions.sourceWidth, dimensions.sourceHeight);
   const svgBlob = new Blob([serializedSvg], { type: 'image/svg+xml;charset=utf-8' });
   const svgUrl = URL.createObjectURL(svgBlob);
 
@@ -160,4 +159,41 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     };
     image.src = src;
   });
+}
+
+export async function renderSvgNodeToPngDataUrl(
+  node: SVGSVGElement,
+  options: {
+    sourceWidth: number;
+    sourceHeight: number;
+    maxEdge?: number;
+    backgroundColor?: string;
+  },
+): Promise<string> {
+  const dimensions = calculatePngExportDimensions(options.sourceWidth, options.sourceHeight, {
+    maxEdge: options.maxEdge,
+  });
+  const blob = await renderSvgNodeToBlob(node, dimensions, options.backgroundColor);
+
+  if (!blob) {
+    throw new Error('PNG rasterization returned an empty image blob.');
+  }
+
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      resolve(String(reader.result));
+    };
+    reader.onerror = () => {
+      reject(new Error('PNG rasterization could not encode the image.'));
+    };
+    reader.readAsDataURL(blob);
+  });
+}
+
+export function downloadImageDataUrl(dataUrl: string, fileNameBase: string): void {
+  const link = document.createElement('a');
+  link.download = createPngFileName(fileNameBase);
+  link.href = dataUrl;
+  link.click();
 }

@@ -40,7 +40,8 @@ import {
 } from '../lib/mindmap/svg-preview';
 import type { GeneratedMindmap } from '../lib/mindmap/schema';
 import type { LayoutWorkerDiagnostics } from '../lib/mindmap/worker-diagnostics';
-import { downloadNodeAsPng } from '../lib/export/png';
+import { downloadNodeAsPng, downloadImageDataUrl, renderSvgNodeToPngDataUrl } from '../lib/export/png';
+import { requestArtisticExportFromApi } from '../lib/styling/client';
 import {
   getOrCreateActiveProject,
   loadCloudDraft,
@@ -106,6 +107,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
   });
   const [exportControls, setExportControls] = useState<ScalingValues>(defaultScalingValues);
   const [theme, setTheme] = useState<MindmapTheme>(defaultMindmapTheme);
+  const [artisticExportBusy, setArtisticExportBusy] = useState(false);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -548,6 +550,63 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
     }
   }
 
+  async function handleArtisticExport(): Promise<void> {
+    if (!effectiveMindmap || !layoutResult) {
+      setExportStatus({
+        tone: 'error',
+        message: 'Artistic export is unavailable until the preview finishes rendering.',
+      });
+      return;
+    }
+
+    setArtisticExportBusy(true);
+    setExportStatus({
+      tone: 'progress',
+      message: 'Rendering the mindmap for the AI…',
+    });
+
+    try {
+      // displayLayoutResult includes the user's node drag offsets.
+      const snapshot = createSvgPreviewSnapshot(effectiveMindmap, displayLayoutResult ?? layoutResult, {
+        profile: 'export',
+        theme,
+      });
+      // 1024px edge keeps the upload well under the serverless body cap.
+      const imageDataUrl = await renderSvgNodeToPngDataUrl(snapshot.node, {
+        sourceWidth: snapshot.width,
+        sourceHeight: snapshot.height,
+        maxEdge: 1024,
+        backgroundColor: '#fffef8',
+      });
+
+      setExportStatus({
+        tone: 'progress',
+        message: 'The AI is repainting your mindmap… this can take up to a minute.',
+      });
+
+      const response = await requestArtisticExportFromApi({
+        imageDataUrl,
+        mindmapTitle: effectiveMindmap.metadata.title,
+      });
+
+      downloadImageDataUrl(
+        response.imageDataUrl,
+        `${effectiveMindmap.metadata.title ?? 'mindmap'}-artistic`,
+      );
+      setExportStatus({
+        tone: 'success',
+        message: `Downloaded the artistic export. ${response.disclaimer}`,
+      });
+    } catch (error) {
+      setExportStatus({
+        tone: 'error',
+        message: error instanceof Error ? error.message : 'Artistic export failed unexpectedly.',
+      });
+    } finally {
+      setArtisticExportBusy(false);
+    }
+  }
+
   function handleRestoreFromHistory(entry: HistoryEntry): void {
     dslEditorRef.current?.setValue(entry.dsl);
     dslEditorRef.current?.focus();
@@ -840,7 +899,21 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
             >
               Quick Export
             </button>
+            <button
+              className="flex-1 rounded-lg border border-accent-200 bg-accent-50 px-3 py-2 text-sm font-medium text-accent-800 transition hover:bg-accent-100 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!layoutResult || layoutStatus === 'loading' || artisticExportBusy}
+              onClick={() => {
+                void handleArtisticExport();
+              }}
+              title="AI-stylized rendering — text may be inaccurate"
+              type="button"
+            >
+              {artisticExportBusy ? 'Painting…' : 'Artistic Export (AI)'}
+            </button>
           </div>
+          <p className="px-1 text-xs text-zinc-400">
+            Artistic Export is AI-stylized — node text may be inaccurate; use Quick Export for faithful output.
+          </p>
         </div>
     </div>
   );
