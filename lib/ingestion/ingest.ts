@@ -1,10 +1,14 @@
 import { maxSourceTextCharacters } from '../generation/limits.ts';
-import { createPdfIngestionAdapter } from './pdf-adapter.ts';
+import { createImageIngestionAdapter, validateImageFile } from './image-adapter.ts';
+import { createPdfIngestionAdapter, isLikelyPdfFile } from './pdf-adapter.ts';
 import { textIngestionAdapter } from './text-adapter.ts';
 import { IngestionError, type IngestedFile, type IngestionAdapter } from './types.ts';
 
-// Registry of available adapters. New input types (images) register here.
-const ingestionAdapters: IngestionAdapter[] = [textIngestionAdapter, createPdfIngestionAdapter()];
+const ingestionAdapters: IngestionAdapter[] = [
+  textIngestionAdapter,
+  createPdfIngestionAdapter(),
+  createImageIngestionAdapter(),
+];
 
 // Default coarse guard so we never pull a huge blob into memory first; the
 // character cap (maxSourceTextCharacters) is the meaningful limit. Adapters may
@@ -61,8 +65,16 @@ export async function ingestFile(file: File): Promise<IngestedFile> {
   const adapter = selectAdapter(file);
   if (!adapter) {
     throw new IngestionError(
-      `"${file.name}" is not a supported file type. Attach a .txt, .md, or .pdf file.`,
+      `"${file.name}" is not a supported file type. Attach a .txt, .md, .pdf, or image file.`,
     );
+  }
+
+  if (adapter.id === 'image') {
+    await validateImageFile(file);
+  }
+
+  if (adapter.id === 'pdf' && !(await isLikelyPdfFile(file))) {
+    throw new IngestionError(`"${file.name}" is not a valid PDF file.`);
   }
 
   const maxBytes = adapter.maxBytes ?? defaultMaxIngestionBytes;

@@ -134,7 +134,10 @@ Source Notes accepts pasted text and file attachments (via the **Attach** button
 
 - **Paste** — notes, bullets, subtitles, or a transcript.
 - **`.txt` / `.md`** — read in the browser.
-- **`.pdf`** — digital (text-based) PDFs are extracted client-side with pdf.js. Scanned/image-only PDFs are detected and rejected (image/OCR support is planned). pdf.js runs on the main thread here to avoid a Web Worker (it fails to instantiate under Turbopack in some browsers).
+- **`.pdf`** — digital (text-based) PDFs are extracted client-side with pdf.js. Scanned or image-only PDFs fall back to OCR with Tesseract.js, and the normalized text then enters the same Source Notes → generate-DSL pipeline.
+- **Images** — screenshots, handwritten notes, and printed pages are accepted as `.png`, `.jpg`, `.jpeg`, `.gif`, `.bmp`, `.webp`, `.tif`, `.tiff`, `.heic`, and `.heif`, then OCRed in-browser before generation.
+
+> **OCR choice and privacy.** The app uses Tesseract.js now as the supported OCR path for scanned PDFs and note photos. A vision model remains a future upgrade only if OCR quality issues justify the higher token cost. Uploaded images are processed in the browser; the app keeps only the extracted text for the generation pipeline and does not retain the original image payload beyond the in-memory OCR step.
 
 > **Known limitation — PDF in Safari.** PDF text extraction currently works in Chrome and Firefox but fails in Safari (pdf.js errors during text extraction, even on the latest Safari). Use Chrome/Firefox for PDFs, or paste the text. Tracked as a follow-up.
 
