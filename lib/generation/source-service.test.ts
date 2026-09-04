@@ -143,7 +143,9 @@ test('generateMindmapDslFromSource rejects DSL that does not parse under the sin
   );
 });
 
-test('generateMindmapDslFromSource rejects lines above the 35-word limit', async () => {
+test('generateMindmapDslFromSource rejects lines above the 100-word limit', async () => {
+  const overLongLine = `  - ${Array.from({ length: 101 }, (_, index) => `word${index}`).join(' ')}`;
+
   await assert.rejects(
     () => generateMindmapDslFromSource(
       {
@@ -153,7 +155,7 @@ test('generateMindmapDslFromSource rejects lines above the 35-word limit', async
         env: testEnv,
         fetchImpl: async () => new Response(JSON.stringify({
           content: [{ type: 'text', text:JSON.stringify({
-            dsl: '@root: Photosynthesis\n- @branch: Stages\n  - this generated branch line intentionally contains far more than thirty five separate distinct words so that the per line word limit validation rule will actually trigger a rejection inside the source generation service during this particular parser safe regression test case today',
+            dsl: `@root: Photosynthesis\n- @branch: Stages\n${overLongLine}`,
           }) }],
         }), {
           status: 200,
@@ -161,7 +163,7 @@ test('generateMindmapDslFromSource rejects lines above the 35-word limit', async
         }),
       },
     ),
-    /35-word per-line limit/i,
+    /100-word per-line limit/i,
   );
 });
 

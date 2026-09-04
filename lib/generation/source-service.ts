@@ -24,7 +24,7 @@ const distillSourceWordThreshold = 500;
 const distillTargetMinLineCount = 12;
 const distillTargetMaxLineCountStandard = 60;
 const distillTargetMaxLineCountDetailed = 90;
-const maxWordsPerLine = 35;
+const maxWordsPerLine = 100;
 
 type EnvRecord = Record<string, string | undefined>;
 
@@ -364,7 +364,7 @@ async function generateDslAttempt(
     : false;
 
   if (!lineWordLimitSatisfied) {
-    throw new Error('Generated DSL exceeded the 35-word per-line limit.');
+    throw new Error(`Generated DSL exceeded the ${maxWordsPerLine}-word per-line limit.`);
   }
 
   return {
