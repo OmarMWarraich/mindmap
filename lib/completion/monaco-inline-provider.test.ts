@@ -31,7 +31,7 @@ test('createMindmapDslInlineCompletionsProvider tracks accepted completions at e
   provider.handleEndOfLifetime?.(
     { items: [] },
     { correlationId: 'completion-1', insertText: ' - key detail' },
-    { kind: 0 },
+    { kind: 0, alternativeAction: false },
     {
       characterCountOriginal: 42,
       requestReason: 'automatic',
