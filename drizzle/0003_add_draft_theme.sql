@@ -1,0 +1,1 @@
+ALTER TABLE "project_draft" ADD COLUMN "theme" jsonb;

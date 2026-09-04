@@ -15,6 +15,7 @@ import MindmapSvgPreview from './MindmapSvgPreview';
 import ModelSelector from './ModelSelector';
 import SourceNotesPanel from './SourceNotesPanel';
 import type { SourceGenerationDetailLevel } from './SourceNotesPanel';
+import ThemePanel from './ThemePanel';
 import { useWorkspace } from './WorkspaceContext';
 import type { MindmapSvgPreviewHandle } from './MindmapSvgPreview';
 import { requestMindmapDslGenerationFromApi } from '../lib/generation/client';
@@ -50,6 +51,8 @@ import {
 } from '../lib/persistence/workspace';
 import { parseMindmapDsl } from '../lib/dsl/parse';
 import { mindmapDslStarterOutline } from '../lib/dsl/mvp';
+import type { MindmapTheme } from '../lib/mindmap/theme';
+import { defaultMindmapTheme } from '../lib/mindmap/theme';
 import type { MindmapValidationIssue } from '../lib/dsl/validation';
 import type { PublicModel } from '../lib/model/public-catalog';
 
@@ -102,6 +105,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
     summary: 'Preview is idle until the outline parses into a valid AST.',
   });
   const [exportControls, setExportControls] = useState<ScalingValues>(defaultScalingValues);
+  const [theme, setTheme] = useState<MindmapTheme>(defaultMindmapTheme);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -284,6 +288,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
           setLatestMindmapSnapshotOutline(cloudDraft.outline);
           setPreviewTransform(cloudDraft.previewTransform);
           setNodePositionOverrides(cloudDraft.nodePositionOverrides ?? {});
+          setTheme(cloudDraft.theme ?? defaultMindmapTheme);
           setDraftStatus({
             tone: 'success',
             message: 'Restored saved project from the cloud.',
@@ -307,6 +312,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
           setLatestMindmapSnapshotOutline(localDraft.outline);
           setPreviewTransform(localDraft.previewTransform);
           setNodePositionOverrides(localDraft.nodePositionOverrides ?? {});
+          setTheme(localDraft.theme ?? defaultMindmapTheme);
           setDraftStatus({
             tone: 'success',
             message: 'Restored the saved draft and preview state.',
@@ -445,6 +451,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
           nodePositionOverrides,
           latestMindmapSnapshot,
         ),
+        theme,
       };
 
       void saveWorkspaceDraft(draft)
@@ -477,7 +484,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [latestDslGeneration, latestMindmapSnapshot, nodePositionOverrides, outline, previewTransform, projectId, rawNotes, selectedDetailLevel]);
+  }, [latestDslGeneration, latestMindmapSnapshot, nodePositionOverrides, outline, previewTransform, projectId, rawNotes, selectedDetailLevel, theme]);
 
   async function handleDownloadPng(): Promise<void> {
     if (!effectiveMindmap) {
@@ -512,6 +519,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
       const snapshot = createSvgPreviewSnapshot(exportMindmap, exportLayoutWithOverrides, {
         profile: 'export',
         renderScale: exportControls.fontScale,
+        theme,
       });
 
       setExportStatus({
@@ -639,6 +647,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
         nodePositionOverrides,
         latestMindmapSnapshot,
       ),
+      theme,
     };
 
     void saveWorkspaceDraft(draft).catch((error) => {
@@ -763,8 +772,11 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
             nodePositionOverrides={nodePositionOverrides}
             onNodePositionOverridesChange={setNodePositionOverrides}
             onTransformChange={setPreviewTransform}
+            theme={theme}
             transform={previewTransform}
           />
+
+          <ThemePanel onThemeChange={setTheme} theme={theme} />
 
           <ExpertScalingPanel
             values={exportControls}
@@ -787,6 +799,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
             }}
             onTransformChange={setPreviewTransform}
             open={previewOpen}
+            theme={theme}
             transform={previewTransform}
           />
 
