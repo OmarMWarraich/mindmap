@@ -13,6 +13,30 @@ import {
   wrapMindmapLabel,
   zoomSvgPreviewAroundPoint,
 } from './svg-preview.ts';
+import { defaultMindmapTheme } from './theme.ts';
+
+function createThemeTestLayout() {
+  return {
+    width: 900,
+    height: 700,
+    nodes: validGeneratedMindmapFixture.nodes.slice(0, 3).map((node, index) => ({
+      id: node.id,
+      x: 80 + index * 220,
+      y: 120 + index * 90,
+      width: node.layout.minWidth,
+      height: node.layout.minHeight,
+    })),
+    edges: [
+      {
+        id: validGeneratedMindmapFixture.edges[0].id,
+        points: [
+          { x: 160, y: 160 },
+          { x: 260, y: 180 },
+        ],
+      },
+    ],
+  };
+}
 
 test('wrapMindmapLabel splits long labels into multiple lines', () => {
   assert.deepEqual(wrapMindmapLabel('Cellular respiration drives ATP output', 18), [
@@ -562,6 +586,59 @@ function estimateLongestLineWidth(
 
   return widestLine * approxCharacterWidth;
 }
+
+test('buildSvgPreviewModel with the default theme matches themeless output exactly', () => {
+  const layout = createThemeTestLayout();
+  const themeless = buildSvgPreviewModel(validGeneratedMindmapFixture, layout);
+  const themed = buildSvgPreviewModel(validGeneratedMindmapFixture, layout, {
+    theme: defaultMindmapTheme,
+  });
+
+  assert.deepEqual(themed, themeless);
+});
+
+test('buildSvgPreviewModel applies per-tier theme node style overrides', () => {
+  const model = buildSvgPreviewModel(validGeneratedMindmapFixture, createThemeTestLayout(), {
+    theme: {
+      ...defaultMindmapTheme,
+      node: {
+        ...defaultMindmapTheme.node,
+        branch: { stroke: '#123456', text: '#f8fafc' },
+      },
+    },
+  });
+  const branchNode = model.nodes.find((node) => node.kind === 'branch');
+
+  assert.equal(branchNode?.style.stroke, '#123456');
+  assert.equal(branchNode?.style.text, '#f8fafc');
+  assert.notEqual(branchNode?.style.fill, undefined);
+});
+
+test('buildSvgPreviewModel uses the mono edge color when the theme requests it', () => {
+  const model = buildSvgPreviewModel(validGeneratedMindmapFixture, createThemeTestLayout(), {
+    theme: {
+      ...defaultMindmapTheme,
+      edge: { strokeWidthScale: 1, opacity: 0.72, colorMode: 'mono', monoColor: '#334155' },
+    },
+  });
+
+  assert.equal(model.edges[0]?.color, '#334155');
+});
+
+test('buildSvgPreviewModel scales node typography from the theme', () => {
+  const layout = createThemeTestLayout();
+  const base = buildSvgPreviewModel(validGeneratedMindmapFixture, layout);
+  const scaled = buildSvgPreviewModel(validGeneratedMindmapFixture, layout, {
+    theme: {
+      ...defaultMindmapTheme,
+      typography: { ...defaultMindmapTheme.typography, rootFontScale: 1.5 },
+    },
+  });
+  const baseRoot = base.nodes.find((node) => node.kind === 'root');
+  const scaledRoot = scaled.nodes.find((node) => node.kind === 'root');
+
+  assert.equal(scaledRoot?.fontSize, (baseRoot?.fontSize ?? 0) * 1.5);
+});
 
 test('zoomSvgPreviewAroundPoint preserves the anchor position while scaling', () => {
   const transform = zoomSvgPreviewAroundPoint(

@@ -6,6 +6,8 @@ import type {
   MindmapNode,
   MindmapNodeKind,
 } from './schema.ts';
+import type { MindmapTheme } from './theme.ts';
+import { defaultMindmapTheme } from './theme.ts';
 
 export interface SvgPreviewNodeStyle {
   fill: string;
@@ -179,10 +181,15 @@ export function buildSvgPreviewModel(
     profile?: SvgPreviewRenderProfile;
     renderScale?: number;
     canvasPadding?: number;
+    theme?: MindmapTheme;
   } = {},
 ): SvgPreviewModel {
   const profile = options.profile ?? 'preview';
-  const metrics = getSvgPreviewRenderMetrics(profile, { scale: options.renderScale });
+  const theme = options.theme ?? defaultMindmapTheme;
+  const metrics = applyThemeTypographyToMetrics(
+    getSvgPreviewRenderMetrics(profile, { scale: options.renderScale }),
+    theme,
+  );
   const layoutNodeMap = new Map(layoutResult.nodes.map((node) => [node.id, node]));
   const mindmapNodeMap = new Map(mindmap.nodes.map((node) => [node.id, node]));
   const canvasPadding = Math.max(0, options.canvasPadding ?? 0);
@@ -209,6 +216,7 @@ export function buildSvgPreviewModel(
       metrics,
       profile,
       exportTypographyTargets,
+      theme,
     )];
   });
 
@@ -218,9 +226,11 @@ export function buildSvgPreviewModel(
     }
 
     const sourceEdge = mindmap.edges.find((candidate) => candidate.id === edge.id);
-    const color = sourceEdge
-      ? getNodeVisualStyle(mindmapNodeMap.get(sourceEdge.from) ?? null).edge
-      : '#a1a1aa';
+    const color = theme.edge.colorMode === 'mono' && theme.edge.monoColor
+      ? theme.edge.monoColor
+      : sourceEdge
+        ? resolveThemedNodeStyle(mindmapNodeMap.get(sourceEdge.from) ?? null, theme).edge
+        : '#a1a1aa';
     const adjustedPoints = edge.points.map((point) => ({
       x: point.x + bounds.offsetX,
       y: point.y + bounds.offsetY,
@@ -288,6 +298,7 @@ function createSvgPreviewNode(
   metrics: SvgPreviewRenderMetrics,
   profile: SvgPreviewRenderProfile,
   exportTypographyTargets: ExportTypographyTargets | null,
+  theme: MindmapTheme,
 ): SvgPreviewNode {
   const typography = createNodeTypography(
     sourceNode,
@@ -314,7 +325,7 @@ function createSvgPreviewNode(
     y: layoutNode.y,
     width: layoutNode.width,
     height: layoutNode.height,
-    style: getNodeVisualStyle(sourceNode),
+    style: resolveThemedNodeStyle(sourceNode, theme),
   };
 }
 
@@ -355,6 +366,7 @@ export function createSvgPreviewSnapshot(
   options: {
     profile?: SvgPreviewRenderProfile;
     renderScale?: number;
+    theme?: MindmapTheme;
   } = {},
 ): { node: SVGSVGElement; width: number; height: number } {
   if (typeof document === 'undefined') {
@@ -362,7 +374,11 @@ export function createSvgPreviewSnapshot(
   }
 
   const profile = options.profile ?? 'preview';
-  const metrics = getSvgPreviewRenderMetrics(profile, { scale: options.renderScale });
+  const theme = options.theme ?? defaultMindmapTheme;
+  const metrics = applyThemeTypographyToMetrics(
+    getSvgPreviewRenderMetrics(profile, { scale: options.renderScale }),
+    theme,
+  );
   const exportPadding = Math.ceil(
     Math.max(metrics.edgeStrokeWidth, metrics.rootStrokeWidth, metrics.nodeStrokeWidth) + 4,
   );
@@ -370,6 +386,7 @@ export function createSvgPreviewSnapshot(
     profile,
     renderScale: options.renderScale,
     canvasPadding: exportPadding,
+    theme,
   });
   const svgNs = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(svgNs, 'svg');
@@ -381,28 +398,7 @@ export function createSvgPreviewSnapshot(
   svg.setAttribute('height', String(height));
   svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
 
-  const defs = document.createElementNS(svgNs, 'defs');
-  const pattern = document.createElementNS(svgNs, 'pattern');
-  pattern.setAttribute('id', 'mindmap-export-grid');
-  pattern.setAttribute('width', '32');
-  pattern.setAttribute('height', '32');
-  pattern.setAttribute('patternUnits', 'userSpaceOnUse');
-  const patternPath = document.createElementNS(svgNs, 'path');
-  patternPath.setAttribute('d', 'M 32 0 L 0 0 0 32');
-  patternPath.setAttribute('fill', 'none');
-  patternPath.setAttribute('stroke', 'rgba(148,163,184,0.12)');
-  patternPath.setAttribute('stroke-width', '1');
-  pattern.append(patternPath);
-  defs.append(pattern);
-  svg.append(defs);
-
-  const background = document.createElementNS(svgNs, 'rect');
-  background.setAttribute('x', '0');
-  background.setAttribute('y', '0');
-  background.setAttribute('width', String(width));
-  background.setAttribute('height', String(height));
-  background.setAttribute('fill', 'url(#mindmap-export-grid)');
-  svg.append(background);
+  appendThemedBackground(svg, svgNs, theme.background, width, height);
 
   const edgeGroup = document.createElementNS(svgNs, 'g');
   edgeGroup.setAttribute('fill', 'none');
@@ -413,8 +409,8 @@ export function createSvgPreviewSnapshot(
     const path = document.createElementNS(svgNs, 'path');
     path.setAttribute('d', edge.path);
     path.setAttribute('stroke', edge.color);
-    path.setAttribute('stroke-opacity', '0.72');
-    path.setAttribute('stroke-width', String(metrics.edgeStrokeWidth));
+    path.setAttribute('stroke-opacity', String(theme.edge.opacity));
+    path.setAttribute('stroke-width', String(metrics.edgeStrokeWidth * theme.edge.strokeWidthScale));
     edgeGroup.append(path);
   }
 
@@ -426,15 +422,42 @@ export function createSvgPreviewSnapshot(
     const nodeWrapper = document.createElementNS(svgNs, 'g');
     nodeWrapper.setAttribute('transform', `translate(${node.x} ${node.y})`);
 
+    const cornerRadius =
+      (node.kind === 'root' ? metrics.rootCornerRadius : metrics.nodeCornerRadius)
+      * theme.node.cornerRadiusScale;
+
+    if (theme.node.frostOpacity > 0) {
+      const frost = document.createElementNS(svgNs, 'rect');
+      frost.setAttribute('x', '0');
+      frost.setAttribute('y', '0');
+      frost.setAttribute('width', String(node.width));
+      frost.setAttribute('height', String(node.height));
+      frost.setAttribute('fill', '#ffffff');
+      frost.setAttribute('fill-opacity', String(theme.node.frostOpacity));
+      frost.setAttribute('rx', String(cornerRadius));
+      nodeWrapper.append(frost);
+    }
+
     const frame = document.createElementNS(svgNs, 'rect');
     frame.setAttribute('x', '0');
     frame.setAttribute('y', '0');
     frame.setAttribute('width', String(node.width));
     frame.setAttribute('height', String(node.height));
     frame.setAttribute('fill', node.style.fill);
+
+    if (theme.node.fillOpacity < 1) {
+      frame.setAttribute('fill-opacity', String(theme.node.fillOpacity));
+    }
+
     frame.setAttribute('stroke', node.style.stroke);
-    frame.setAttribute('stroke-width', String(node.kind === 'root' ? metrics.rootStrokeWidth : metrics.nodeStrokeWidth));
-    frame.setAttribute('rx', String(node.kind === 'root' ? metrics.rootCornerRadius : metrics.nodeCornerRadius));
+    frame.setAttribute(
+      'stroke-width',
+      String(
+        (node.kind === 'root' ? metrics.rootStrokeWidth : metrics.nodeStrokeWidth)
+        * theme.node.strokeWidthScale,
+      ),
+    );
+    frame.setAttribute('rx', String(cornerRadius));
     nodeWrapper.append(frame);
 
     const accent = document.createElementNS(svgNs, 'rect');
@@ -449,7 +472,7 @@ export function createSvgPreviewSnapshot(
     const text = document.createElementNS(svgNs, 'text');
     text.setAttribute('x', String(node.width / 2));
     text.setAttribute('fill', node.style.text);
-    text.setAttribute('font-family', 'ui-sans-serif, system-ui, sans-serif');
+    text.setAttribute('font-family', theme.typography.fontFamily);
     text.setAttribute('font-size', String(node.fontSize));
     text.setAttribute('font-weight', node.kind === 'root' ? '800' : '700');
     text.setAttribute('text-anchor', 'middle');
@@ -494,6 +517,87 @@ export function createSvgPreviewSnapshot(
     width,
     height,
   };
+}
+
+function appendThemedBackground(
+  svg: SVGSVGElement,
+  svgNs: string,
+  background: MindmapTheme['background'],
+  width: number,
+  height: number,
+): void {
+  const fullRect = (): SVGRectElement => {
+    const rect = document.createElementNS(svgNs, 'rect') as SVGRectElement;
+    rect.setAttribute('x', '0');
+    rect.setAttribute('y', '0');
+    rect.setAttribute('width', String(width));
+    rect.setAttribute('height', String(height));
+    return rect;
+  };
+
+  if (background.kind === 'grid') {
+    const defs = document.createElementNS(svgNs, 'defs');
+    const pattern = document.createElementNS(svgNs, 'pattern');
+    pattern.setAttribute('id', 'mindmap-export-grid');
+    pattern.setAttribute('width', '32');
+    pattern.setAttribute('height', '32');
+    pattern.setAttribute('patternUnits', 'userSpaceOnUse');
+    const patternPath = document.createElementNS(svgNs, 'path');
+    patternPath.setAttribute('d', 'M 32 0 L 0 0 0 32');
+    patternPath.setAttribute('fill', 'none');
+    patternPath.setAttribute('stroke', 'rgba(148,163,184,0.12)');
+    patternPath.setAttribute('stroke-width', '1');
+    pattern.append(patternPath);
+    defs.append(pattern);
+    svg.append(defs);
+
+    const rect = fullRect();
+    rect.setAttribute('fill', 'url(#mindmap-export-grid)');
+    svg.append(rect);
+    return;
+  }
+
+  if (background.kind === 'solid') {
+    const rect = fullRect();
+    rect.setAttribute('fill', background.color);
+    svg.append(rect);
+    return;
+  }
+
+  if (background.kind === 'gradient') {
+    const defs = document.createElementNS(svgNs, 'defs');
+    const gradient = document.createElementNS(svgNs, 'linearGradient');
+    gradient.setAttribute('id', 'mindmap-theme-gradient');
+    gradient.setAttribute('gradientTransform', `rotate(${background.angle} 0.5 0.5)`);
+    const fromStop = document.createElementNS(svgNs, 'stop');
+    fromStop.setAttribute('offset', '0%');
+    fromStop.setAttribute('stop-color', background.from);
+    const toStop = document.createElementNS(svgNs, 'stop');
+    toStop.setAttribute('offset', '100%');
+    toStop.setAttribute('stop-color', background.to);
+    gradient.append(fromStop, toStop);
+    defs.append(gradient);
+    svg.append(defs);
+
+    const rect = fullRect();
+    rect.setAttribute('fill', 'url(#mindmap-theme-gradient)');
+    svg.append(rect);
+    return;
+  }
+
+  const image = document.createElementNS(svgNs, 'image');
+  image.setAttribute('x', '0');
+  image.setAttribute('y', '0');
+  image.setAttribute('width', String(width));
+  image.setAttribute('height', String(height));
+  image.setAttribute('href', background.imageDataUrl);
+  image.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+  svg.append(image);
+
+  const overlay = fullRect();
+  overlay.setAttribute('fill', background.overlayColor);
+  overlay.setAttribute('fill-opacity', String(background.overlayOpacity));
+  svg.append(overlay);
 }
 
 export function createEdgePath(points: Array<{ x: number; y: number }>): string {
@@ -931,6 +1035,40 @@ function getNodeVisualStyle(node: MindmapNode | null): SvgPreviewNodeStyle {
   return {
     ...branchTokenStyles[node.style.colorToken][node.style.tintTone ?? 'base'],
     text: readableNodeTextColor,
+  };
+}
+
+function resolveThemedNodeStyle(node: MindmapNode | null, theme: MindmapTheme): SvgPreviewNodeStyle {
+  const base = getNodeVisualStyle(node);
+  const override = theme.node[node?.kind ?? 'root'];
+
+  if (!override) {
+    return base;
+  }
+
+  return {
+    fill: override.fill ?? base.fill,
+    stroke: override.stroke ?? base.stroke,
+    text: override.text ?? base.text,
+    accent: override.accent ?? base.accent,
+    edge: base.edge,
+  };
+}
+
+function applyThemeTypographyToMetrics(
+  metrics: SvgPreviewRenderMetrics,
+  theme: MindmapTheme,
+): SvgPreviewRenderMetrics {
+  const { rootFontScale, nodeFontScale } = theme.typography;
+
+  if (rootFontScale === 1 && nodeFontScale === 1) {
+    return metrics;
+  }
+
+  return {
+    ...metrics,
+    rootFontSize: Math.max(1, metrics.rootFontSize * rootFontScale),
+    nodeFontSize: Math.max(1, metrics.nodeFontSize * nodeFontScale),
   };
 }
 
