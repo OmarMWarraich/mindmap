@@ -11,7 +11,32 @@ import {
   validMindmapDslFixture,
   validMindmapDslFixtures,
 } from "./__fixtures__/parser.ts";
+import { generateMindmapFromAst } from "../mindmap/from-ast.ts";
 import { parseMindmapDsl } from "./parse.ts";
+
+test("issues from odd-space indentation keep integer indent levels", () => {
+  const result = parseMindmapDsl(invalidIndentationMindmapDslFixture);
+
+  for (const issue of [...result.errors, ...result.warnings]) {
+    const indentLevel = issue.target.source?.indentLevel;
+
+    if (indentLevel !== undefined) {
+      assert.equal(Number.isInteger(indentLevel), true, `${issue.code} at line ${issue.target.source?.line}`);
+    }
+  }
+});
+
+test("recovered odd-indentation outlines survive mindmap schema validation", () => {
+  const result = parseMindmapDsl(invalidIndentationMindmapDslFixture);
+
+  assert.ok(result.ast);
+  assert.doesNotThrow(() => {
+    generateMindmapFromAst(result.ast!, {
+      warnings: result.warnings,
+      errors: result.errors,
+    });
+  });
+});
 
 test("parser fixtures cover valid outlines without fatal parse failures", () => {
   for (const fixture of validMindmapDslFixtures) {

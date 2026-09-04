@@ -9,6 +9,7 @@ import {
   createEdgePath,
   getSvgPreviewRenderMetrics,
   panSvgPreviewTransform,
+  wrapFormattedMindmapLabel,
   wrapMindmapLabel,
   zoomSvgPreviewAroundPoint,
 } from './svg-preview.ts';
@@ -33,6 +34,36 @@ test('wrapMindmapLabel splits long hyphenated tokens without dropping content', 
     wrapMindmapLabel('Jean-Jacques Rousseau legitimacy-based consent', 10),
     ['Jean-', 'Jacques', 'Rousseau', 'legitimacy', '-based', 'consent'],
   );
+});
+
+test('wrapFormattedMindmapLabel wraps by visible length and strips markers', () => {
+  const wrapped = wrapFormattedMindmapLabel('**Krebs cycle** drives _ATP_ output', 18);
+
+  assert.deepEqual(wrapped.lines, ['Krebs cycle drives', 'ATP output']);
+});
+
+test('wrapFormattedMindmapLabel carries styles onto per-line segments', () => {
+  const wrapped = wrapFormattedMindmapLabel('**Krebs cycle** drives _ATP_ output', 18);
+
+  assert.deepEqual(wrapped.lineSegments, [
+    [
+      { text: 'Krebs cycle', bold: true, italic: false, underline: false },
+      { text: ' drives', bold: false, italic: false, underline: false },
+    ],
+    [
+      { text: 'ATP', bold: false, italic: true, underline: false },
+      { text: ' output', bold: false, italic: false, underline: false },
+    ],
+  ]);
+});
+
+test('wrapFormattedMindmapLabel keeps plain labels as single plain segments', () => {
+  const wrapped = wrapFormattedMindmapLabel('ATP output', 18);
+
+  assert.deepEqual(wrapped.lines, ['ATP output']);
+  assert.deepEqual(wrapped.lineSegments, [
+    [{ text: 'ATP output', bold: false, italic: false, underline: false }],
+  ]);
 });
 
 test('createEdgePath converts routed points into an SVG path', () => {

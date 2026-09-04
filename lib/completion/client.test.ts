@@ -55,6 +55,23 @@ test('requestInlineCompletionFromApi posts to the completion endpoint', async ()
   assert.equal(requestInit?.method, 'POST');
 });
 
+test('requestInlineCompletionFromApi treats aborted requests as a normal no-op', async () => {
+  const response = await requestInlineCompletionFromApi(
+    {
+      outline: '@root: Photosynthesis',
+      cursor: { lineNumber: 1, column: 5 },
+    },
+    {
+      fetchImpl: async () => {
+        const error = new DOMException('The operation was aborted.', 'AbortError');
+        throw error;
+      },
+    },
+  );
+
+  assert.equal(response, null);
+});
+
 test('trackInlineCompletionEvent posts lifecycle events to the instrumentation endpoint', async () => {
   let requestUrl = '';
   let requestInit: RequestInit | undefined;

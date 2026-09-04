@@ -83,3 +83,39 @@ test('parsePersistedWorkspaceDraft rejects malformed preview transforms', () => 
 
   assert.equal(draft, null);
 });
+
+test('parsePersistedWorkspaceDraft round-trips node position overrides', () => {
+  const draft = parsePersistedWorkspaceDraft({
+    version: 1,
+    updatedAt: '2026-05-03T00:00:00.000Z',
+    outline: '@root: Photosynthesis',
+    mindmap: null,
+    previewTransform: {
+      scale: 1,
+      translateX: 0,
+      translateY: 0,
+    },
+    nodePositionOverrides: { 'branch-1-overview': { dx: 24, dy: -12 } },
+  });
+
+  assert.deepEqual(draft?.nodePositionOverrides, {
+    'branch-1-overview': { dx: 24, dy: -12 },
+  });
+});
+
+test('parsePersistedWorkspaceDraft rejects malformed node position overrides', () => {
+  const draft = parsePersistedWorkspaceDraft({
+    version: 1,
+    updatedAt: '2026-05-03T00:00:00.000Z',
+    outline: '@root: Photosynthesis',
+    mindmap: null,
+    previewTransform: {
+      scale: 1,
+      translateX: 0,
+      translateY: 0,
+    },
+    nodePositionOverrides: { 'branch-1-overview': { dx: 'sideways', dy: 0 } },
+  });
+
+  assert.equal(draft, null);
+});

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { mindmapNodePositionOverridesSchema } from '../mindmap/node-overrides.ts';
 import { generatedMindmapSchema } from '../mindmap/schema.ts';
 
 // Shared Zod schemas for project API request bodies. Replaces the ad hoc
@@ -22,9 +23,10 @@ export const previewTransformSchema = z
 export const draftUpdateSchema = z.object({
   outline: z.string().optional(),
   rawNotes: z.string().optional(),
-  selectedDetailLevel: z.enum(['standard', 'detailed']).optional(),
+  selectedDetailLevel: z.enum(['standard', 'detailed', 'compact', 'plain']).optional(),
   mindmap: generatedMindmapSchema.nullable().optional(),
   previewTransform: previewTransformSchema.nullable().optional(),
+  nodePositionOverrides: mindmapNodePositionOverridesSchema.nullable().optional(),
 });
 
 export type DraftUpdateInput = z.infer<typeof draftUpdateSchema>;

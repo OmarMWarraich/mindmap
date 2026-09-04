@@ -464,7 +464,9 @@ function createSource(raw: string, lineIndex: number, indentLevel: number): Mind
 
 function countIndentLevel(raw: string): number {
   const leadingSpaces = raw.match(/^ */)?.[0].length ?? 0;
-  return leadingSpaces / MINDMAP_DSL_INDENT.length;
+  // Floor so odd-space lines report the nearest containing level; fractional
+  // levels would fail the schema's integer contract when errors propagate.
+  return Math.floor(leadingSpaces / MINDMAP_DSL_INDENT.length);
 }
 
 function hasValidIndentation(raw: string): boolean {

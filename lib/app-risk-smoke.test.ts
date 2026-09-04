@@ -77,3 +77,56 @@ test('accent token swap is preserved across key landing and app surfaces', () =>
   assert.match(sidebarSource, /bg-accent-500/);
   assert.match(chatPanelSource, /bg-accent-600/);
 });
+
+test('dsl editor renders in the left column ahead of source notes', () => {
+  const workspaceSource = readSource('../components/StudyWorkspace.tsx');
+  const editorIndex = workspaceSource.search(/<DslEditorPanel\s/);
+  const notesIndex = workspaceSource.search(/<SourceNotesPanel\s/);
+  const previewIndex = workspaceSource.search(/<MindmapSvgPreview\s/);
+
+  assert.ok(editorIndex > -1);
+  assert.ok(notesIndex > -1);
+  assert.ok(previewIndex > -1);
+  assert.ok(editorIndex < notesIndex);
+  assert.ok(notesIndex < previewIndex);
+});
+
+test('swapped workspace panels exchange their height constraints', () => {
+  const workspaceSource = readSource('../components/StudyWorkspace.tsx');
+
+  assert.match(workspaceSource, /"h-\[480px\] xl:flex-1">\s*<DslEditorPanel/);
+  assert.match(workspaceSource, /"h-\[480px\]">\s*<SourceNotesPanel/);
+});
+
+test('dsl editor stays mounted while history or chat panels are open', () => {
+  const workspaceSource = readSource('../components/StudyWorkspace.tsx');
+  const editorIndex = workspaceSource.search(/<DslEditorPanel\s/);
+  const conditionalIndex = workspaceSource.indexOf("activePanel === 'history' ?");
+
+  assert.ok(editorIndex > -1);
+  assert.ok(conditionalIndex > -1);
+  assert.ok(editorIndex < conditionalIndex);
+});
+
+test('editor ref wiring for history restore and generation stays intact', () => {
+  const workspaceSource = readSource('../components/StudyWorkspace.tsx');
+
+  assert.match(workspaceSource, /ref=\{dslEditorRef\}/);
+  assert.match(workspaceSource, /dslEditorRef\.current\?\.setValue\(entry\.dsl\)/);
+  assert.match(workspaceSource, /dslEditorRef\.current\?\.setValue\(response\.dsl\)/);
+  assert.match(workspaceSource, /onRestore=\{handleRestoreFromHistory\}/);
+});
+
+test('model selectors stay paired with their swapped panels', () => {
+  const workspaceSource = readSource('../components/StudyWorkspace.tsx');
+  const completionIndex = workspaceSource.indexOf('id="completion-model"');
+  const generationIndex = workspaceSource.indexOf('id="generation-model"');
+  const editorIndex = workspaceSource.search(/<DslEditorPanel\s/);
+  const notesIndex = workspaceSource.search(/<SourceNotesPanel\s/);
+
+  assert.ok(completionIndex > -1);
+  assert.ok(generationIndex > -1);
+  assert.ok(completionIndex < editorIndex);
+  assert.ok(editorIndex < generationIndex);
+  assert.ok(generationIndex < notesIndex);
+});
