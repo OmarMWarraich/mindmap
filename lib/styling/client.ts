@@ -1,4 +1,9 @@
 import type {
+  MindmapBackgroundGenerationRequest,
+  MindmapBackgroundGenerationResponse,
+} from './background-service.ts';
+import { mindmapBackgroundGenerationResponseSchema } from './background-service.ts';
+import type {
   MindmapThemeGenerationRequest,
   MindmapThemeGenerationResponse,
 } from './theme-service.ts';
@@ -45,4 +50,35 @@ async function parseErrorPayload(response: Response): Promise<ThemeGenerationErr
   } catch {
     return {};
   }
+}
+
+export async function requestMindmapBackgroundFromApi(
+  request: MindmapBackgroundGenerationRequest,
+  options: {
+    fetchImpl?: typeof fetch;
+    signal?: AbortSignal;
+  } = {},
+): Promise<MindmapBackgroundGenerationResponse> {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const response = await fetchImpl('/api/styling/background', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+    signal: options.signal,
+  });
+
+  if (!response.ok) {
+    const payload = await parseErrorPayload(response);
+    throw new Error(payload.error ?? `Background generation failed with status ${response.status}.`);
+  }
+
+  const parsed = mindmapBackgroundGenerationResponseSchema.safeParse(await response.json());
+
+  if (!parsed.success) {
+    throw new Error('Background generation returned an invalid response payload.');
+  }
+
+  return parsed.data;
 }

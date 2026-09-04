@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 import { mindmapThemePresets } from '../lib/mindmap/theme-presets';
-import { requestMindmapThemeFromApi } from '../lib/styling/client';
+import { requestMindmapBackgroundFromApi, requestMindmapThemeFromApi } from '../lib/styling/client';
 import type { MindmapTheme } from '../lib/mindmap/theme';
 
 interface ThemePanelProps {
@@ -55,6 +55,46 @@ export default function ThemePanel({
       setRestyleStatus({
         tone: 'error',
         message: error instanceof Error ? error.message : 'Theme generation failed unexpectedly.',
+      });
+    }
+  }
+
+  async function handleGenerateBackground(): Promise<void> {
+    const trimmedPrompt = stylePrompt.trim();
+
+    if (trimmedPrompt.length === 0) {
+      setRestyleStatus({ tone: 'error', message: 'Describe a style first, e.g. "misty forest at dawn".' });
+      return;
+    }
+
+    setRestyleStatus({ tone: 'progress', message: 'Generating background image… this can take a moment.' });
+
+    try {
+      const response = await requestMindmapBackgroundFromApi({
+        stylePrompt: trimmedPrompt,
+        mindmapTitle,
+      });
+
+      onThemeChange({
+        ...theme,
+        name: 'Custom',
+        background: {
+          kind: 'image',
+          imageDataUrl: response.imageDataUrl,
+          overlayColor: '#0f172a',
+          overlayOpacity: 0.25,
+        },
+        node: {
+          ...theme.node,
+          // Photo backgrounds need node backing to keep text legible.
+          frostOpacity: Math.max(theme.node.frostOpacity, 0.75),
+        },
+      });
+      setRestyleStatus({ tone: 'success', message: 'Applied the generated background.' });
+    } catch (error) {
+      setRestyleStatus({
+        tone: 'error',
+        message: error instanceof Error ? error.message : 'Background generation failed unexpectedly.',
       });
     }
   }
@@ -115,6 +155,18 @@ export default function ThemePanel({
           type="button"
         >
           {isRestyling ? 'Restyling…' : 'Restyle with AI'}
+        </button>
+        <button
+          aria-label="Generate an AI background image from the style description"
+          className="shrink-0 rounded-lg border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={isRestyling}
+          onClick={() => {
+            void handleGenerateBackground();
+          }}
+          title="Generate an AI background image from the style description"
+          type="button"
+        >
+          AI background
         </button>
       </div>
 
