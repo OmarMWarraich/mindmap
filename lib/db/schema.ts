@@ -92,6 +92,7 @@ export const projectDrafts = pgTable('project_draft', {
   mindmap: jsonb('mindmap'),
   previewTransform: jsonb('previewTransform'),
   nodePositionOverrides: jsonb('nodePositionOverrides'),
+  theme: jsonb('theme'),
   updatedAt: timestamp('updatedAt', { mode: 'date' }).notNull().defaultNow(),
 });
 

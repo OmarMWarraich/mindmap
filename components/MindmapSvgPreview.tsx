@@ -14,6 +14,8 @@ import {
 import type { MindmapLayoutResult } from '../lib/mindmap/layout';
 import type { MindmapNodePositionOverrides } from '../lib/mindmap/node-overrides';
 import type { GeneratedMindmap } from '../lib/mindmap/schema';
+import type { MindmapTheme } from '../lib/mindmap/theme';
+import { defaultMindmapTheme } from '../lib/mindmap/theme';
 
 export interface MindmapSvgPreviewHandle {
   getExportSnapshot(): {
@@ -32,6 +34,7 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
   onTransformChange?: (transform: SvgPreviewTransform) => void;
   nodePositionOverrides?: MindmapNodePositionOverrides;
   onNodePositionOverridesChange?: (overrides: MindmapNodePositionOverrides) => void;
+  theme?: MindmapTheme;
 }>(function MindmapSvgPreview({
   mindmap,
   layoutResult,
@@ -41,6 +44,7 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
   onTransformChange,
   nodePositionOverrides,
   onNodePositionOverridesChange,
+  theme = defaultMindmapTheme,
 }, ref) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -50,7 +54,7 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
   const [uncontrolledTransform, setUncontrolledTransform] = useState(createDefaultSvgPreviewTransform);
   const transform = controlledTransform ?? uncontrolledTransform;
   const setTransform = onTransformChange ?? setUncontrolledTransform;
-  const model = mindmap && layoutResult ? buildSvgPreviewModel(mindmap, layoutResult) : null;
+  const model = mindmap && layoutResult ? buildSvgPreviewModel(mindmap, layoutResult, { theme }) : null;
   const previewMetrics = getSvgPreviewRenderMetrics();
 
   useImperativeHandle(ref, () => ({
@@ -243,8 +247,47 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
           <pattern height="32" id="mindmap-grid" patternUnits="userSpaceOnUse" width="32">
             <path d="M 32 0 L 0 0 0 32" fill="none" stroke="rgba(148,163,184,0.12)" strokeWidth="1" />
           </pattern>
+          {theme.background.kind === 'gradient' ? (
+            <linearGradient gradientTransform={`rotate(${theme.background.angle} 0.5 0.5)`} id="mindmap-theme-gradient">
+              <stop offset="0%" stopColor={theme.background.from} />
+              <stop offset="100%" stopColor={theme.background.to} />
+            </linearGradient>
+          ) : null}
         </defs>
-        <rect fill="url(#mindmap-grid)" height={previewModel.height} width={previewModel.width} x="0" y="0" />
+        {theme.background.kind === 'image' ? (
+          <>
+            <image
+              height={previewModel.height}
+              href={theme.background.imageDataUrl}
+              preserveAspectRatio="xMidYMid slice"
+              width={previewModel.width}
+              x="0"
+              y="0"
+            />
+            <rect
+              fill={theme.background.overlayColor}
+              fillOpacity={theme.background.overlayOpacity}
+              height={previewModel.height}
+              width={previewModel.width}
+              x="0"
+              y="0"
+            />
+          </>
+        ) : (
+          <rect
+            fill={
+              theme.background.kind === 'solid'
+                ? theme.background.color
+                : theme.background.kind === 'gradient'
+                  ? 'url(#mindmap-theme-gradient)'
+                  : 'url(#mindmap-grid)'
+            }
+            height={previewModel.height}
+            width={previewModel.width}
+            x="0"
+            y="0"
+          />
+        )}
 
         <g transform={`matrix(${transform.scale} 0 0 ${transform.scale} ${transform.translateX} ${transform.translateY})`}>
           <g fill="none" strokeLinecap="round" strokeLinejoin="round">
@@ -253,8 +296,8 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
                 d={edge.path}
                 key={edge.id}
                 stroke={edge.color}
-                strokeOpacity="0.72"
-                strokeWidth={previewMetrics.edgeStrokeWidth}
+                strokeOpacity={theme.edge.opacity}
+                strokeWidth={previewMetrics.edgeStrokeWidth * theme.edge.strokeWidthScale}
               />
             ))}
           </g>
@@ -283,12 +326,24 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
                   }
                   transform={`translate(${node.x} ${node.y})`}
                 >
+                  {theme.node.frostOpacity > 0 ? (
+                    <rect
+                      fill="#ffffff"
+                      fillOpacity={theme.node.frostOpacity}
+                      height={node.height}
+                      rx={(node.kind === 'root' ? previewMetrics.rootCornerRadius : previewMetrics.nodeCornerRadius) * theme.node.cornerRadiusScale}
+                      width={node.width}
+                      x="0"
+                      y="0"
+                    />
+                  ) : null}
                   <rect
                     fill={node.style.fill}
+                    fillOpacity={theme.node.fillOpacity < 1 ? theme.node.fillOpacity : undefined}
                     height={node.height}
-                    rx={node.kind === 'root' ? previewMetrics.rootCornerRadius : previewMetrics.nodeCornerRadius}
+                    rx={(node.kind === 'root' ? previewMetrics.rootCornerRadius : previewMetrics.nodeCornerRadius) * theme.node.cornerRadiusScale}
                     stroke={node.style.stroke}
-                    strokeWidth={node.kind === 'root' ? previewMetrics.rootStrokeWidth : previewMetrics.nodeStrokeWidth}
+                    strokeWidth={(node.kind === 'root' ? previewMetrics.rootStrokeWidth : previewMetrics.nodeStrokeWidth) * theme.node.strokeWidthScale}
                     width={node.width}
                     x="0"
                     y="0"
@@ -304,7 +359,7 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
                   <text
                     dominantBaseline="hanging"
                     fill={node.style.text}
-                    fontFamily="ui-sans-serif, system-ui, sans-serif"
+                    fontFamily={theme.typography.fontFamily}
                     fontSize={node.fontSize}
                     fontWeight={node.kind === 'root' ? 800 : 700}
                     textAnchor="middle"

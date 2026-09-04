@@ -7,6 +7,7 @@ import type { MindmapSvgPreviewHandle } from './MindmapSvgPreview';
 import type { MindmapLayoutResult } from '../lib/mindmap/layout';
 import type { GeneratedMindmap } from '../lib/mindmap/schema';
 import type { SvgPreviewTransform } from '../lib/mindmap/svg-preview';
+import type { MindmapTheme } from '../lib/mindmap/theme';
 
 export interface MindmapPreviewDrawerProps {
   open: boolean;
@@ -17,6 +18,7 @@ export interface MindmapPreviewDrawerProps {
   layoutError: string | null;
   transform: SvgPreviewTransform;
   onTransformChange: (transform: SvgPreviewTransform) => void;
+  theme?: MindmapTheme;
 }
 
 function XIcon() {
@@ -51,6 +53,7 @@ const MindmapPreviewDrawer = forwardRef<
     layoutError,
     transform,
     onTransformChange,
+    theme,
   },
   ref,
 ) {
@@ -93,6 +96,7 @@ const MindmapPreviewDrawer = forwardRef<
             layoutStatus={layoutStatus}
             mindmap={mindmap}
             onTransformChange={onTransformChange}
+            theme={theme}
             transform={transform}
           />
         </div>

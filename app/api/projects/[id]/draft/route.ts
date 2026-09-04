@@ -53,6 +53,7 @@ export const PUT = withProject(async (req, { projectId }) => {
             body.nodePositionOverrides !== undefined
               ? body.nodePositionOverrides
               : existing.nodePositionOverrides,
+          theme: body.theme !== undefined ? body.theme : existing.theme,
           updatedAt: now,
         })
         .where(eq(projectDrafts.id, existing.id))
@@ -73,6 +74,7 @@ export const PUT = withProject(async (req, { projectId }) => {
         mindmap: body.mindmap ?? null,
         previewTransform: body.previewTransform ?? null,
         nodePositionOverrides: body.nodePositionOverrides ?? null,
+        theme: body.theme ?? null,
       })
       .returning();
 

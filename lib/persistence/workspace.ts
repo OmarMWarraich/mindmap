@@ -5,6 +5,7 @@ import { previewTransformSchema } from '../api/projects-schema.ts';
 import { sourceMindmapGenerationResponseSchema } from '../generation/source-schema.ts';
 import { mindmapNodePositionOverridesSchema } from '../mindmap/node-overrides.ts';
 import { generatedMindmapSchema } from '../mindmap/schema.ts';
+import { mindmapThemeSchema } from '../mindmap/theme.ts';
 
 const workspaceDraftStoreName = 'workspace-drafts';
 const workspaceDraftKey = 'study-workspace';
@@ -21,6 +22,7 @@ export const persistedWorkspaceDraftSchema = z.object({
   mindmap: generatedMindmapSchema.nullable(),
   previewTransform: previewTransformSchema,
   nodePositionOverrides: mindmapNodePositionOverridesSchema.optional(),
+  theme: mindmapThemeSchema.optional(),
 }).strict();
 
 export type PersistedWorkspaceDraft = z.infer<typeof persistedWorkspaceDraftSchema>;
@@ -155,6 +157,7 @@ export async function loadCloudDraft(projectId: string): Promise<PersistedWorksp
     mindmap: raw.mindmap ?? null,
     previewTransform: raw.previewTransform ?? { scale: 1, translateX: 0, translateY: 0 },
     nodePositionOverrides: raw.nodePositionOverrides ?? undefined,
+    theme: raw.theme ?? undefined,
   });
 }
 
@@ -172,6 +175,7 @@ export async function saveCloudDraft(
       mindmap: draft.mindmap,
       previewTransform: draft.previewTransform,
       nodePositionOverrides: draft.nodePositionOverrides ?? null,
+      theme: draft.theme ?? null,
     }),
   });
 
