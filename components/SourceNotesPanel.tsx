@@ -6,7 +6,12 @@ import type { SourceMindmapGenerationResponse } from '../lib/generation/source-s
 import { acceptedIngestionExtensions } from '../lib/ingestion/accepted-extensions.ts';
 import { MAX_FILES_PER_UPLOAD, MAX_TOTAL_UPLOAD_BYTES, prepareFilesForUpload } from '../lib/ingestion/upload-constraints.ts';
 
-const fileInputAccept = acceptedIngestionExtensions.map((extension) => `.${extension}`).join(',');
+// `image/*` makes mobile browsers offer the photo library with multi-select;
+// extension entries keep desktop pickers scoped to supported formats.
+const fileInputAccept = [
+  ...acceptedIngestionExtensions.map((extension) => `.${extension}`),
+  'image/*',
+].join(',');
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
