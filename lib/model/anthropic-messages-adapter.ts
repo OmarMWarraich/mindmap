@@ -95,7 +95,7 @@ function toAnthropicConversation(
 
       return {
         role: message.role,
-        content: message.content.flatMap((part) => {
+        content: message.content.flatMap((part): AnthropicContentBlock[] => {
           if (part.type === 'text') {
             return [{ type: 'text', text: part.text }];
           }

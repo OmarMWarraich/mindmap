@@ -144,18 +144,43 @@ function extractVisionTextPayload(payload: unknown): string {
   return visitNode(payload);
 }
 
-async function defaultImageTextExtractor(file: File): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
-  if (!apiKey) {
-    throw new IngestionError(
-      `"${file.name}" requires OPENAI_API_KEY before the image vision model can extract notes. Configure it and try again.`,
-    );
+const visionRefusalPattern = /(?:unable to (?:read|extract|transcribe)|can't read|cannot read|couldn't read|no (?:readable|legible) text|can't assist|cannot assist)/iu;
+
+function isUnreadableVisionOutput(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return true;
   }
 
-  const blob = await file.arrayBuffer();
-  const bytes = new Uint8Array(blob);
-  const dataUrl = `data:${file.type || 'image/png'};base64,${Buffer.from(bytes).toString('base64')}`;
+  return trimmed.length < 240 && visionRefusalPattern.test(trimmed);
+}
 
+async function toVisionDataUrl(bytes: Buffer, mimeType: string): Promise<string> {
+  return `data:${mimeType};base64,${bytes.toString('base64')}`;
+}
+
+// Normalize the uploaded bytes once: strip EXIF orientation (phone photos carry
+// rotation in metadata that raw base64 uploads do not apply), then re-encode to
+// JPEG so every rotation retry starts from an upright, uniform source. Falls
+// back to the raw bytes when sharp is unavailable (e.g. browser runtimes).
+async function normalizeImageBytes(file: File): Promise<{ bytes: Buffer; mimeType: string }> {
+  const rawBytes = Buffer.from(await file.arrayBuffer());
+
+  try {
+    const { default: sharp } = await import('sharp');
+    const normalized = await sharp(rawBytes).rotate().jpeg({ quality: 92 }).toBuffer();
+    return { bytes: normalized, mimeType: 'image/jpeg' };
+  } catch {
+    return { bytes: rawBytes, mimeType: file.type || 'image/png' };
+  }
+}
+
+async function rotateImageBytes(bytes: Buffer, degrees: number): Promise<Buffer> {
+  const { default: sharp } = await import('sharp');
+  return sharp(bytes).rotate(degrees).jpeg({ quality: 92 }).toBuffer();
+}
+
+async function requestVisionExtraction(apiKey: string, dataUrl: string): Promise<string> {
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -176,27 +201,69 @@ async function defaultImageTextExtractor(file: File): Promise<string> {
               'Sub sub Topic: ...',
               'Examples:',
               '- ...',
+              'The page may be photographed sideways or upside down; rotate it mentally and read the upright text.',
+              'If the photo shows a two-page book spread, transcribe both pages in reading order.',
+              'Preserve tables as bullet lines that pair each row label with its value.',
               'Do not include page numbers, repeated headers, OCR artifacts, or extra explanation.',
             ].join('\n'),
           },
           { type: 'image_url', image_url: { url: dataUrl } },
         ],
       }],
-      max_completion_tokens: 1200,
+      max_completion_tokens: 2400,
     }),
   });
 
   if (!response.ok) {
     throw new IngestionError(
-      `"${file.name}" could not be read with the vision model. Try a sharper image, a clearer scan, or paste the notes manually.`,
+      'The vision model could not process the image. Try a sharper image, a clearer scan, or paste the notes manually.',
     );
   }
 
   const payload = await response.json() as unknown;
-  const extracted = extractVisionTextPayload(payload);
+  return extractVisionTextPayload(payload);
+}
+
+async function defaultImageTextExtractor(file: File): Promise<string> {
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  if (!apiKey) {
+    throw new IngestionError(
+      `"${file.name}" requires OPENAI_API_KEY before the image vision model can extract notes. Configure it and try again.`,
+    );
+  }
+
+  const { bytes, mimeType } = await normalizeImageBytes(file);
+
+  // Sideways or upside-down page photos are the top cause of empty vision
+  // output, so retry with rotated copies before declaring the file unreadable.
+  const rotationAttempts = [0, 90, 180, 270] as const;
+  let extracted = '';
+  let sawRotationSupport = true;
+
+  for (const degrees of rotationAttempts) {
+    let attemptBytes = bytes;
+    if (degrees !== 0) {
+      try {
+        attemptBytes = await rotateImageBytes(bytes, degrees);
+      } catch {
+        sawRotationSupport = false;
+        break;
+      }
+    }
+
+    extracted = await requestVisionExtraction(apiKey, await toVisionDataUrl(attemptBytes, mimeType));
+    if (!isUnreadableVisionOutput(extracted)) {
+      break;
+    }
+
+    extracted = '';
+  }
+
   if (!extracted.trim()) {
     throw new IngestionError(
-      `"${file.name}" returned no readable text from the vision model.`,
+      sawRotationSupport
+        ? `"${file.name}" returned no readable text from the vision model, even after rotating it. Try a sharper, upright photo or paste the notes manually.`
+        : `"${file.name}" returned no readable text from the vision model. Try a sharper image, a clearer scan, or paste the notes manually.`,
     );
   }
 

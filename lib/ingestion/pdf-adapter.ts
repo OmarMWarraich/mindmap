@@ -168,7 +168,7 @@ async function defaultOcrPdfPageText(
     canvas.width = viewport.width;
     canvas.height = viewport.height;
 
-    await page.render({ canvasContext: context, viewport }).promise;
+    await page.render({ canvas, canvasContext: context, viewport }).promise;
 
     const { createWorker } = await import('tesseract.js');
     const worker = await createWorker('eng');

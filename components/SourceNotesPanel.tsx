@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import type { SourceMindmapGenerationResponse } from '../lib/generation/source-schema';
-import { acceptedIngestionExtensions } from '../lib/ingestion';
+import { acceptedIngestionExtensions } from '../lib/ingestion/accepted-extensions.ts';
 import { MAX_FILES_PER_UPLOAD, MAX_TOTAL_UPLOAD_BYTES, prepareFilesForUpload } from '../lib/ingestion/upload-constraints.ts';
 
 const fileInputAccept = acceptedIngestionExtensions.map((extension) => `.${extension}`).join(',');
@@ -122,6 +122,7 @@ export default function SourceNotesPanel({
         text?: string;
         ingested?: Array<{ meta: { fileName: string } }>;
         errors?: Array<{ fileName: string; message: string }>;
+        error?: string;
       };
 
       if (!response.ok) {

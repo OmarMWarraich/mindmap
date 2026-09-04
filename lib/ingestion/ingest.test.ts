@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { maxSourceTextCharacters } from '../generation/limits.ts';
+import { acceptedIngestionExtensions as clientAcceptedExtensions } from './accepted-extensions.ts';
 import { createImageIngestionAdapter } from './image-adapter.ts';
 import { acceptedIngestionExtensions, ingestFile, ingestFiles } from './ingest.ts';
 import { convertNormalizedTextSourceNotesFormat, normalizeOCTText } from './ocr-normalizer.ts';
@@ -202,6 +203,10 @@ test('acceptedIngestionExtensions advertises common text and image formats', () 
   assert.ok(acceptedIngestionExtensions.includes('md'));
   assert.ok(acceptedIngestionExtensions.includes('pdf'));
   assert.ok(acceptedIngestionExtensions.includes('png'));
+});
+
+test('client-safe extensions list stays in sync with the adapter-derived list', () => {
+  assert.deepEqual([...clientAcceptedExtensions].sort(), [...acceptedIngestionExtensions].sort());
 });
 
 test('ingestFile handles uppercase extensions (NOTES.TXT)', async () => {
