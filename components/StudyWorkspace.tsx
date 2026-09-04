@@ -776,7 +776,16 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
             transform={previewTransform}
           />
 
-          <ThemePanel onThemeChange={setTheme} theme={theme} />
+          <ThemePanel
+            branchLabels={effectiveMindmap?.nodes
+              .filter((node) => node.kind === 'branch')
+              .slice(0, 12)
+              .map((node) => node.label)}
+            mindmapTitle={effectiveMindmap?.metadata.title}
+            modelId={generationModelId}
+            onThemeChange={setTheme}
+            theme={theme}
+          />
 
           <ExpertScalingPanel
             values={exportControls}
