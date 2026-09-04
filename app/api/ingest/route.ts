@@ -23,7 +23,7 @@ export const POST = withUser(async (req) => {
     const totalBytes = files.reduce((total, file) => total + file.size, 0);
     if (totalBytes > MAX_TOTAL_UPLOAD_BYTES) {
       return errorResponse(
-        `The total upload size is too large. Keep the batch under ${Math.round(MAX_TOTAL_UPLOAD_BYTES / (1024 * 1024))} MB before attaching.`,
+        `The total upload size is too large. Keep the batch under ${Math.round(MAX_TOTAL_UPLOAD_BYTES / (1024 * 1024))} MB before attaching. Vercel rejects larger request bodies before the route can process them.`,
         400,
       );
     }

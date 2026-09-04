@@ -1,5 +1,5 @@
 export const MAX_FILES_PER_UPLOAD = 12;
-export const MAX_TOTAL_UPLOAD_BYTES = 12 * 1024 * 1024;
+export const MAX_TOTAL_UPLOAD_BYTES = 4 * 1024 * 1024;
 
 const imageExtensionPattern = /\.(png|jpe?g|gif|bmp|webp|tif|tiff|heic|heif)$/i;
 

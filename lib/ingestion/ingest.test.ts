@@ -6,6 +6,7 @@ import { acceptedIngestionExtensions as clientAcceptedExtensions } from './accep
 import { createImageIngestionAdapter } from './image-adapter.ts';
 import { acceptedIngestionExtensions, ingestFile, ingestFiles } from './ingest.ts';
 import { convertNormalizedTextSourceNotesFormat, normalizeOCTText } from './ocr-normalizer.ts';
+import { MAX_TOTAL_UPLOAD_BYTES } from './upload-constraints.ts';
 import { IngestionError } from './types.ts';
 
 function pngSignatureBytes(): Uint8Array<ArrayBuffer> {
@@ -28,6 +29,15 @@ function makeImageFile(name: string, type: string, signature: Uint8Array<ArrayBu
 function makeFile(name: string, content: string, type = ''): File {
   return new File([content], name, { type });
 }
+
+test('upload limit stays under Vercel safe payload threshold', () => {
+  const vercelSafeLimitBytes = 4 * 1024 * 1024;
+
+  assert.ok(
+    MAX_TOTAL_UPLOAD_BYTES <= vercelSafeLimitBytes,
+    `Upload limit ${MAX_TOTAL_UPLOAD_BYTES} exceeds Vercel's safe payload threshold of ${vercelSafeLimitBytes} bytes`,
+  );
+});
 
 test('ingestFile reads a .txt file into text with metadata', async () => {
   const result = await ingestFile(makeFile('notes.txt', 'hello world', 'text/plain'));
