@@ -10,9 +10,39 @@ import {
 } from './pdf-adapter.ts';
 import { IngestionError } from './types.ts';
 
-function pdfFile(name = 'doc.pdf'): File {
-  // Content is irrelevant — the extractor is injected, so pdf.js never runs.
-  return new File(['%PDF-1.7'], name, { type: 'application/pdf' });
+function escapePdfText(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+}
+
+function buildMinimalPdf(value: string): Uint8Array {
+  const stream = `BT\n/F1 18 Tf\n50 80 Td\n(${escapePdfText(value)}) Tj\nET`;
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
+    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+
+  let pdf = '%PDF-1.4\n';
+  const offsets = [0];
+  for (let index = 0; index < objects.length; index += 1) {
+    offsets.push(pdf.length);
+    pdf += `${index + 1} 0 obj\n${objects[index]}\nendobj\n`;
+  }
+
+  const xrefOffset = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (let index = 0; index < objects.length; index += 1) {
+    pdf += `${String(offsets[index + 1]).padStart(10, '0')} 00000 n \n`;
+  }
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+
+  return new TextEncoder().encode(pdf);
+}
+
+function pdfFile(name = 'doc.pdf', text = 'Photosynthesis'): File {
+  return new File([buildMinimalPdf(text)], name, { type: 'application/pdf' });
 }
 
 function extractorReturning(pages: string[]): PdfPageExtractor {
@@ -59,16 +89,60 @@ test('PDF adapter OCRs a scanned/image-only PDF when no text layer exists', asyn
   assert.equal(result.meta.pageCount, 3);
 });
 
-test('PDF adapter flags a multi-page PDF whose only text is sparse headers as scanned', async () => {
-  // Ten pages, each with just a running header / page number — well below the
-  // per-page average, so the whole document is treated as scanned.
-  const sparsePages = Array.from({ length: 10 }, (_, index) => `p.${index + 1}`);
-  const adapter = createPdfIngestionAdapter(extractorReturning(sparsePages));
+test('PDF adapter falls back to the server-safe vision path when the PDF is scanned and no DOM exists', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = 'sk-test';
 
-  await assert.rejects(
-    adapter.read(pdfFile('sparse-scan.pdf')),
-    (error) => error instanceof IngestionError && /scanned or image-only/.test(error.message),
-  );
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    choices: [{ message: { content: [{ type: 'text', text: 'Main Topic: Biology\n\nSub Topic: Photosynthesis' }] } }],
+  }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  try {
+    const adapter = createPdfIngestionAdapter(extractorReturning(['', '   ']), {
+    ocrPageText: async () => 'Main Topic: Biology\n\nSub Topic: Photosynthesis',
+  });
+    const result = await adapter.read(pdfFile('scanned-server.pdf', 'Biology'));
+
+    assert.match(result.text, /^Main Topic: Biology/);
+    assert.match(result.text, /Sub Topic: Photosynthesis/);
+    assert.equal(result.meta.pageCount, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalKey === undefined) {
+      delete process.env.OPENAI_API_KEY;
+    } else {
+      process.env.OPENAI_API_KEY = originalKey;
+    }
+  }
+});
+
+test('PDF adapter flags a multi-page PDF whose only text is sparse headers as scanned', async () => {
+  const originalKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = 'sk-test';
+
+  try {
+    // Ten pages, each with just a running header / page number — well below the
+    // per-page average, so the whole document is treated as scanned.
+    const sparsePages = Array.from({ length: 10 }, (_, index) => `p.${index + 1}`);
+    const adapter = createPdfIngestionAdapter(extractorReturning(sparsePages), {
+      ocrPageText: async () => 'Main Topic: Header only',
+    });
+
+    await assert.rejects(
+      adapter.read(pdfFile('sparse-scan.pdf')),
+      (error) => error instanceof IngestionError && /scanned or image-only/.test(error.message),
+    );
+  } finally {
+    if (originalKey === undefined) {
+      delete process.env.OPENAI_API_KEY;
+    } else {
+      process.env.OPENAI_API_KEY = originalKey;
+    }
+  }
 });
 
 test('PDF adapter rejects a document over the page cap', async () => {

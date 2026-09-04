@@ -1,5 +1,6 @@
 import type * as Pdfjs from 'pdfjs-dist';
 
+import { requestVisionExtraction, toVisionDataUrl } from './image-adapter.ts';
 import { convertNormalizedTextSourceNotesFormat } from './ocr-normalizer.ts';
 import { IngestionError, type IngestedFile, type IngestionAdapter } from './types.ts';
 
@@ -45,6 +46,15 @@ function looksLikeRawOcrNoise(text: string): boolean {
     const weirdSpacing = /\b[a-z]\s+[a-z]\b/i.test(line) || /\b[a-z]{1,3}\s+[a-z]{1,3}\b/i.test(line);
     return pageNoise || artifactNoise || weirdSpacing;
   });
+}
+
+export async function isLikelyPdfFile(file: File): Promise<boolean> {
+  if (!file.name.toLowerCase().endsWith('.pdf')) {
+    return false;
+  }
+
+  const header = new Uint8Array(await file.slice(0, 5).arrayBuffer());
+  return header.length >= 5 && header[0] === 0x25 && header[1] === 0x50 && header[2] === 0x44 && header[3] === 0x46 && header[4] === 0x2d;
 }
 
 export function shouldPolyfillPdfjsReadableStreams(
@@ -135,14 +145,24 @@ async function defaultExtractPdfPages(data: ArrayBuffer): Promise<string[]> {
   }
 }
 
-async function defaultOcrPdfPageText(
+async function renderPdfPageToBuffer(page: { render: (options: Record<string, unknown>) => { promise: Promise<void> } }, viewport: { width: number; height: number }): Promise<Buffer> {
+  const { createCanvas } = await import('@napi-rs/canvas');
+  const canvas = createCanvas(viewport.width, viewport.height);
+  const context = canvas.getContext('2d');
+
+  await page.render({ canvas, canvasContext: context, viewport }).promise;
+  return canvas.toBuffer('image/png');
+}
+
+async function defaultVisionPdfPageText(
   pageNumber: number,
   fileName: string,
   data: ArrayBuffer,
 ): Promise<string> {
-  if (typeof document === 'undefined') {
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  if (!apiKey) {
     throw new IngestionError(
-      `"${fileName}" has no extractable text — it looks scanned or image-only. Please upload a clearer scan or paste the notes manually.`,
+      `"${fileName}" requires OPENAI_API_KEY before scanned PDFs can be extracted. Configure it and try again.`,
     );
   }
 
@@ -157,27 +177,9 @@ async function defaultOcrPdfPageText(
     const doc = await loadingTask.promise;
     const page = await doc.getPage(pageNumber);
     const viewport = page.getViewport({ scale: 1.8 });
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    if (!context) {
-      throw new IngestionError(
-        `"${fileName}" has no extractable text — it looks scanned or image-only. Please upload a clearer scan or paste the notes manually.`,
-      );
-    }
-
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-
-    await page.render({ canvas, canvasContext: context, viewport }).promise;
-
-    const { createWorker } = await import('tesseract.js');
-    const worker = await createWorker('eng');
-    try {
-      const result = await worker.recognize(canvas);
-      return normalizeExtractedText(result.data.text);
-    } finally {
-      await worker.terminate();
-    }
+    const pngBuffer = await renderPdfPageToBuffer(page, viewport);
+    const dataUrl = await toVisionDataUrl(pngBuffer, 'image/png');
+    return normalizeExtractedText(await requestVisionExtraction(apiKey, dataUrl));
   } finally {
     await loadingTask.destroy();
   }
@@ -193,7 +195,7 @@ export function createPdfIngestionAdapter(
   extractPages: PdfPageExtractor = defaultExtractPdfPages,
   options: PdfIngestionAdapterOptions = {},
 ): IngestionAdapter {
-  const ocrPageText = options.ocrPageText ?? ((pageNumber, fileName, data) => defaultOcrPdfPageText(pageNumber, fileName, data));
+  const ocrPageText = options.ocrPageText ?? ((pageNumber, fileName, data) => defaultVisionPdfPageText(pageNumber, fileName, data));
 
   return {
     id: 'pdf',
@@ -228,11 +230,12 @@ export function createPdfIngestionAdapter(
       const text = normalizeExtractedText(pages.join('\n\n'));
 
       // Average extractable text per page — see minCharsPerPage. If the PDF is
-      // truly scanned or image-only, fall back to OCR page-by-page and continue
-      // through the same Source Notes generation flow.
+      // truly scanned or image-only, fall back to vision page-by-page and continue
+      // through the same Source Notes generation flow, but keep the page budget bounded.
       if (text.replace(/\s/gu, '').length < minCharsPerPage * Math.max(1, pages.length)) {
+        const pageBudget = Math.min(pages.length, 4);
         const ocrPages: string[] = [];
-        for (let pageNumber = 1; pageNumber <= pages.length; pageNumber += 1) {
+        for (let pageNumber = 1; pageNumber <= pageBudget; pageNumber += 1) {
           try {
             const pageText = normalizeExtractedText(await ocrPageText(pageNumber, file.name, data));
             if (pageText && pageText !== ocrPages.at(-1)) {
