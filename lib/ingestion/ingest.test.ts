@@ -8,6 +8,18 @@ import { acceptedIngestionExtensions, ingestFile, ingestFiles } from './ingest.t
 import { convertNormalizedTextSourceNotesFormat, normalizeOCTText } from './ocr-normalizer.ts';
 import { IngestionError } from './types.ts';
 
+function pngSignatureBytes(): Uint8Array {
+  return Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52]);
+}
+
+function jpegSignatureBytes(): Uint8Array {
+  return Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01]);
+}
+
+function makeImageFile(name: string, type: string, signature: Uint8Array): File {
+  return new File([signature], name, { type });
+}
+
 function makeFile(name: string, content: string, type = ''): File {
   return new File([content], name, { type });
 }
@@ -34,7 +46,7 @@ test('ingestFile reads a PNG image with OCR-backed text extraction when the file
   const adapter = createImageIngestionAdapter({
     textExtractor: async () => 'Lecture notes\n\nPhotosynthesis and respiration',
   });
-  const result = await adapter.read(makeFile('photo.png', 'binary', 'image/png'));
+  const result = await adapter.read(makeImageFile('photo.png', 'image/png', pngSignatureBytes()));
 
   assert.equal(result.text, 'Lecture notes\n\nPhotosynthesis and respiration');
   assert.equal(result.meta.fileName, 'photo.png');
@@ -52,7 +64,7 @@ test('image ingestion prefers the LLM vision route before falling back to OCR', 
 
   try {
     const adapter = createImageIngestionAdapter();
-    const result = await adapter.read(makeFile('photo.png', 'binary', 'image/png'));
+    const result = await adapter.read(makeImageFile('photo.png', 'image/png', pngSignatureBytes()));
 
     assert.equal(result.text, 'Main Topic: Sociology\n\nSub Topic: Social relationships');
     assert.equal(result.meta.fileName, 'photo.png');
@@ -73,8 +85,28 @@ test('image ingestion requires an OpenAI key before using the vision path', asyn
   try {
     const adapter = createImageIngestionAdapter();
     await assert.rejects(
-      adapter.read(makeFile('photo.png', 'binary', 'image/png')),
+      adapter.read(makeImageFile('photo.png', 'image/png', pngSignatureBytes())),
       (error) => error instanceof IngestionError && /OPENAI_API_KEY/.test(error.message),
+    );
+  } finally {
+    if (originalKey === undefined) {
+      delete process.env.OPENAI_API_KEY;
+    } else {
+      process.env.OPENAI_API_KEY = originalKey;
+    }
+  }
+});
+
+test('ingestFile rejects a renamed binary file even when the extension matches', async () => {
+  const originalKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = 'test-key';
+
+  try {
+    const file = new File(['not really png'], 'photo.png', { type: 'application/octet-stream' });
+
+    await assert.rejects(
+      ingestFile(file),
+      (error) => error instanceof IngestionError && /not a valid image|invalid image/.test(error.message),
     );
   } finally {
     if (originalKey === undefined) {
@@ -117,7 +149,7 @@ test('image ingestion normalizes noisy vision output into Source Notes format', 
 
   try {
     const adapter = createImageIngestionAdapter();
-    const result = await adapter.read(makeFile('photo.png', 'binary', 'image/png'));
+    const result = await adapter.read(makeImageFile('photo.png', 'image/png', pngSignatureBytes()));
 
     assert.match(result.text, /^Main Topic: Introduction to Sociology/);
     assert.match(result.text, /Sub Topic: Concept of Sociology/);
@@ -155,7 +187,7 @@ test('image ingestion reads nested output_text payloads from the latest OpenAI r
 
   try {
     const adapter = createImageIngestionAdapter();
-    const result = await adapter.read(makeFile('photo.png', 'binary', 'image/png'));
+    const result = await adapter.read(makeImageFile('photo.png', 'image/png', pngSignatureBytes()));
 
     assert.match(result.text, /^Main Topic: Biology/);
     assert.match(result.text, /Sub Topic: Photosynthesis/);

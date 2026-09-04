@@ -35,7 +35,7 @@ test('ingest route reads uploaded image notes with the server env key', async ()
 
   try {
     const form = new FormData();
-    form.append('files', new File(['binary'], 'IMG_0282.jpeg', { type: 'image/jpeg' }));
+    form.append('files', new File([Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01])], 'IMG_0282.jpeg', { type: 'image/jpeg' }));
 
     const response = await POST(new Request('http://localhost/api/ingest', {
       method: 'POST',

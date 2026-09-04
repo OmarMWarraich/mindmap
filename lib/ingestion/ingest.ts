@@ -1,6 +1,6 @@
 import { maxSourceTextCharacters } from '../generation/limits.ts';
-import { createImageIngestionAdapter } from './image-adapter.ts';
-import { createPdfIngestionAdapter } from './pdf-adapter.ts';
+import { createImageIngestionAdapter, validateImageFile } from './image-adapter.ts';
+import { createPdfIngestionAdapter, isLikelyPdfFile } from './pdf-adapter.ts';
 import { textIngestionAdapter } from './text-adapter.ts';
 import { IngestionError, type IngestedFile, type IngestionAdapter } from './types.ts';
 
@@ -67,6 +67,14 @@ export async function ingestFile(file: File): Promise<IngestedFile> {
     throw new IngestionError(
       `"${file.name}" is not a supported file type. Attach a .txt, .md, .pdf, or image file.`,
     );
+  }
+
+  if (adapter.id === 'image') {
+    await validateImageFile(file);
+  }
+
+  if (adapter.id === 'pdf' && !(await isLikelyPdfFile(file))) {
+    throw new IngestionError(`"${file.name}" is not a valid PDF file.`);
   }
 
   const maxBytes = adapter.maxBytes ?? defaultMaxIngestionBytes;

@@ -9,6 +9,8 @@ export interface ImageIngestionAdapterOptions {
 }
 
 export const maxImageBytes = 12 * 1024 * 1024;
+export const maxVisionProviderTimeoutMs = 30_000;
+export const maxVisionAttemptsPerImage = 3;
 
 const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'tif', 'tiff', 'heic', 'heif'];
 const imageMimeTypes = [
@@ -57,13 +59,67 @@ function looksLikeRawOcrNoise(text: string): boolean {
   return noisyLineCount >= 1;
 }
 
-function formatSourceNotesText(text: string): string {
+export function formatSourceNotesText(text: string): string {
   if (!text.trim() || !looksLikeRawOcrNoise(text)) {
     return text;
   }
 
   const formatted = convertNormalizedTextSourceNotesFormat(text);
   return formatted || text;
+}
+
+export function isLikelyImageFile(file: File): boolean {
+  const mimeType = file.type.toLowerCase();
+  if (mimeType.startsWith('image/')) {
+    return true;
+  }
+
+  const extension = file.name.split('.').pop()?.toLowerCase();
+  if (!extension) {
+    return false;
+  }
+
+  return imageExtensions.includes(extension);
+}
+
+export async function validateImageFile(file: File): Promise<void> {
+  if (!isLikelyImageFile(file)) {
+    throw new IngestionError(`"${file.name}" is not a valid image file.`);
+  }
+
+  const signature = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+  if (signature.length === 0) {
+    throw new IngestionError(`"${file.name}" is not a valid image file.`);
+  }
+
+  const pngSignature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  const jpegSignature = [0xff, 0xd8, 0xff];
+  const gifSignature = [0x47, 0x49, 0x46];
+  const bmpSignature = [0x42, 0x4d];
+  const webpSignature = [0x52, 0x49, 0x46, 0x46];
+  const tiffSignature = [0x49, 0x49, 0x2a, 0x00];
+  const tiffBigEndianSignature = [0x4d, 0x4d, 0x00, 0x2a];
+  const heicSignature = [0x66, 0x74, 0x79, 0x70];
+
+  const matches = (bytes: number[]) => bytes.every((byte, index) => signature[index] === byte);
+
+  if (
+    matches(pngSignature)
+    || matches(jpegSignature)
+    || matches(gifSignature)
+    || matches(bmpSignature)
+    || (matches(webpSignature) && signature[8] === 0x57 && signature[9] === 0x45 && signature[10] === 0x42 && signature[11] === 0x50)
+    || matches(tiffSignature)
+    || matches(tiffBigEndianSignature)
+    || (matches(heicSignature) && signature[4] === 0x68 && signature[5] === 0x65 && signature[6] === 0x69 && signature[7] === 0x63)
+  ) {
+    return;
+  }
+
+  const fileName = file.name.toLowerCase();
+  if (fileName.endsWith('.png') || fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') || fileName.endsWith('.gif') || fileName.endsWith('.bmp') || fileName.endsWith('.webp') || fileName.endsWith('.tif') || fileName.endsWith('.tiff') || fileName.endsWith('.heic') || fileName.endsWith('.heif')) {
+    throw new IngestionError(`"${file.name}" is not a valid image file.`);
+  }
 }
 
 function extractVisionTextPayload(payload: unknown): string {
@@ -155,7 +211,7 @@ function isUnreadableVisionOutput(text: string): boolean {
   return trimmed.length < 240 && visionRefusalPattern.test(trimmed);
 }
 
-async function toVisionDataUrl(bytes: Buffer, mimeType: string): Promise<string> {
+export async function toVisionDataUrl(bytes: Buffer, mimeType: string): Promise<string> {
   return `data:${mimeType};base64,${bytes.toString('base64')}`;
 }
 
@@ -180,7 +236,7 @@ async function rotateImageBytes(bytes: Buffer, degrees: number): Promise<Buffer>
   return sharp(bytes).rotate(degrees).jpeg({ quality: 92 }).toBuffer();
 }
 
-async function requestVisionExtraction(apiKey: string, dataUrl: string): Promise<string> {
+export async function requestVisionExtraction(apiKey: string, dataUrl: string): Promise<string> {
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -212,6 +268,7 @@ async function requestVisionExtraction(apiKey: string, dataUrl: string): Promise
       }],
       max_completion_tokens: 2400,
     }),
+    signal: AbortSignal.timeout(maxVisionProviderTimeoutMs),
   });
 
   if (!response.ok) {
@@ -236,7 +293,9 @@ async function defaultImageTextExtractor(file: File): Promise<string> {
 
   // Sideways or upside-down page photos are the top cause of empty vision
   // output, so retry with rotated copies before declaring the file unreadable.
-  const rotationAttempts = [0, 90, 180, 270] as const;
+  // Keep the budget bounded so a single upload cannot trigger unbounded model
+  // spend across a batch of images.
+  const rotationAttempts = [0, 90, 180] as const;
   let extracted = '';
   let sawRotationSupport = true;
 
@@ -281,6 +340,8 @@ export function createImageIngestionAdapter(
     mimeTypes: imageMimeTypes,
     maxBytes: maxImageBytes,
     async read(file: File): Promise<IngestedFile> {
+      await validateImageFile(file);
+
       let text: string;
       try {
         text = formatSourceNotesText(normalizeExtractedText(await textExtractor(file)));
