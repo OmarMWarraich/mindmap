@@ -294,8 +294,9 @@ async function defaultImageTextExtractor(file: File): Promise<string> {
   // Sideways or upside-down page photos are the top cause of empty vision
   // output, so retry with rotated copies before declaring the file unreadable.
   // Keep the budget bounded so a single upload cannot trigger unbounded model
-  // spend across a batch of images.
-  const rotationAttempts = [0, 90, 180] as const;
+  // spend across a batch of images. Include the full orthogonal rotation set so
+  // the model gets one final 270° retry before we surface a clear error.
+  const rotationAttempts = [0, 90, 180, 270] as const;
   let extracted = '';
   let sawRotationSupport = true;
 

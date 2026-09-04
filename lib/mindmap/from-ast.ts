@@ -36,8 +36,8 @@ const antiCramLayoutDefaults: MindmapLayoutDefaults = {
   leafHeightHint: 60,
 };
 
-const maxDirectBranchChildrenBeforeGrouping = 18;
-const overflowGroupChunkSize = 6;
+const maxDirectBranchChildrenBeforeGrouping = 6;
+const overflowGroupChunkSize = 4;
 const estimatedCharWidthPx = 8;
 const estimatedLineHeightPx = 20;
 

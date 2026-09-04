@@ -1,4 +1,4 @@
-import * as Pdfjs from 'pdfjs-dist';
+import type * as Pdfjs from 'pdfjs-dist';
 import type { PDFPageProxy }from 'pdfjs-dist';
 
 import { requestVisionExtraction, toVisionDataUrl } from './image-adapter.ts';
@@ -20,6 +20,165 @@ export interface PdfIngestionAdapterOptions {
 
 type PdfViewport = ReturnType<PDFPageProxy['getViewport']>;
 type PdfRenderOptions = Parameters<PDFPageProxy['render']>[0];
+
+function ensureDomMatrixPolyfill(): void {
+  if (typeof globalThis === 'undefined' || typeof (globalThis as typeof globalThis & { DOMMatrix?: unknown }).DOMMatrix !== 'undefined') {
+    return;
+  }
+
+  class DOMMatrixPolyfill {
+    a: number;
+    b: number;
+    c: number;
+    d: number;
+    e: number;
+    f: number;
+    is2D: boolean;
+    isIdentity: boolean;
+
+    constructor(init?: string | number[] | { a?: number; b?: number; c?: number; d?: number; e?: number; f?: number }) {
+      const matrix = parseDomMatrixInit(init);
+      this.a = matrix.a;
+      this.b = matrix.b;
+      this.c = matrix.c;
+      this.d = matrix.d;
+      this.e = matrix.e;
+      this.f = matrix.f;
+      this.is2D = true;
+      this.isIdentity = this.a === 1 && this.b === 0 && this.c === 0 && this.d === 1 && this.e === 0 && this.f === 0;
+    }
+
+    scaleSelf(scaleX = 1, scaleY = 1, scaleZ = 1, originX = 0, originY = 0, originZ = 0): DOMMatrixPolyfill {
+      this.a *= scaleX;
+      this.b *= scaleX;
+      this.c *= scaleY;
+      this.d *= scaleY;
+      this.e += originX * (scaleX - 1) + originY * this.c;
+      this.f += originY * (scaleY - 1) + originX * this.b;
+      void scaleZ;
+      void originZ;
+      this.isIdentity = this.a === 1 && this.b === 0 && this.c === 0 && this.d === 1 && this.e === 0 && this.f === 0;
+      return this;
+    }
+
+    translateSelf(tx = 0, ty = 0, tz = 0): DOMMatrixPolyfill {
+      this.e += tx;
+      this.f += ty;
+      void tz;
+      this.isIdentity = this.a === 1 && this.b === 0 && this.c === 0 && this.d === 1 && this.e === 0 && this.f === 0;
+      return this;
+    }
+
+    multiplySelf(other?: { a?: number; b?: number; c?: number; d?: number; e?: number; f?: number }): DOMMatrixPolyfill {
+      const matrix = parseDomMatrixInit(other);
+      const nextA = this.a * matrix.a + this.c * matrix.b;
+      const nextB = this.b * matrix.a + this.d * matrix.b;
+      const nextC = this.a * matrix.c + this.c * matrix.d;
+      const nextD = this.b * matrix.c + this.d * matrix.d;
+      const nextE = this.a * matrix.e + this.c * matrix.f + this.e;
+      const nextF = this.b * matrix.e + this.d * matrix.f + this.f;
+      this.a = nextA;
+      this.b = nextB;
+      this.c = nextC;
+      this.d = nextD;
+      this.e = nextE;
+      this.f = nextF;
+      this.isIdentity = this.a === 1 && this.b === 0 && this.c === 0 && this.d === 1 && this.e === 0 && this.f === 0;
+      return this;
+    }
+
+    preMultiplySelf(other?: { a?: number; b?: number; c?: number; d?: number; e?: number; f?: number }): DOMMatrixPolyfill {
+      return this.multiplySelf(other);
+    }
+
+    setMatrixValue(transformList: string): DOMMatrixPolyfill {
+      const parsed = parseDomMatrixInit(transformList);
+      this.a = parsed.a;
+      this.b = parsed.b;
+      this.c = parsed.c;
+      this.d = parsed.d;
+      this.e = parsed.e;
+      this.f = parsed.f;
+      this.isIdentity = this.a === 1 && this.b === 0 && this.c === 0 && this.d === 1 && this.e === 0 && this.f === 0;
+      return this;
+    }
+
+    invertSelf(): DOMMatrixPolyfill {
+      const determinant = this.a * this.d - this.b * this.c;
+      if (!determinant) {
+        return this;
+      }
+      const nextA = this.d / determinant;
+      const nextB = -this.b / determinant;
+      const nextC = -this.c / determinant;
+      const nextD = this.a / determinant;
+      const nextE = -(this.a * this.e + this.c * this.f) / determinant;
+      const nextF = -(this.b * this.e + this.d * this.f) / determinant;
+      this.a = nextA;
+      this.b = nextB;
+      this.c = nextC;
+      this.d = nextD;
+      this.e = nextE;
+      this.f = nextF;
+      this.isIdentity = this.a === 1 && this.b === 0 && this.c === 0 && this.d === 1 && this.e === 0 && this.f === 0;
+      return this;
+    }
+
+    static fromFloat32Array(array32: Float32Array): DOMMatrixPolyfill {
+      return new DOMMatrixPolyfill(Array.from(array32.slice(0, 6)));
+    }
+
+    static fromFloat64Array(array64: Float64Array): DOMMatrixPolyfill {
+      return new DOMMatrixPolyfill(Array.from(array64.slice(0, 6)));
+    }
+
+    static fromMatrix(other?: { a?: number; b?: number; c?: number; d?: number; e?: number; f?: number }): DOMMatrixPolyfill {
+      return new DOMMatrixPolyfill(other);
+    }
+  }
+
+  const globalWithDomMatrix = globalThis as typeof globalThis & {
+    DOMMatrix?: typeof DOMMatrix;
+    SVGMatrix?: typeof SVGMatrix;
+  };
+  globalWithDomMatrix.DOMMatrix = DOMMatrixPolyfill as unknown as typeof DOMMatrix;
+  globalWithDomMatrix.SVGMatrix = DOMMatrixPolyfill as unknown as typeof SVGMatrix;
+}
+
+function parseDomMatrixInit(
+  init?: string | number[] | { a?: number; b?: number; c?: number; d?: number; e?: number; f?: number },
+): { a: number; b: number; c: number; d: number; e: number; f: number } {
+  if (typeof init === 'string') {
+    const match = init.match(/matrix\(([^)]+)\)/i) ?? init.match(/\(([^)]+)\)/);
+    if (match) {
+      const values = match[1]!.split(/\s+/).filter(Boolean).map(Number);
+      if (values.length >= 6) {
+        return { a: values[0] ?? 1, b: values[1] ?? 0, c: values[2] ?? 0, d: values[3] ?? 1, e: values[4] ?? 0, f: values[5] ?? 0 };
+      }
+    }
+    return { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
+  }
+
+  if (Array.isArray(init)) {
+    return {
+      a: init[0] ?? 1,
+      b: init[1] ?? 0,
+      c: init[2] ?? 0,
+      d: init[3] ?? 1,
+      e: init[4] ?? 0,
+      f: init[5] ?? 0,
+    };
+  }
+
+  return {
+    a: init?.a ?? 1,
+    b: init?.b ?? 0,
+    c: init?.c ?? 0,
+    d: init?.d ?? 1,
+    e: init?.e ?? 0,
+    f: init?.f ?? 0,
+  };
+}
 
 export const maxPdfPages = 80;
 
@@ -163,7 +322,7 @@ async function renderPdfPageToBuffer(
     canvas: canvas as unknown as HTMLCanvasElement,
     canvasContext: context as unknown as CanvasRenderingContext2D,
     viewport,
-  });
+  } as PdfRenderOptions);
 
   await renderTask.promise;
   return canvas.toBuffer('image/png');
