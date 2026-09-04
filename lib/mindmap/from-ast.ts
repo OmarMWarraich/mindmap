@@ -3,6 +3,9 @@ import type {
   MindmapDocumentAst,
   MindmapLeafAstNode,
 } from "../dsl/ast.ts";
+import {
+  stripMindmapInlineFormatting,
+} from "../dsl/inline-formatting.ts";
 import type {
   MindmapValidationError,
   MindmapValidationWarning,
@@ -245,16 +248,20 @@ function createNodeLayout(
       ? antiCramLayoutDefaults.branchWidthHint
       : kind === "leaf"
         ? antiCramLayoutDefaults.leafWidthHint
-        : antiCramLayoutDefaults.branchWidthHint + 28;
+        : antiCramLayoutDefaults.branchWidthHint + 48;
   const baseHeight =
     kind === "branch"
       ? antiCramLayoutDefaults.branchHeightHint
       : kind === "leaf"
         ? antiCramLayoutDefaults.leafHeightHint
-        : antiCramLayoutDefaults.branchHeightHint + 12;
+        : antiCramLayoutDefaults.branchHeightHint + 18;
+
+  // Use a wider wrap target for root nodes and tighter wrapping for branches
+  // and leaves so text remains readable without making the boxes too large.
   const targetCharsPerLine =
-    kind === 'root' ? 28 : kind === 'branch' ? 24 : 22;
-  const wrappedLines = wrapLabelForLayout(label, targetCharsPerLine);
+    kind === 'root' ? 48 : kind === 'branch' ? 24 : 22;
+  // Size boxes from the visible text so formatting markers don't inflate nodes.
+  const wrappedLines = wrapLabelForLayout(stripMindmapInlineFormatting(label), targetCharsPerLine);
   const longestLineLength = wrappedLines.reduce(
     (longest, line) => Math.max(longest, line.length),
     0,

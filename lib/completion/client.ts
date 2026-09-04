@@ -23,20 +23,49 @@ export async function requestInlineCompletionFromApi(
   } = {},
 ): Promise<InlineCompletionClientResponse | null> {
   const fetchImpl = options.fetchImpl ?? fetch;
-  const response = await fetchImpl('/api/completion', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(request),
-    signal: options.signal,
-  });
 
-  if (!response.ok) {
-    return null;
+  try {
+    const response = await fetchImpl('/api/completion', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+      signal: options.signal,
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return parseInlineCompletionClientResponse(await response.json());
+  } catch (error) {
+    if (isAbortLikeError(error)) {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+function isAbortLikeError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
   }
 
-  return parseInlineCompletionClientResponse(await response.json());
+  const candidate = error as { name?: unknown; message?: unknown };
+  const lowerName = typeof candidate.name === 'string' ? candidate.name.trim().toLowerCase() : '';
+  const lowerMessage = typeof candidate.message === 'string' ? candidate.message.trim().toLowerCase() : '';
+
+  return (
+    lowerName === 'aborterror' ||
+    lowerName === 'canceled' ||
+    lowerName === 'cancelled' ||
+    lowerMessage.includes('aborted') ||
+    lowerMessage.includes('canceled') ||
+    lowerMessage.includes('cancelled') ||
+    lowerMessage.includes('signal is aborted')
+  );
 }
 
 export function parseInlineCompletionClientResponse(

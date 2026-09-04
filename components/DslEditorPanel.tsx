@@ -16,6 +16,11 @@ import {
   trackInlineCompletionEvent,
 } from '../lib/completion/client';
 import { createInlineSuggestionRange } from '../lib/dsl/inline-completion';
+import {
+  MINDMAP_DSL_INLINE_FORMAT_MARKERS,
+  toggleMindmapDslInlineFormatting,
+} from '../lib/dsl/inline-formatting';
+import type { MindmapDslInlineFormat } from '../lib/dsl/inline-formatting';
 
 // ── Module-level Monaco state ──────────────────────────────────────────────
 
@@ -166,6 +171,30 @@ const DslEditorPanel = forwardRef<DslEditorPanelHandle, DslEditorPanelProps>(
       activeCompletionModelId = completionModelId;
     }, [completionModelId]);
 
+    function applyInlineFormat(format: MindmapDslInlineFormat): void {
+      const monacoEditor = editorRef.current;
+      const model = monacoEditor?.getModel();
+      const selection = monacoEditor?.getSelection();
+      if (!monacoEditor || !model || !selection) return;
+
+      const selectedText = model.getValueInRange(selection);
+      const text = toggleMindmapDslInlineFormatting(selectedText, format);
+
+      monacoEditor.executeEdits('mindmap-inline-format', [
+        { range: selection, text, forceMoveMarkers: true },
+      ]);
+      monacoEditor.pushUndoStop();
+
+      // With no selection, park the caret between the inserted markers.
+      if (selectedText.length === 0) {
+        monacoEditor.setPosition({
+          lineNumber: selection.startLineNumber,
+          column: selection.startColumn + MINDMAP_DSL_INLINE_FORMAT_MARKERS[format].prefix.length,
+        });
+      }
+      monacoEditor.focus();
+    }
+
     return (
       <div className="flex h-full flex-col overflow-hidden rounded-xl border border-zinc-300 bg-white shadow-sm">
 
@@ -195,6 +224,43 @@ const DslEditorPanel = forwardRef<DslEditorPanelHandle, DslEditorPanelProps>(
               <CopyIcon />
             </button>
           </div>
+        </div>
+
+        {/* ── Formatting toolbar ───────────────────────────────────── */}
+        <div className="flex shrink-0 items-center gap-0.5 border-b border-zinc-200 px-2 py-1">
+          <button
+            aria-label="Bold selection"
+            className="rounded-md px-2 py-1 text-xs font-bold text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700"
+            onClick={() => {
+              applyInlineFormat('bold');
+            }}
+            title="Bold (**text**)"
+            type="button"
+          >
+            B
+          </button>
+          <button
+            aria-label="Italicize selection"
+            className="rounded-md px-2 py-1 text-xs italic text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700"
+            onClick={() => {
+              applyInlineFormat('italic');
+            }}
+            title="Italic (_text_)"
+            type="button"
+          >
+            I
+          </button>
+          <button
+            aria-label="Underline selection"
+            className="rounded-md px-2 py-1 text-xs text-zinc-500 underline transition hover:bg-zinc-100 hover:text-zinc-700"
+            onClick={() => {
+              applyInlineFormat('underline');
+            }}
+            title="Underline (<u>text</u>)"
+            type="button"
+          >
+            U
+          </button>
         </div>
 
         {/* ── Monaco editor ────────────────────────────────────────── */}

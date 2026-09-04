@@ -2,9 +2,25 @@ import type { ModelWireFormat } from './catalog.ts';
 
 export type ModelChatMessageRole = 'system' | 'user' | 'assistant';
 
+export interface ModelChatTextPart {
+  type: 'text';
+  text: string;
+}
+
+export interface ModelChatImageUrlPart {
+  type: 'image_url';
+  image_url: {
+    url: string;
+    detail?: 'low' | 'high' | 'auto';
+  };
+}
+
+export type ModelChatContentPart = ModelChatTextPart | ModelChatImageUrlPart;
+export type ModelChatMessageContent = string | ModelChatContentPart[];
+
 export interface ModelChatMessage {
   role: ModelChatMessageRole;
-  content: string;
+  content: ModelChatMessageContent;
 }
 
 // Resolved server-side credentials for a single request. Never sourced from the

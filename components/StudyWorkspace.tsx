@@ -28,6 +28,11 @@ import {
 } from '../lib/mindmap/layout';
 import { getMindmapLayoutClient } from '../lib/mindmap/layout-client';
 import {
+  applyMindmapNodePositionOverrides,
+  pruneMindmapNodePositionOverrides,
+  type MindmapNodePositionOverrides,
+} from '../lib/mindmap/node-overrides';
+import {
   createSvgPreviewSnapshot,
   createDefaultSvgPreviewTransform,
   type SvgPreviewTransform,
@@ -68,6 +73,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
   const [previewTransform, setPreviewTransform] = useState<SvgPreviewTransform>(
     createDefaultSvgPreviewTransform,
   );
+  const [nodePositionOverrides, setNodePositionOverrides] = useState<MindmapNodePositionOverrides>({});
   const [exportStatus, setExportStatus] = useState<{
     tone: 'idle' | 'progress' | 'success' | 'error';
     message: string;
@@ -239,6 +245,14 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
   const effectiveMindmap = generatedMindmap
     ?? (latestMindmapSnapshotOutline === outline ? latestMindmapSnapshot : null);
 
+  const displayLayoutResult = useMemo(() => {
+    if (!layoutResult || !effectiveMindmap) {
+      return layoutResult;
+    }
+
+    return applyMindmapNodePositionOverrides(effectiveMindmap, layoutResult, nodePositionOverrides);
+  }, [effectiveMindmap, layoutResult, nodePositionOverrides]);
+
   const effectiveLayoutStatus = layoutStatus;
   const effectiveLayoutError = layoutError;
   const effectiveLayoutDiagnostics = layoutDiagnostics;
@@ -269,6 +283,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
           setLatestMindmapSnapshot(cloudDraft.mindmap);
           setLatestMindmapSnapshotOutline(cloudDraft.outline);
           setPreviewTransform(cloudDraft.previewTransform);
+          setNodePositionOverrides(cloudDraft.nodePositionOverrides ?? {});
           setDraftStatus({
             tone: 'success',
             message: 'Restored saved project from the cloud.',
@@ -291,6 +306,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
           setLatestMindmapSnapshot(localDraft.mindmap);
           setLatestMindmapSnapshotOutline(localDraft.outline);
           setPreviewTransform(localDraft.previewTransform);
+          setNodePositionOverrides(localDraft.nodePositionOverrides ?? {});
           setDraftStatus({
             tone: 'success',
             message: 'Restored the saved draft and preview state.',
@@ -425,6 +441,10 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
         latestDslGeneration,
         mindmap: latestMindmapSnapshot,
         previewTransform,
+        nodePositionOverrides: pruneMindmapNodePositionOverrides(
+          nodePositionOverrides,
+          latestMindmapSnapshot,
+        ),
       };
 
       void saveWorkspaceDraft(draft)
@@ -457,7 +477,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [latestDslGeneration, latestMindmapSnapshot, outline, previewTransform, projectId, rawNotes, selectedDetailLevel]);
+  }, [latestDslGeneration, latestMindmapSnapshot, nodePositionOverrides, outline, previewTransform, projectId, rawNotes, selectedDetailLevel]);
 
   async function handleDownloadPng(): Promise<void> {
     if (!effectiveMindmap) {
@@ -481,7 +501,15 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
       // Off the main thread via the layout client (falls back to in-page ELK if
       // the worker is unavailable), so the upscaled export layout cannot jank the UI.
       const { result: exportLayout } = await getMindmapLayoutClient().layout(exportMindmap);
-      const snapshot = createSvgPreviewSnapshot(exportMindmap, exportLayout, {
+      // Drag offsets are stored in preview-layout units; rescale them into the
+      // export layout's coordinate space so the PNG matches the preview.
+      const exportLayoutWithOverrides = layoutResult
+        ? applyMindmapNodePositionOverrides(exportMindmap, exportLayout, nodePositionOverrides, {
+            scaleX: layoutResult.width > 0 ? exportLayout.width / layoutResult.width : 1,
+            scaleY: layoutResult.height > 0 ? exportLayout.height / layoutResult.height : 1,
+          })
+        : exportLayout;
+      const snapshot = createSvgPreviewSnapshot(exportMindmap, exportLayoutWithOverrides, {
         profile: 'export',
         renderScale: exportControls.fontScale,
       });
@@ -543,7 +571,19 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
     });
 
     try {
-      const response = await requestMindmapDslGenerationFromApi({ sourceText, detailLevel, modelId: generationModelId });
+      const readabilityMode = detailLevel === 'plain'
+        ? 'plain'
+        : detailLevel === 'compact'
+          ? 'compact'
+          : detailLevel === 'detailed'
+            ? 'detailed'
+            : 'compact';
+      const response = await requestMindmapDslGenerationFromApi({
+        sourceText,
+        detailLevel,
+        readabilityMode,
+        modelId: generationModelId,
+      });
 
       dslEditorRef.current?.setValue(response.dsl);
       dslEditorRef.current?.focus();
@@ -602,7 +642,44 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
 
   return (
     <div className="grid gap-6 p-5 xl:grid-cols-2">
-        {/* Left column: Source Notes + Validation (or History panel) */}
+        {/* Left column: DSL Editor + Validation */}
+        <div className="flex flex-col gap-4">
+          <ModelSelector
+            id="completion-model"
+            label="Completion model"
+            loading={modelsLoading}
+            models={completionModels}
+            onChange={setCompletionModelId}
+            placeholder="Default completion model"
+            value={completionModelId}
+          />
+          {/* 480px below xl (the editor's pre-swap height); fills the column on xl like the notes slot it replaced. */}
+          <div className="h-[480px] xl:flex-1">
+            <DslEditorPanel
+              ref={dslEditorRef}
+              completionModelId={completionModelId}
+              defaultValue={mindmapDslStarterOutline}
+              onChange={setOutline}
+              onGenerateMindmap={handleGenerateMindmapFromDsl}
+              onResetDsl={handleResetDsl}
+            />
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <ValidationPanel
+              issues={parseResult.errors}
+              tone="error"
+              title={`Errors (${parseResult.errors.length})`}
+            />
+            <ValidationPanel
+              issues={parseResult.warnings}
+              tone="warning"
+              title={`Warnings (${parseResult.warnings.length})`}
+            />
+          </div>
+        </div>
+
+        {/* Right column: Source Notes (or History/Chat) + Preview/Export */}
         <div className="flex flex-col gap-4">
           {activePanel === 'history' ? (
             <GenerationHistoryPanel
@@ -626,63 +703,32 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
                 placeholder="Default generation model"
                 value={generationModelId}
               />
-              <SourceNotesPanel
-                generationStatus={generationStatus}
-                latestDslGeneration={latestDslGeneration}
-                onClearNotes={handleClearNotes}
-                onDetailLevelChange={setSelectedDetailLevel}
-                onGenerateDsl={(detailLevel) => {
-                  void handleGenerateDsl(detailLevel);
-                }}
-                onRawNotesChange={setRawNotes}
-                rawNotes={rawNotes}
-                selectedDetailLevel={selectedDetailLevel}
-              />
-
-              <div className="grid gap-4 lg:grid-cols-2">
-                <ValidationPanel
-                  issues={parseResult.errors}
-                  tone="error"
-                  title={`Errors (${parseResult.errors.length})`}
-                />
-                <ValidationPanel
-                  issues={parseResult.warnings}
-                  tone="warning"
-                  title={`Warnings (${parseResult.warnings.length})`}
+              {/* Fixed height carried over from the editor slot this panel replaced. */}
+              <div className="h-[480px]">
+                <SourceNotesPanel
+                  generationStatus={generationStatus}
+                  latestDslGeneration={latestDslGeneration}
+                  onClearNotes={handleClearNotes}
+                  onDetailLevelChange={setSelectedDetailLevel}
+                  onGenerateDsl={(detailLevel) => {
+                    void handleGenerateDsl(detailLevel);
+                  }}
+                  onRawNotesChange={setRawNotes}
+                  rawNotes={rawNotes}
+                  selectedDetailLevel={selectedDetailLevel}
                 />
               </div>
             </>
           )}
-        </div>
-
-        {/* Right column: DSL Editor (upper) + Preview/Export (lower) */}
-        <div className="flex flex-col gap-4">
-          <ModelSelector
-            id="completion-model"
-            label="Completion model"
-            loading={modelsLoading}
-            models={completionModels}
-            onChange={setCompletionModelId}
-            placeholder="Default completion model"
-            value={completionModelId}
-          />
-          <div className="h-[480px]">
-            <DslEditorPanel
-              ref={dslEditorRef}
-              completionModelId={completionModelId}
-              defaultValue={mindmapDslStarterOutline}
-              onChange={setOutline}
-              onGenerateMindmap={handleGenerateMindmapFromDsl}
-              onResetDsl={handleResetDsl}
-            />
-          </div>
 
           <MindmapSvgPreview
             ref={previewRef}
             layoutError={effectiveLayoutError}
-            layoutResult={layoutResult}
+            layoutResult={displayLayoutResult}
             layoutStatus={effectiveLayoutStatus}
             mindmap={effectiveMindmap}
+            nodePositionOverrides={nodePositionOverrides}
+            onNodePositionOverridesChange={setNodePositionOverrides}
             onTransformChange={setPreviewTransform}
             transform={previewTransform}
           />
@@ -700,7 +746,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
           <MindmapPreviewDrawer
             ref={previewRef}
             layoutError={effectiveLayoutError}
-            layoutResult={layoutResult}
+            layoutResult={displayLayoutResult}
             layoutStatus={effectiveLayoutStatus}
             mindmap={effectiveMindmap}
             onClose={() => {

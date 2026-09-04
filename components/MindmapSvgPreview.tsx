@@ -12,6 +12,7 @@ import {
   zoomSvgPreviewAroundPoint,
 } from '../lib/mindmap/svg-preview';
 import type { MindmapLayoutResult } from '../lib/mindmap/layout';
+import type { MindmapNodePositionOverrides } from '../lib/mindmap/node-overrides';
 import type { GeneratedMindmap } from '../lib/mindmap/schema';
 
 export interface MindmapSvgPreviewHandle {
@@ -29,6 +30,8 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
   layoutError: string | null;
   transform?: SvgPreviewTransform;
   onTransformChange?: (transform: SvgPreviewTransform) => void;
+  nodePositionOverrides?: MindmapNodePositionOverrides;
+  onNodePositionOverridesChange?: (overrides: MindmapNodePositionOverrides) => void;
 }>(function MindmapSvgPreview({
   mindmap,
   layoutResult,
@@ -36,10 +39,14 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
   layoutError,
   transform: controlledTransform,
   onTransformChange,
+  nodePositionOverrides,
+  onNodePositionOverridesChange,
 }, ref) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+  const nodeDragRef = useRef<{ nodeId: string; x: number; y: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
   const [uncontrolledTransform, setUncontrolledTransform] = useState(createDefaultSvgPreviewTransform);
   const transform = controlledTransform ?? uncontrolledTransform;
   const setTransform = onTransformChange ?? setUncontrolledTransform;
@@ -165,18 +172,36 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
         }}
         onPointerLeave={() => {
           dragStartRef.current = null;
+          nodeDragRef.current = null;
           setIsDragging(false);
+          setDraggingNodeId(null);
         }}
         onPointerMove={(event) => {
-          const dragStart = dragStartRef.current;
-
-          if (!dragStart) {
-            return;
-          }
-
           const rect = svgRef.current?.getBoundingClientRect();
 
           if (!rect) {
+            return;
+          }
+
+          const nodeDrag = nodeDragRef.current;
+
+          if (nodeDrag && onNodePositionOverridesChange) {
+            // Screen px → viewBox units → layout user units (undo the zoom scale).
+            const stepX = (((event.clientX - nodeDrag.x) / rect.width) * model.width) / transform.scale;
+            const stepY = (((event.clientY - nodeDrag.y) / rect.height) * model.height) / transform.scale;
+            const current = nodePositionOverrides?.[nodeDrag.nodeId] ?? { dx: 0, dy: 0 };
+
+            nodeDragRef.current = { nodeId: nodeDrag.nodeId, x: event.clientX, y: event.clientY };
+            onNodePositionOverridesChange({
+              ...nodePositionOverrides,
+              [nodeDrag.nodeId]: { dx: current.dx + stepX, dy: current.dy + stepY },
+            });
+            return;
+          }
+
+          const dragStart = dragStartRef.current;
+
+          if (!dragStart) {
             return;
           }
 
@@ -191,7 +216,9 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
         }}
         onPointerUp={(event) => {
           dragStartRef.current = null;
+          nodeDragRef.current = null;
           setIsDragging(false);
+          setDraggingNodeId(null);
           svgRef.current?.releasePointerCapture(event.pointerId);
         }}
         onWheel={(event) => {
@@ -235,7 +262,27 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
           <g>
             {previewModel.nodes.map((node) => {
               return (
-                <g key={node.id} transform={`translate(${node.x} ${node.y})`}>
+                <g
+                  className={
+                    onNodePositionOverridesChange
+                      ? draggingNodeId === node.id
+                        ? 'cursor-grabbing'
+                        : 'cursor-move'
+                      : undefined
+                  }
+                  key={node.id}
+                  onPointerDown={
+                    onNodePositionOverridesChange
+                      ? (event) => {
+                          event.stopPropagation();
+                          nodeDragRef.current = { nodeId: node.id, x: event.clientX, y: event.clientY };
+                          setDraggingNodeId(node.id);
+                          svgRef.current?.setPointerCapture(event.pointerId);
+                        }
+                      : undefined
+                  }
+                  transform={`translate(${node.x} ${node.y})`}
+                >
                   <rect
                     fill={node.style.fill}
                     height={node.height}
@@ -255,23 +302,28 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
                     y={previewMetrics.accentInsetY}
                   />
                   <text
+                    dominantBaseline="hanging"
                     fill={node.style.text}
                     fontFamily="ui-sans-serif, system-ui, sans-serif"
                     fontSize={node.fontSize}
                     fontWeight={node.kind === 'root' ? 800 : 700}
+                    textAnchor="middle"
                     x={node.width / 2}
                   >
-                    {node.lines.map((line, index) => (
-                      <tspan
-                        dominantBaseline="hanging"
-                        key={`${node.id}-${index}`}
-                        textAnchor="middle"
-                        x={node.width / 2}
-                        y={node.lineStartY + index * node.lineHeight}
-                      >
-                        {line}
-                      </tspan>
-                    ))}
+                    {node.lineSegments.flatMap((segments, lineIndex) =>
+                      segments.map((segment, segmentIndex) => (
+                        <tspan
+                          fontStyle={segment.italic ? 'italic' : undefined}
+                          fontWeight={segment.bold ? 900 : undefined}
+                          key={`${node.id}-${lineIndex}-${segmentIndex}`}
+                          textDecoration={segment.underline ? 'underline' : undefined}
+                          x={segmentIndex === 0 ? node.width / 2 : undefined}
+                          y={segmentIndex === 0 ? node.lineStartY + lineIndex * node.lineHeight : undefined}
+                        >
+                          {segment.text}
+                        </tspan>
+                      )),
+                    )}
                   </text>
                 </g>
               );

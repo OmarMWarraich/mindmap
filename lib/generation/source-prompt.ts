@@ -1,9 +1,12 @@
+export type SourceMindmapReadabilityMode = 'compact' | 'plain' | 'detailed';
+
 export interface SourceMindmapGenerationPromptInput {
   sourceText: string;
   sourceMeaningfulLineCount: number;
   targetMinLineCount: number;
   targetMaxLineCount: number;
-  detailLevel?: 'standard' | 'detailed';
+  detailLevel?: 'standard' | 'detailed' | 'compact' | 'plain';
+  readabilityMode?: SourceMindmapReadabilityMode;
   minimumChildrenPerBranch?: number;
   // 'expand' (default): enrich smaller sources toward a density target.
   // 'distill': condense a large source into a bounded, structured outline.
@@ -58,7 +61,7 @@ Content goals:
 - Rewrite raw note fragments into compact explanatory DSL lines instead of mirroring the notes verbatim.
 - Do not repeat a source heading or bullet as a child line unless the term itself needs preservation.
 - Prefer short phrase blocks over long sentences.
-- Use symbols such as =, =>, +, -> when they shorten wording naturally.
+{{READABILITY_GUIDANCE}}
 - Never exceed 35 words on any DSL line.
 - Expand the outline through additional valid child lines, not longer lines.
 
@@ -155,13 +158,27 @@ function resolveDetailPreference(
     : 'standard: meet the target range without padding';
 }
 
+function resolveReadabilityGuidance(readabilityMode: SourceMindmapReadabilityMode): string {
+  switch (readabilityMode) {
+    case 'plain':
+      return 'Prefer plain-language labels and explanatory phrasing. Avoid symbols such as =, +, =>, and -> unless a shorthand is essential. Add rich explanatory child lines and make branch labels easy to read in plain English.';
+    case 'detailed':
+      return 'Prefer plain-language labels and rich explanatory child lines. Keep labels readable, avoid compressed symbols, and give each branch enough detail to explain the concept clearly.';
+    case 'compact':
+    default:
+      return 'Use symbols such as =, =>, +, -> when they shorten wording naturally.';
+  }
+}
+
 export function createSourceMindmapGenerationPrompt(
   input: SourceMindmapGenerationPromptInput,
 ): SourceMindmapGenerationPrompt {
   const mode = input.mode ?? 'expand';
+  const readabilityMode = input.readabilityMode ?? 'compact';
   const minimumChildrenPerBranch = input.minimumChildrenPerBranch
     ?? (input.detailLevel === 'detailed' ? 3 : 2);
   const detailPreference = resolveDetailPreference(mode, input.detailLevel);
+  const readabilityGuidance = resolveReadabilityGuidance(readabilityMode);
   const retryGuidance = input.retryGuidance
     ?? [
       'Keep the same topic coverage while fixing the density problem.',
@@ -197,6 +214,7 @@ ${input.previousDslAttempt}
     .replace('{{TARGET_MAX_LINE_COUNT}}', String(input.targetMaxLineCount))
     .replace('{{MIN_CHILDREN_PER_BRANCH}}', String(minimumChildrenPerBranch))
     .replace('{{DETAIL_PREFERENCE}}', detailPreference)
+    .replace('{{READABILITY_GUIDANCE}}', readabilityGuidance)
     .replace('{{RETRY_BLOCK}}', () => retryBlock)
     .replace('{{SOURCE_TEXT}}', () => input.sourceText);
 

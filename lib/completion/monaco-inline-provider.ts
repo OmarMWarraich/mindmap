@@ -92,7 +92,7 @@ export function createMindmapDslInlineCompletionsProvider(
             },
           ],
         };
-      } catch (error) {
+          } catch (error) {
         if (isAbortError(error)) {
           return { items: [] };
         }
@@ -146,7 +146,23 @@ function linkAbortControllerToCancellationToken(token: CancellationToken): {
 }
 
 function isAbortError(error: unknown): boolean {
-  return error instanceof Error && error.name === 'AbortError';
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const candidate = error as { name?: unknown; message?: unknown };
+  const lowerName = typeof candidate.name === 'string' ? candidate.name.trim().toLowerCase() : '';
+  const lowerMessage = typeof candidate.message === 'string' ? candidate.message.trim().toLowerCase() : '';
+
+  return (
+    lowerName === 'aborterror' ||
+    lowerName === 'canceled' ||
+    lowerName === 'cancelled' ||
+    lowerMessage.includes('aborted') ||
+    lowerMessage.includes('canceled') ||
+    lowerMessage.includes('cancelled') ||
+    lowerMessage.includes('signal is aborted')
+  );
 }
 
 function createInlineCompletionCorrelationId(): string {
