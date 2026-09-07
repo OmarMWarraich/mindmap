@@ -17,6 +17,7 @@ export interface MindmapPreviewDrawerProps {
   layoutStatus: 'idle' | 'loading' | 'ready' | 'error';
   layoutError: string | null;
   transform: SvgPreviewTransform;
+  renderScale?: number;
   onTransformChange: (transform: SvgPreviewTransform) => void;
   theme?: MindmapTheme;
 }
@@ -52,6 +53,7 @@ const MindmapPreviewDrawer = forwardRef<
     layoutStatus,
     layoutError,
     transform,
+    renderScale,
     onTransformChange,
     theme,
   },
@@ -96,6 +98,7 @@ const MindmapPreviewDrawer = forwardRef<
             layoutStatus={layoutStatus}
             mindmap={mindmap}
             onTransformChange={onTransformChange}
+            renderScale={renderScale}
             theme={theme}
             transform={transform}
           />

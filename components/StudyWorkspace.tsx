@@ -841,6 +841,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
             nodePositionOverrides={nodePositionOverrides}
             onNodePositionOverridesChange={setNodePositionOverrides}
             onTransformChange={setPreviewTransform}
+            renderScale={exportControls.fontScale}
             theme={theme}
             transform={previewTransform}
           />
@@ -877,6 +878,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
             }}
             onTransformChange={setPreviewTransform}
             open={previewOpen}
+            renderScale={exportControls.fontScale}
             theme={theme}
             transform={previewTransform}
           />

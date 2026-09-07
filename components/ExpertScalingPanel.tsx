@@ -60,7 +60,7 @@ export default function ExpertScalingPanel({ values, onChange, onReset }: Expert
       <div className="flex shrink-0 items-center justify-between border-b border-zinc-200 px-4 py-2.5">
         <div className="grid gap-0.5">
           <h2 className="text-sm font-semibold text-zinc-900">Expert Scaling</h2>
-          <p className="text-xs text-zinc-500">Affects PNG export only</p>
+          <p className="text-xs text-zinc-500">Affects preview and PNG export</p>
         </div>
         <button
           aria-label="Collapse scaling panel"

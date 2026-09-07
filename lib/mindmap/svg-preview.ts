@@ -648,25 +648,10 @@ function createNodeTypography(
   const baseFontSize = sourceNode.kind === 'root' ? metrics.rootFontSize : metrics.nodeFontSize;
   const baseLineStartY = sourceNode.kind === 'root' ? metrics.rootLineStartY : metrics.nodeLineStartY;
   const availableWidth = Math.max(64, layoutNode.width - sourceNode.layout.paddingX * 2);
-
-  if (profile !== 'export') {
-    const wrapped = wrapFormattedMindmapLabel(
-      sourceNode.label,
-      Math.max(8, Math.floor(availableWidth / metrics.approxCharacterWidth)),
-    );
-
-    return {
-      lines: wrapped.lines,
-      lineSegments: wrapped.lineSegments,
-      fontSize: baseFontSize,
-      lineHeight: metrics.lineHeight,
-      lineStartY: baseLineStartY,
-    };
-  }
-
   const availableBottomY = Math.max(metrics.lineHeight, layoutNode.height - sourceNode.layout.paddingY);
-  const minimumFontSize = 12;
+  const minimumFontSize = profile === 'export' ? 12 : 10;
   const initialFontSize = Math.min(baseFontSize, targetFontSize ?? baseFontSize);
+
   let bestTypography = measureNodeTypography(
     sourceNode.label,
     availableWidth,
@@ -677,9 +662,10 @@ function createNodeTypography(
   );
 
   for (let fontSize = initialFontSize; fontSize >= minimumFontSize; fontSize -= 0.5) {
-    const candidate = measureNodeTypography(
+    const candidate = findBestTypographyForBox(
       sourceNode.label,
       availableWidth,
+      availableBottomY,
       fontSize,
       metrics,
       baseFontSize,
@@ -691,6 +677,49 @@ function createNodeTypography(
     if (doesNodeTypographyFit(candidate, availableWidth, availableBottomY, metrics, baseFontSize)) {
       break;
     }
+  }
+
+  return bestTypography;
+}
+
+function findBestTypographyForBox(
+  label: string,
+  availableWidth: number,
+  availableBottomY: number,
+  fontSize: number,
+  metrics: SvgPreviewRenderMetrics,
+  baseFontSize: number,
+  baseLineStartY: number,
+): Pick<SvgPreviewNode, 'lines' | 'lineSegments' | 'fontSize' | 'lineHeight' | 'lineStartY'> {
+  const scale = fontSize / baseFontSize;
+  const approxCharacterWidth = Math.max(1, metrics.approxCharacterWidth * scale * 1.08);
+  const maxCharsPerLine = Math.max(4, Math.floor(availableWidth / approxCharacterWidth));
+  const minimumCharsPerLine = Math.max(1, Math.floor(maxCharsPerLine * 0.35));
+  let bestTypography = measureNodeTypography(
+    label,
+    availableWidth,
+    fontSize,
+    metrics,
+    baseFontSize,
+    baseLineStartY,
+  );
+
+  for (let charsPerLine = maxCharsPerLine; charsPerLine >= minimumCharsPerLine; charsPerLine -= 1) {
+    const candidate = measureNodeTypography(
+      label,
+      availableWidth,
+      fontSize,
+      metrics,
+      baseFontSize,
+      baseLineStartY,
+      charsPerLine,
+    );
+
+    if (doesNodeTypographyFit(candidate, availableWidth, availableBottomY, metrics, baseFontSize)) {
+      return candidate;
+    }
+
+    bestTypography = candidate;
   }
 
   return bestTypography;
@@ -801,6 +830,7 @@ function measureNodeTypography(
   metrics: SvgPreviewRenderMetrics,
   baseFontSize: number,
   baseLineStartY: number,
+  charsPerLine?: number,
 ): Pick<SvgPreviewNode, 'lines' | 'lineSegments' | 'fontSize' | 'lineHeight' | 'lineStartY'> {
   const scale = fontSize / baseFontSize;
   const approxCharacterWidth = Math.max(1, metrics.approxCharacterWidth * scale);
@@ -809,9 +839,10 @@ function measureNodeTypography(
     fontSize * 1.35,
     Math.min(baseLineStartY * scale, metrics.accentInsetY + metrics.accentHeight + fontSize * 0.72),
   );
+  const maxCharsPerLine = charsPerLine ?? Math.max(8, Math.floor(availableWidth / approxCharacterWidth));
   const wrapped = wrapFormattedMindmapLabel(
     label,
-    Math.max(8, Math.floor(availableWidth / approxCharacterWidth)),
+    Math.max(1, maxCharsPerLine),
   );
 
   return {

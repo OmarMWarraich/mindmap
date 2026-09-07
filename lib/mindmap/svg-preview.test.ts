@@ -639,6 +639,45 @@ test('buildSvgPreviewModel splits long hyphenated export tokens into separate li
   assert.equal(model.nodes[0]!.fontSize < metrics.nodeFontSize, true);
 });
 
+test('buildSvgPreviewModel fills tall boxes with denser wrapping instead of leaving vertical gaps', () => {
+  const node = validGeneratedMindmapFixture.nodes[1]!;
+  const metrics = getSvgPreviewRenderMetrics('preview', { scale: 1.15 });
+  const model = buildSvgPreviewModel(
+    {
+      ...validGeneratedMindmapFixture,
+      nodes: [{
+        ...node,
+        label: 'A dense branch label that should wrap tightly into the available box height instead of leaving a large vertical gap and overflowing horizontally',
+      }],
+      edges: [],
+    },
+    {
+      width: 420,
+      height: 220,
+      nodes: [{
+        id: node.id,
+        x: 40,
+        y: 20,
+        width: 220,
+        height: 140,
+      }],
+      edges: [],
+    },
+    {
+      profile: 'preview',
+      renderScale: 1.15,
+    },
+  );
+
+  const rendered = model.nodes[0]!;
+  const widestLine = rendered.lines.reduce((max, line) => Math.max(max, line.length), 0);
+  const approxCharWidth = Math.max(1, metrics.approxCharacterWidth * (rendered.fontSize / metrics.nodeFontSize) * 1.08);
+  const bottomY = rendered.lineStartY + rendered.lines.length * rendered.lineHeight;
+
+  assert.equal(widestLine * approxCharWidth <= 220 - node.layout.paddingX * 2, true);
+  assert.equal(bottomY >= 90, true);
+});
+
 function estimateLongestLineWidth(
   node: { lines: string[]; fontSize: number },
   metrics: { approxCharacterWidth: number; rootFontSize: number; nodeFontSize: number },
@@ -690,7 +729,7 @@ test('buildSvgPreviewModel uses the mono edge color when the theme requests it',
   assert.equal(model.edges[0]?.color, '#334155');
 });
 
-test('buildSvgPreviewModel scales node typography from the theme', () => {
+test('buildSvgPreviewModel keeps theme-driven typography when the box has room to fit it', () => {
   const layout = createThemeTestLayout();
   const base = buildSvgPreviewModel(validGeneratedMindmapFixture, layout);
   const scaled = buildSvgPreviewModel(validGeneratedMindmapFixture, layout, {
@@ -702,7 +741,8 @@ test('buildSvgPreviewModel scales node typography from the theme', () => {
   const baseRoot = base.nodes.find((node) => node.kind === 'root');
   const scaledRoot = scaled.nodes.find((node) => node.kind === 'root');
 
-  assert.equal(scaledRoot?.fontSize, (baseRoot?.fontSize ?? 0) * 1.5);
+  assert.ok((scaledRoot?.fontSize ?? 0) >= (baseRoot?.fontSize ?? 0));
+  assert.ok((scaledRoot?.fontSize ?? 0) >= 24);
 });
 
 test('zoomSvgPreviewAroundPoint preserves the anchor position while scaling', () => {

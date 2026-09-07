@@ -31,6 +31,7 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
   layoutStatus: 'idle' | 'loading' | 'ready' | 'error';
   layoutError: string | null;
   transform?: SvgPreviewTransform;
+  renderScale?: number;
   onTransformChange?: (transform: SvgPreviewTransform) => void;
   nodePositionOverrides?: MindmapNodePositionOverrides;
   onNodePositionOverridesChange?: (overrides: MindmapNodePositionOverrides) => void;
@@ -41,6 +42,7 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
   layoutStatus,
   layoutError,
   transform: controlledTransform,
+  renderScale = 1,
   onTransformChange,
   nodePositionOverrides,
   onNodePositionOverridesChange,
@@ -54,8 +56,10 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
   const [uncontrolledTransform, setUncontrolledTransform] = useState(createDefaultSvgPreviewTransform);
   const transform = controlledTransform ?? uncontrolledTransform;
   const setTransform = onTransformChange ?? setUncontrolledTransform;
-  const model = mindmap && layoutResult ? buildSvgPreviewModel(mindmap, layoutResult, { theme }) : null;
-  const previewMetrics = getSvgPreviewRenderMetrics();
+  const model = mindmap && layoutResult
+    ? buildSvgPreviewModel(mindmap, layoutResult, { theme, renderScale, profile: 'preview' })
+    : null;
+  const previewMetrics = getSvgPreviewRenderMetrics('preview', { scale: renderScale });
 
   useImperativeHandle(ref, () => ({
     getExportSnapshot() {
