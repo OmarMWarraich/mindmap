@@ -488,6 +488,13 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
     };
   }, [latestDslGeneration, latestMindmapSnapshot, nodePositionOverrides, outline, previewTransform, projectId, rawNotes, selectedDetailLevel, theme]);
 
+  function getDeterministicLayoutForVisualExport(): MindmapLayoutResult | null {
+    // The artistic/background render is decorative only. It reuses the already
+    // computed cluster-based geometry from preview/export so the readable layout
+    // remains deterministic and never gets re-derived by the AI styling pass.
+    return displayLayoutResult ?? layoutResult ?? null;
+  }
+
   async function handleDownloadPng(): Promise<void> {
     if (!effectiveMindmap) {
       setExportStatus({
@@ -551,7 +558,9 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
   }
 
   async function handleArtisticExport(): Promise<void> {
-    if (!effectiveMindmap || !layoutResult) {
+    const deterministicLayout = getDeterministicLayoutForVisualExport();
+
+    if (!effectiveMindmap || !deterministicLayout) {
       setExportStatus({
         tone: 'error',
         message: 'Artistic export is unavailable until the preview finishes rendering.',
@@ -566,8 +575,9 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
     });
 
     try {
-      // displayLayoutResult includes the user's node drag offsets.
-      const snapshot = createSvgPreviewSnapshot(effectiveMindmap, displayLayoutResult ?? layoutResult, {
+      // The AI pass renders a visual background layer only. It does not decide the
+      // mindmap geometry; it consumes the exact same deterministic branch-cluster layout as preview/export.
+      const snapshot = createSvgPreviewSnapshot(effectiveMindmap, deterministicLayout, {
         profile: 'export',
         theme,
       });
