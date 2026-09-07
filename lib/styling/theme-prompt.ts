@@ -34,7 +34,8 @@ Do not wrap the JSON in markdown.
 Do not add commentary.
 Pick harmonious, readable colors: node text must stay legible on node fills, and node fills must contrast with the background.
 Never use background kind "image" — you cannot produce image data. Use "solid", "gradient", or "grid" only.
-All colors must be CSS hex values like #0f172a.`;
+All colors must be CSS hex values like #0f172a.
+Default rule: preserve node text verbatim; do not rewrite, paraphrase, or alter the wording unless the user explicitly asks for a text rewrite.`;
 
 export const mindmapThemeOutputContract = `Return a JSON object with this exact shape (no extra keys):
 {
@@ -127,6 +128,7 @@ export function createMindmapThemePrompt(input: MindmapThemePromptInput): Mindma
     ...retryLines,
     'Design a mindmap theme for this style request:',
     `STYLE REQUEST: ${input.stylePrompt}`,
+    'TEXT RULE: preserve node text verbatim. Keep labels unchanged and do not rewrite, paraphrase, or rephrase them unless the user explicitly requests a text rewrite.',
     ...(contextLines.length > 0 ? ['', ...contextLines] : []),
     '',
     mindmapThemeOutputContract,

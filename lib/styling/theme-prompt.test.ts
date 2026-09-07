@@ -12,6 +12,13 @@ test('createMindmapThemePrompt includes the style request and output contract', 
   assert.match(prompt.user, /"colorMode": "branch" \| "mono"/);
 });
 
+test('createMindmapThemePrompt preserves node text verbatim by default', () => {
+  const prompt = createMindmapThemePrompt({ stylePrompt: 'earthy forest tones' });
+
+  assert.match(prompt.user, /preserve.*text.*verbatim/i);
+  assert.match(prompt.user, /do not rewrite|do not paraphrase|keep the exact wording/i);
+});
+
 test('createMindmapThemePrompt forbids image backgrounds in the system prompt', () => {
   const prompt = createMindmapThemePrompt({ stylePrompt: 'ocean blues' });
 
