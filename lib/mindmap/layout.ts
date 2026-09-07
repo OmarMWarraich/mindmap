@@ -239,33 +239,61 @@ function applyBranchClusterPostPass(
     x: rootNode.x + rootNode.width / 2,
     y: rootNode.y + rootNode.height / 2,
   };
-  const compactnessScale = clampNumber(0.82 + (plan.clusters.length - 2) * 0.04, 0.82, 0.9);
+  const clusterByNodeId = new Map<string, MindmapBranchCluster>();
 
-  for (const node of adjustedNodes) {
-    if (node.id === rootNode.id) {
+  for (const cluster of plan.clusters) {
+    for (const nodeId of cluster.nodeIds) {
+      clusterByNodeId.set(nodeId, cluster);
+    }
+  }
+
+  const compactnessScale = clampNumber(0.82 + (plan.clusters.length - 2) * 0.04, 0.74, 0.88);
+
+  for (const cluster of plan.clusters) {
+    const branchNode = adjustedNodes.find((node) => node.id === cluster.branchId);
+
+    if (!branchNode || branchNode.id === rootNode.id) {
       continue;
     }
 
-    const center = {
-      x: node.x + node.width / 2,
-      y: node.y + node.height / 2,
+    const branchCenter = {
+      x: branchNode.x + branchNode.width / 2,
+      y: branchNode.y + branchNode.height / 2,
     };
     const offset = {
-      x: center.x - rootCenter.x,
-      y: center.y - rootCenter.y,
+      x: branchCenter.x - rootCenter.x,
+      y: branchCenter.y - rootCenter.y,
     };
     const distance = Math.hypot(offset.x, offset.y) || 1;
     const direction = {
       x: offset.x / distance,
       y: offset.y / distance,
     };
-    const compactedCenter = {
-      x: rootCenter.x + direction.x * distance * compactnessScale,
-      y: rootCenter.y + direction.y * distance * compactnessScale,
+    const clusterPreference = clampNumber(
+      1 - cluster.nodeCount / Math.max(plan.totalWeight, 1) * 0.16,
+      0.72,
+      0.9,
+    );
+    const targetDistance = Math.max(48, distance * compactnessScale * clusterPreference);
+    const targetCenter = {
+      x: rootCenter.x + direction.x * targetDistance,
+      y: rootCenter.y + direction.y * targetDistance,
+    };
+    const translation = {
+      x: targetCenter.x - branchCenter.x,
+      y: targetCenter.y - branchCenter.y,
     };
 
-    node.x = compactedCenter.x - node.width / 2;
-    node.y = compactedCenter.y - node.height / 2;
+    for (const nodeId of cluster.nodeIds) {
+      const node = adjustedNodes.find((candidate) => candidate.id === nodeId);
+
+      if (!node) {
+        continue;
+      }
+
+      node.x += translation.x;
+      node.y += translation.y;
+    }
   }
 
   resolveRadialNodeOverlap(adjustedNodes, rootCenter);
@@ -322,7 +350,7 @@ function resolveRadialNodeOverlap(
   nodes: MindmapLayoutNode[],
   rootCenter: { x: number; y: number },
 ): void {
-  for (let pass = 0; pass < 12; pass += 1) {
+  for (let pass = 0; pass < 20; pass += 1) {
     let moved = false;
 
     for (let index = 0; index < nodes.length; index += 1) {
@@ -337,18 +365,60 @@ function resolveRadialNodeOverlap(
         moved = true;
         const leftCenter = { x: left.x + left.width / 2, y: left.y + left.height / 2 };
         const rightCenter = { x: right.x + right.width / 2, y: right.y + right.height / 2 };
-        const leftVector = { x: leftCenter.x - rootCenter.x, y: leftCenter.y - rootCenter.y };
-        const rightVector = { x: rightCenter.x - rootCenter.x, y: rightCenter.y - rootCenter.y };
-        const leftDistance = Math.hypot(leftVector.x, leftVector.y) || 1;
-        const rightDistance = Math.hypot(rightVector.x, rightVector.y) || 1;
-        const leftDirection = { x: leftVector.x / leftDistance, y: leftVector.y / leftDistance };
-        const rightDirection = { x: rightVector.x / rightDistance, y: rightVector.y / rightDistance };
-        const pushDistance = 8;
+        const dx = leftCenter.x - rightCenter.x;
+        const dy = leftCenter.y - rightCenter.y;
+        const overlapX = Math.min(left.x + left.width, right.x + right.width) - Math.max(left.x, right.x);
+        const overlapY = Math.min(left.y + left.height, right.y + right.height) - Math.max(left.y, right.y);
+        const pushX = Math.max(overlapX / 2 + 2, 2);
+        const pushY = Math.max(overlapY / 2 + 2, 2);
 
-        left.x += leftDirection.x * pushDistance;
-        left.y += leftDirection.y * pushDistance;
-        right.x -= rightDirection.x * pushDistance;
-        right.y -= rightDirection.y * pushDistance;
+        if (overlapX > 0 && overlapY > 0) {
+          if (overlapX < overlapY) {
+            if (dx >= 0) {
+              left.x += pushX;
+              right.x -= pushX;
+            } else {
+              left.x -= pushX;
+              right.x += pushX;
+            }
+          } else if (dy >= 0) {
+            left.y += pushY;
+            right.y -= pushY;
+          } else {
+            left.y -= pushY;
+            right.y += pushY;
+          }
+        } else if (overlapX > 0) {
+          if (dx >= 0) {
+            left.x += pushX;
+            right.x -= pushX;
+          } else {
+            left.x -= pushX;
+            right.x += pushX;
+          }
+        } else if (dy >= 0) {
+          left.y += pushY;
+          right.y -= pushY;
+        } else {
+          left.y -= pushY;
+          right.y += pushY;
+        }
+
+        const leftPolarRadius = Math.hypot(leftCenter.x - rootCenter.x, leftCenter.y - rootCenter.y) || 1;
+        const rightPolarRadius = Math.hypot(rightCenter.x - rootCenter.x, rightCenter.y - rootCenter.y) || 1;
+        const minAllowedRadius = Math.min(leftPolarRadius, rightPolarRadius) * 0.98;
+
+        if (leftPolarRadius < minAllowedRadius) {
+          const leftAngle = Math.atan2(leftCenter.y - rootCenter.y, leftCenter.x - rootCenter.x);
+          left.x = rootCenter.x + Math.cos(leftAngle) * minAllowedRadius - left.width / 2;
+          left.y = rootCenter.y + Math.sin(leftAngle) * minAllowedRadius - left.height / 2;
+        }
+
+        if (rightPolarRadius < minAllowedRadius) {
+          const rightAngle = Math.atan2(rightCenter.y - rootCenter.y, rightCenter.x - rootCenter.x);
+          right.x = rootCenter.x + Math.cos(rightAngle) * minAllowedRadius - right.width / 2;
+          right.y = rootCenter.y + Math.sin(rightAngle) * minAllowedRadius - right.height / 2;
+        }
       }
     }
 
