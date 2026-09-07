@@ -143,6 +143,27 @@ test('createExportMindmapVariant grows text-driven boxes more slowly than text s
   );
 });
 
+test('manual export overrides only refine the density-adjusted layout and keep the layout deterministic', () => {
+  const baseMindmap = createExportMindmapVariant(validGeneratedMindmapFixture);
+  const overrideMindmap = createExportMindmapVariant(validGeneratedMindmapFixture, {
+    nodeWidthScale: 1.8,
+    nodeHeightScale: 1.7,
+    nodePaddingScale: 1.5,
+    siblingGapScale: 1.3,
+    levelGapScale: 1.25,
+    textScale: 1.6,
+  });
+
+  assert.equal(overrideMindmap.nodes[0]!.layout.minWidth > baseMindmap.nodes[0]!.layout.minWidth, true);
+  assert.equal(overrideMindmap.nodes[0]!.layout.minHeight > baseMindmap.nodes[0]!.layout.minHeight, true);
+  assert.equal(overrideMindmap.metadata.layout.levelGap > baseMindmap.metadata.layout.levelGap, true);
+  assert.equal(overrideMindmap.metadata.layout.levelGap < baseMindmap.metadata.layout.levelGap * 1.5, true);
+  assert.equal(
+    overrideMindmap.nodes[0]!.layout.minWidth < baseMindmap.nodes[0]!.layout.minWidth * 1.8,
+    true,
+  );
+});
+
 test('layoutMindmapWithElk avoids node overlap in dense radial layouts', async () => {
   const denseMindmap = generateMindmapFromAst({
     root: {

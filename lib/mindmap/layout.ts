@@ -557,6 +557,9 @@ export function createExportMindmapVariant(
   const widthScaleCeiling = Math.max(1.05, exportScale.textScale * 0.98);
   const heightScaleCeiling = Math.max(1.05, exportScale.textScale * 0.98);
   const paddingScaleCeiling = Math.max(1.05, exportScale.textScale * 0.98);
+
+  // Manual sliders are overrides on top of the deterministic density model.
+  // They tune the export variant, but never replace the underlying cluster-based layout.
   const effectiveWidthScale = clampNumber(
     exportScale.nodeWidthScale * densityAdaptiveScale * textDrivenBoxScale,
     1.05,
