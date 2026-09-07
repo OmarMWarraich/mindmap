@@ -97,11 +97,11 @@ export type MindmapLayoutWorkerResponse =
 const elk = new ELK();
 
 const defaultMindmapExportScaleOptions: Required<MindmapExportScaleOptions> = {
-  nodeWidthScale: 1.42,
-  nodeHeightScale: 1.48,
-  nodePaddingScale: 1.22,
-  siblingGapScale: 1.18,
-  levelGapScale: 1.1,
+  nodeWidthScale: 1.32,
+  nodeHeightScale: 1.36,
+  nodePaddingScale: 1.15,
+  siblingGapScale: 1.1,
+  levelGapScale: 1.05,
   textScale: 1,
 };
 
