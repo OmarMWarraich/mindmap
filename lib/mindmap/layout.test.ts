@@ -81,6 +81,131 @@ test('estimateMindmapDensity measures occupancy, spread, and edge density for au
   assert.equal(density.densityScore <= 1, true);
 });
 
+test('clustered layout keeps total edge length within a compact bounded range and reduces branch radius', async () => {
+  const rawLayout = await layoutMindmapWithElkRaw(validGeneratedMindmapFixture);
+  const clusteredLayout = await layoutMindmapWithElk(validGeneratedMindmapFixture);
+  const rawMetrics = computeMindmapLayoutMetrics(validGeneratedMindmapFixture, rawLayout);
+  const clusteredMetrics = computeMindmapLayoutMetrics(validGeneratedMindmapFixture, clusteredLayout);
+
+  assert.equal(rawMetrics.totalEdgeLength > 0, true);
+  assert.equal(clusteredMetrics.totalEdgeLength > 0, true);
+  assert.equal(clusteredMetrics.totalEdgeLength < rawMetrics.totalEdgeLength * 3.5, true);
+  assert.equal(clusteredMetrics.meanBranchRadius < rawMetrics.meanBranchRadius, true);
+});
+
+test('density fit expands occupied node area while staying inside the adaptive clamp', () => {
+  const rawDensity = estimateMindmapDensity(validGeneratedMindmapFixture);
+  const fittedDensity = estimateMindmapDensity(createExportMindmapVariant(validGeneratedMindmapFixture, {
+    nodeWidthScale: 1.6,
+    nodeHeightScale: 1.7,
+    nodePaddingScale: 1.3,
+    siblingGapScale: 1.25,
+    levelGapScale: 1.2,
+    textScale: 1.4,
+  }));
+
+  assert.equal(fittedDensity.occupiedNodeArea > rawDensity.occupiedNodeArea, true);
+  assert.equal(fittedDensity.scaleAdjustment >= 1, true);
+  assert.equal(fittedDensity.scaleAdjustment <= 1.35, true);
+});
+
+test('dense branch fixtures remain overlap-free after the clustered layout pass', async () => {
+  const denseMindmap = generateMindmapFromAst({
+    root: {
+      id: 'root-law',
+      kind: 'root',
+      label: 'Law',
+      source: {
+        line: 1,
+        column: 1,
+        indentLevel: 0,
+        raw: '@root: Law',
+      },
+      branches: ['Public law', 'Private law', 'Criminal law', 'Procedure law'].map((branch, branchIndex) => ({
+        id: `branch-${branchIndex + 1}`,
+        kind: 'branch',
+        label: branch,
+        source: {
+          line: branchIndex + 2,
+          column: 1,
+          indentLevel: 0,
+          raw: `- @branch: ${branch}`,
+        },
+        children: Array.from({ length: 12 }, (_, childIndex) => ({
+          id: `leaf-${branchIndex + 1}-${childIndex + 1}`,
+          kind: 'leaf',
+          label: `${branch} leaf ${childIndex + 1} discussing judicial review remedies precedent interpretation and balancing tests under complex factual matrices`,
+          source: {
+            line: 20 + branchIndex * 20 + childIndex,
+            column: 3,
+            indentLevel: 1,
+            raw: `  - ${branch} leaf ${childIndex + 1}`,
+          },
+          children: [],
+        })),
+      })),
+    },
+  });
+
+  const rawLayout = await layoutMindmapWithElkRaw(denseMindmap);
+  const clusteredLayout = await layoutMindmapWithElk(denseMindmap);
+  const rawMetrics = computeMindmapLayoutMetrics(denseMindmap, rawLayout);
+  const clusteredMetrics = computeMindmapLayoutMetrics(denseMindmap, clusteredLayout);
+
+  assert.equal(clusteredMetrics.branchOverlap, 0);
+  assert.equal(clusteredMetrics.meanBranchRadius < rawMetrics.meanBranchRadius, true);
+  assert.deepEqual(findOverlappingNodePairs(clusteredLayout.nodes), []);
+});
+
+test('large multi-branch trees keep compact branch spacing after clustering', async () => {
+  const largeMindmap = generateMindmapFromAst({
+    root: {
+      id: 'root-compactness',
+      kind: 'root',
+      label: 'Research Portfolio',
+      source: {
+        line: 1,
+        column: 1,
+        indentLevel: 0,
+        raw: '@root: Research Portfolio',
+      },
+      branches: Array.from({ length: 10 }, (_, branchIndex) => ({
+        id: `branch-${branchIndex + 1}`,
+        kind: 'branch',
+        label: `Theme ${branchIndex + 1} exploring evidence, friction, adaptation, design, and policy outcomes`,
+        source: {
+          line: branchIndex + 2,
+          column: 1,
+          indentLevel: 0,
+          raw: `- @branch: Theme ${branchIndex + 1}`,
+        },
+        children: Array.from({ length: 9 }, (_, childIndex) => ({
+          id: `leaf-${branchIndex + 1}-${childIndex + 1}`,
+          kind: 'leaf',
+          label: `Leaf ${childIndex + 1} summarizing a major finding, test, evidence stream, and practical implication for decision-making`,
+          source: {
+            line: 20 + branchIndex * 20 + childIndex,
+            column: 3,
+            indentLevel: 1,
+            raw: `  - Leaf ${childIndex + 1}`,
+          },
+          children: [],
+        })),
+      })),
+    },
+  });
+
+  const rawLayout = await layoutMindmapWithElkRaw(largeMindmap);
+  const clusteredLayout = await layoutMindmapWithElk(largeMindmap);
+  const rawMetrics = computeMindmapLayoutMetrics(largeMindmap, rawLayout);
+  const clusteredMetrics = computeMindmapLayoutMetrics(largeMindmap, clusteredLayout);
+
+  assert.equal(clusteredMetrics.meanBranchRadius < rawMetrics.meanBranchRadius, true);
+  assert.equal(clusteredMetrics.branchSpread <= rawMetrics.branchSpread, true);
+  assert.equal(clusteredMetrics.nodeCoverageRatio > rawMetrics.nodeCoverageRatio, true);
+  assert.deepEqual(findOverlappingNodePairs(clusteredLayout.nodes), []);
+});
+
 test('layoutMindmapWithElk reduces branch radius after the branch-cluster post-pass', async () => {
   const rawLayout = await layoutMindmapWithElkRaw(validGeneratedMindmapFixture);
   const clusteredLayout = await layoutMindmapWithElk(validGeneratedMindmapFixture);
