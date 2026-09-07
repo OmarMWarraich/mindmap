@@ -94,7 +94,7 @@ const defaultMindmapExportScaleOptions: Required<MindmapExportScaleOptions> = {
   textScale: 1,
 };
 
-export async function layoutMindmapWithElk(
+export async function layoutMindmapWithElkRaw(
   mindmap: GeneratedMindmap,
 ): Promise<MindmapLayoutResult> {
   const elkGraph = translateMindmapToElkGraph(mindmap);
@@ -118,6 +118,13 @@ export async function layoutMindmapWithElk(
       points: collectEdgePoints(edge),
     })),
   };
+}
+
+export async function layoutMindmapWithElk(
+  mindmap: GeneratedMindmap,
+): Promise<MindmapLayoutResult> {
+  const rawLayout = await layoutMindmapWithElkRaw(mindmap);
+  return applyBranchClusterPostPass(mindmap, rawLayout);
 }
 
 export function buildMindmapBranchClusterPlan(
@@ -199,6 +206,171 @@ export function buildMindmapBranchClusterPlan(
     clusters,
     totalWeight,
   };
+}
+
+function applyBranchClusterPostPass(
+  mindmap: GeneratedMindmap,
+  layout: MindmapLayoutResult,
+): MindmapLayoutResult {
+  const plan = buildMindmapBranchClusterPlan(mindmap);
+  if (plan.clusters.length < 2) {
+    return layout;
+  }
+
+  const adjustedNodes = layout.nodes.map((node) => ({ ...node }));
+  const rootNode = adjustedNodes.find((node) => node.id === mindmap.metadata.rootId);
+
+  if (!rootNode) {
+    return layout;
+  }
+
+  const rootCenter = {
+    x: rootNode.x + rootNode.width / 2,
+    y: rootNode.y + rootNode.height / 2,
+  };
+  const compactnessScale = clampNumber(0.82 + (plan.clusters.length - 2) * 0.04, 0.82, 0.9);
+
+  for (const node of adjustedNodes) {
+    if (node.id === rootNode.id) {
+      continue;
+    }
+
+    const center = {
+      x: node.x + node.width / 2,
+      y: node.y + node.height / 2,
+    };
+    const offset = {
+      x: center.x - rootCenter.x,
+      y: center.y - rootCenter.y,
+    };
+    const distance = Math.hypot(offset.x, offset.y) || 1;
+    const direction = {
+      x: offset.x / distance,
+      y: offset.y / distance,
+    };
+    const compactedCenter = {
+      x: rootCenter.x + direction.x * distance * compactnessScale,
+      y: rootCenter.y + direction.y * distance * compactnessScale,
+    };
+
+    node.x = compactedCenter.x - node.width / 2;
+    node.y = compactedCenter.y - node.height / 2;
+  }
+
+  resolveRadialNodeOverlap(adjustedNodes, rootCenter);
+
+  const minX = Math.min(...adjustedNodes.map((node) => node.x), rootNode.x);
+  const maxX = Math.max(
+    ...adjustedNodes.map((node) => node.x + node.width),
+    rootNode.x + rootNode.width,
+  );
+  const minY = Math.min(...adjustedNodes.map((node) => node.y), rootNode.y);
+  const maxY = Math.max(
+    ...adjustedNodes.map((node) => node.y + node.height),
+    rootNode.y + rootNode.height,
+  );
+  const width = maxX - minX;
+  const height = maxY - minY;
+
+  const nodesById = new Map(adjustedNodes.map((node) => [node.id, node]));
+  const edges = mindmap.edges.map((edge) => {
+    const sourceNode = nodesById.get(edge.from);
+    const targetNode = nodesById.get(edge.to);
+
+    if (!sourceNode || !targetNode) {
+      return {
+        id: edge.id,
+        points: [{ x: 0, y: 0 }, { x: 0, y: 0 }],
+      };
+    }
+
+    return {
+      id: edge.id,
+      points: [
+        {
+          x: sourceNode.x + sourceNode.width / 2,
+          y: sourceNode.y + sourceNode.height / 2,
+        },
+        {
+          x: targetNode.x + targetNode.width / 2,
+          y: targetNode.y + targetNode.height / 2,
+        },
+      ],
+    };
+  });
+
+  return {
+    width: Math.max(width, 1),
+    height: Math.max(height, 1),
+    nodes: adjustedNodes,
+    edges,
+  };
+}
+
+function resolveRadialNodeOverlap(
+  nodes: MindmapLayoutNode[],
+  rootCenter: { x: number; y: number },
+): void {
+  for (let pass = 0; pass < 12; pass += 1) {
+    let moved = false;
+
+    for (let index = 0; index < nodes.length; index += 1) {
+      for (let comparisonIndex = index + 1; comparisonIndex < nodes.length; comparisonIndex += 1) {
+        const left = nodes[index];
+        const right = nodes[comparisonIndex];
+
+        if (!rectsOverlap(left, right)) {
+          continue;
+        }
+
+        moved = true;
+        const leftCenter = { x: left.x + left.width / 2, y: left.y + left.height / 2 };
+        const rightCenter = { x: right.x + right.width / 2, y: right.y + right.height / 2 };
+        const leftVector = { x: leftCenter.x - rootCenter.x, y: leftCenter.y - rootCenter.y };
+        const rightVector = { x: rightCenter.x - rootCenter.x, y: rightCenter.y - rootCenter.y };
+        const leftDistance = Math.hypot(leftVector.x, leftVector.y) || 1;
+        const rightDistance = Math.hypot(rightVector.x, rightVector.y) || 1;
+        const leftDirection = { x: leftVector.x / leftDistance, y: leftVector.y / leftDistance };
+        const rightDirection = { x: rightVector.x / rightDistance, y: rightVector.y / rightDistance };
+        const pushDistance = 8;
+
+        left.x += leftDirection.x * pushDistance;
+        left.y += leftDirection.y * pushDistance;
+        right.x -= rightDirection.x * pushDistance;
+        right.y -= rightDirection.y * pushDistance;
+      }
+    }
+
+    if (!moved) {
+      break;
+    }
+  }
+}
+
+function rectsOverlap(
+  left: { x: number; y: number; width: number; height: number },
+  right: { x: number; y: number; width: number; height: number },
+): boolean {
+  return (
+    left.x < right.x + right.width &&
+    left.x + left.width > right.x &&
+    left.y < right.y + right.height &&
+    left.y + left.height > right.y
+  );
+}
+
+function doesNodeOverlapAny(
+  candidate: { x: number; y: number },
+  width: number,
+  height: number,
+  placedNodes: Array<{ id: string; x: number; y: number; width: number; height: number }>,
+): boolean {
+  return placedNodes.some((node) =>
+    candidate.x < node.x + node.width &&
+    candidate.x + width > node.x &&
+    candidate.y < node.y + node.height &&
+    candidate.y + height > node.y,
+  );
 }
 
 export function computeMindmapLayoutMetrics(
@@ -461,6 +633,10 @@ function scalePositiveInt(value: number, factor: number): number {
 
 function scaleNonNegativeInt(value: number, factor: number): number {
   return Math.max(0, Math.ceil(value * factor));
+}
+
+function clampNumber(value: number, minimum: number, maximum: number): number {
+  return Math.min(Math.max(value, minimum), maximum);
 }
 
 function scaleWithTextInfluence(textScale: number, influence: number): number {

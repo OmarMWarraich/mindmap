@@ -9,6 +9,7 @@ import {
   createExportMindmapVariant,
   createMindmapRadialLayoutOptions,
   layoutMindmapWithElk,
+  layoutMindmapWithElkRaw,
 } from './layout.ts';
 
 test('createMindmapRadialLayoutOptions maps generation spacing hints to ELK radial options', () => {
@@ -63,6 +64,17 @@ test('buildMindmapBranchClusterPlan groups branches into compact angular slots a
   assert.equal(plan.clusters.every((cluster) => cluster.angleEnd > cluster.angleStart), true);
   assert.equal(plan.clusters.every((cluster) => cluster.angle >= cluster.angleStart), true);
   assert.equal(plan.clusters.every((cluster) => cluster.angle <= cluster.angleEnd), true);
+});
+
+test('layoutMindmapWithElk reduces branch radius after the branch-cluster post-pass', async () => {
+  const rawLayout = await layoutMindmapWithElkRaw(validGeneratedMindmapFixture);
+  const clusteredLayout = await layoutMindmapWithElk(validGeneratedMindmapFixture);
+  const rawMetrics = computeMindmapLayoutMetrics(validGeneratedMindmapFixture, rawLayout);
+  const clusteredMetrics = computeMindmapLayoutMetrics(validGeneratedMindmapFixture, clusteredLayout);
+
+  assert.equal(clusteredMetrics.meanBranchRadius < rawMetrics.meanBranchRadius, true);
+  assert.equal(clusteredMetrics.nodeCoverageRatio > rawMetrics.nodeCoverageRatio, true);
+  assert.equal(clusteredLayout.nodes.every((node) => Number.isFinite(node.x) && Number.isFinite(node.y)), true);
 });
 
 test('createExportMindmapVariant scales node boxes and spacing for export layout', () => {
