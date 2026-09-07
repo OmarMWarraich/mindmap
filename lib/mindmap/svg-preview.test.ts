@@ -691,6 +691,43 @@ function estimateLongestLineWidth(
   return widestLine * approxCharacterWidth;
 }
 
+test('buildSvgPreviewModel wraps bold preview root labels instead of overflowing the root box', () => {
+  const rootNode = validGeneratedMindmapFixture.nodes[0]!;
+  const model = buildSvgPreviewModel(
+    {
+      ...validGeneratedMindmapFixture,
+      nodes: [{ ...rootNode, label: 'Introduction to Sociology' }],
+      edges: [],
+    },
+    {
+      width: 500,
+      height: 400,
+      nodes: [{
+        id: rootNode.id,
+        x: 20,
+        y: 20,
+        width: rootNode.layout.minWidth,
+        height: rootNode.layout.minHeight,
+      }],
+      edges: [],
+    },
+    {
+      profile: 'preview',
+      renderScale: 1,
+    },
+  );
+
+  const rendered = model.nodes[0]!;
+  const availableWidth = rootNode.layout.minWidth - rootNode.layout.paddingX * 2;
+  const widestLine = rendered.lines.reduce((max, line) => Math.max(max, line.length), 0);
+  const realisticBoldCharWidth = rendered.fontSize * 0.52 * 1.08;
+  const textBottomY = rendered.lineStartY + rendered.lines.length * rendered.lineHeight;
+
+  assert.equal(rendered.lines.length >= 2, true);
+  assert.equal(widestLine * realisticBoldCharWidth <= availableWidth, true);
+  assert.equal(textBottomY <= rootNode.layout.minHeight - rootNode.layout.paddingY, true);
+});
+
 test('buildSvgPreviewModel with the default theme matches themeless output exactly', () => {
   const layout = createThemeTestLayout();
   const themeless = buildSvgPreviewModel(validGeneratedMindmapFixture, layout);

@@ -86,6 +86,20 @@ interface SvgPreviewRenderMetrics {
 const exportSharedRootFontScaleFloor = 0.82;
 const exportSharedNodeFontScaleFloor = 0.84;
 const exportSharedFontSizePercentile = 0.35;
+// Bold sans glyphs average ~0.52em; the fixed metric alone underestimates large bold text.
+const minimumCharacterWidthEm = 0.52;
+
+function estimateCharacterWidth(
+  metrics: SvgPreviewRenderMetrics,
+  fontSize: number,
+  baseFontSize: number,
+): number {
+  return Math.max(
+    1,
+    metrics.approxCharacterWidth * (fontSize / baseFontSize),
+    fontSize * minimumCharacterWidthEm,
+  );
+}
 
 const rootNodeStyle: SvgPreviewNodeStyle = {
   fill: '#fff7ed',
@@ -691,8 +705,7 @@ function findBestTypographyForBox(
   baseFontSize: number,
   baseLineStartY: number,
 ): Pick<SvgPreviewNode, 'lines' | 'lineSegments' | 'fontSize' | 'lineHeight' | 'lineStartY'> {
-  const scale = fontSize / baseFontSize;
-  const approxCharacterWidth = Math.max(1, metrics.approxCharacterWidth * scale * 1.08);
+  const approxCharacterWidth = estimateCharacterWidth(metrics, fontSize, baseFontSize) * 1.08;
   const maxCharsPerLine = Math.max(4, Math.floor(availableWidth / approxCharacterWidth));
   const minimumCharsPerLine = Math.max(1, Math.floor(maxCharsPerLine * 0.35));
   let bestTypography = measureNodeTypography(
@@ -806,9 +819,10 @@ function findFittingExportFontSize(
   const minimumFontSize = 12;
 
   for (let fontSize = baseFontSize; fontSize >= minimumFontSize; fontSize -= 0.5) {
-    const candidate = measureNodeTypography(
+    const candidate = findBestTypographyForBox(
       sourceNode.label,
       availableWidth,
+      availableBottomY,
       fontSize,
       metrics,
       baseFontSize,
@@ -833,7 +847,7 @@ function measureNodeTypography(
   charsPerLine?: number,
 ): Pick<SvgPreviewNode, 'lines' | 'lineSegments' | 'fontSize' | 'lineHeight' | 'lineStartY'> {
   const scale = fontSize / baseFontSize;
-  const approxCharacterWidth = Math.max(1, metrics.approxCharacterWidth * scale);
+  const approxCharacterWidth = estimateCharacterWidth(metrics, fontSize, baseFontSize);
   const lineHeight = Math.max(fontSize * 1.18, metrics.lineHeight * scale);
   const lineStartY = Math.max(
     fontSize * 1.35,
@@ -861,8 +875,7 @@ function doesNodeTypographyFit(
   metrics: SvgPreviewRenderMetrics,
   baseFontSize: number,
 ): boolean {
-  const scale = typography.fontSize / baseFontSize;
-  const approxCharacterWidth = Math.max(1, metrics.approxCharacterWidth * scale * 1.08);
+  const approxCharacterWidth = estimateCharacterWidth(metrics, typography.fontSize, baseFontSize) * 1.08;
   const widestLine = typography.lines.reduce((max, line) => Math.max(max, line.length), 0);
   const fitsWidth = widestLine * approxCharacterWidth <= availableWidth;
   const fitsHeight = typography.lineStartY + typography.lines.length * typography.lineHeight <= availableBottomY;
