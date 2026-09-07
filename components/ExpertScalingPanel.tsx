@@ -10,11 +10,11 @@ export interface ScalingValues {
 }
 
 export const defaultScalingValues: ScalingValues = {
-  nodeWidthScale: 1.42,
-  nodeHeightScale: 1.48,
-  nodePaddingScale: 1.22,
-  siblingGapScale: 1.18,
-  levelGapScale: 1.1,
+  nodeWidthScale: 1.32,
+  nodeHeightScale: 1.36,
+  nodePaddingScale: 1.15,
+  siblingGapScale: 1.1,
+  levelGapScale: 1.05,
   fontScale: 1,
 };
 
@@ -31,12 +31,12 @@ const SLIDERS: ReadonlyArray<{
   max: number;
   step: number;
 }> = [
-  { key: 'nodeWidthScale',   label: 'Box width',       min: 1,    max: 2.2, step: 0.02 },
-  { key: 'nodeHeightScale',  label: 'Box height',      min: 1,    max: 2.2, step: 0.02 },
-  { key: 'nodePaddingScale', label: 'Box padding',     min: 1,    max: 2,   step: 0.02 },
-  { key: 'siblingGapScale',  label: 'Sibling spacing', min: 0.85, max: 1.8, step: 0.01 },
-  { key: 'levelGapScale',    label: 'Root distance',   min: 0.9,  max: 1.8, step: 0.01 },
-  { key: 'fontScale',        label: 'Text size',       min: 0.9,  max: 2.5, step: 0.01 },
+  { key: 'nodeWidthScale',   label: 'Box width',       min: 1,    max: 1.9, step: 0.02 },
+  { key: 'nodeHeightScale',  label: 'Box height',      min: 1,    max: 1.9, step: 0.02 },
+  { key: 'nodePaddingScale', label: 'Box padding',     min: 1,    max: 1.8, step: 0.02 },
+  { key: 'siblingGapScale',  label: 'Sibling spacing', min: 0.85, max: 1.6, step: 0.01 },
+  { key: 'levelGapScale',    label: 'Root distance',   min: 0.9,  max: 1.6, step: 0.01 },
+  { key: 'fontScale',        label: 'Text size',       min: 0.9,  max: 2.2, step: 0.01 },
 ];
 
 function formatPct(value: number): string {
