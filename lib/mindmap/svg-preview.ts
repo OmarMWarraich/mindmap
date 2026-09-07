@@ -79,6 +79,14 @@ export function resolveMindmapFontWeights(baseWeight = 800): {
   };
 }
 
+// Discrete weight steps are coarse; a same-color glyph stroke fattens text
+// continuously the same way the boundary stroke slider fattens borders.
+export function resolveMindmapTextStrokeWidth(fontSize: number, weight: number): number {
+  const clamped = Math.min(900, Math.max(400, weight));
+
+  return fontSize * ((clamped - 400) / 900) * 0.055;
+}
+
 interface SvgPreviewRenderMetrics {
   approxCharacterWidth: number;
   lineHeight: number;
@@ -511,6 +519,18 @@ export function createSvgPreviewSnapshot(
     text.setAttribute('font-weight', String(node.kind === 'root' ? fontWeights.root : fontWeights.node));
     text.setAttribute('text-anchor', 'middle');
     text.setAttribute('dominant-baseline', 'hanging');
+
+    const textStrokeWidth = resolveMindmapTextStrokeWidth(
+      node.fontSize,
+      node.kind === 'root' ? fontWeights.root : fontWeights.node,
+    );
+
+    if (textStrokeWidth > 0) {
+      text.setAttribute('stroke', node.style.text);
+      text.setAttribute('stroke-width', String(textStrokeWidth));
+      text.setAttribute('stroke-linejoin', 'round');
+      text.setAttribute('paint-order', 'stroke fill');
+    }
 
     for (const [index, segments] of node.lineSegments.entries()) {
       for (const [segmentIndex, segment] of segments.entries()) {

@@ -10,6 +10,7 @@ import {
   getSvgPreviewRenderMetrics,
   panSvgPreviewTransform,
   resolveMindmapFontWeights,
+  resolveMindmapTextStrokeWidth,
   wrapFormattedMindmapLabel,
   wrapMindmapLabel,
   zoomSvgPreviewAroundPoint,
@@ -736,6 +737,15 @@ test('resolveMindmapFontWeights maps the base weight onto root, node, and bold t
   assert.deepEqual(resolveMindmapFontWeights(900), { root: 900, node: 900, bold: 900 });
   assert.deepEqual(resolveMindmapFontWeights(1200), { root: 900, node: 900, bold: 900 });
   assert.deepEqual(resolveMindmapFontWeights(613), { root: 700, node: 600, bold: 800 });
+});
+
+test('resolveMindmapTextStrokeWidth fattens text continuously with weight and vanishes at 400', () => {
+  assert.equal(resolveMindmapTextStrokeWidth(22, 400), 0);
+  assert.equal(resolveMindmapTextStrokeWidth(22, 300), 0);
+  assert.equal(resolveMindmapTextStrokeWidth(22, 800) > resolveMindmapTextStrokeWidth(22, 600), true);
+  assert.equal(resolveMindmapTextStrokeWidth(30, 900) > resolveMindmapTextStrokeWidth(22, 900), true);
+  assert.equal(resolveMindmapTextStrokeWidth(30, 1200), resolveMindmapTextStrokeWidth(30, 900));
+  assert.equal(resolveMindmapTextStrokeWidth(30, 900) < 1.2, true);
 });
 
 test('buildSvgPreviewModel with the default theme matches themeless output exactly', () => {

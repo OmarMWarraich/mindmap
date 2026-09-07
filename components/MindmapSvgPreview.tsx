@@ -9,6 +9,7 @@ import {
   getSvgPreviewRenderMetrics,
   panSvgPreviewTransform,
   resolveMindmapFontWeights,
+  resolveMindmapTextStrokeWidth,
   type SvgPreviewTransform,
   zoomSvgPreviewAroundPoint,
 } from '../lib/mindmap/svg-preview';
@@ -372,6 +373,13 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
                     fontFamily={theme.typography.fontFamily}
                     fontSize={node.fontSize}
                     fontWeight={node.kind === 'root' ? fontWeights.root : fontWeights.node}
+                    paintOrder="stroke fill"
+                    stroke={node.style.text}
+                    strokeLinejoin="round"
+                    strokeWidth={resolveMindmapTextStrokeWidth(
+                      node.fontSize,
+                      node.kind === 'root' ? fontWeights.root : fontWeights.node,
+                    )}
                     textAnchor="middle"
                     x={node.width / 2}
                   >
