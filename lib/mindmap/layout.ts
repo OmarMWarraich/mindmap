@@ -32,6 +32,17 @@ export interface MindmapLayoutMetrics {
   branchOverlap: number;
 }
 
+export interface MindmapDensityEstimate {
+  occupiedNodeArea: number;
+  totalCanvasArea: number;
+  averageBranchSpread: number;
+  edgeToNodeRatio: number;
+  estimatedCoverage: number;
+  densityScore: number;
+  targetCoverage: number;
+  scaleAdjustment: number;
+}
+
 export interface MindmapBranchCluster {
   branchId: string;
   rootId: string;
@@ -462,6 +473,70 @@ function countOverlappingNodePairs(nodes: MindmapLayoutNode[]): number {
   return overlaps;
 }
 
+export function estimateMindmapDensity(
+  mindmap: GeneratedMindmap,
+  layoutOverride?: MindmapLayoutResult,
+): MindmapDensityEstimate {
+  const occupiedNodeArea = mindmap.nodes.reduce((total, node) => {
+    const nodeWidth = node.layout.minWidth + node.layout.paddingX * 2;
+    const nodeHeight = node.layout.minHeight + node.layout.paddingY * 2;
+    return total + nodeWidth * nodeHeight;
+  }, 0);
+
+  const branchNodes = mindmap.nodes.filter((node) => node.kind === 'branch');
+  const branchSpread =
+    branchNodes.length > 0
+      ? branchNodes.reduce((total, node) => {
+          const width = node.layout.minWidth + node.layout.paddingX * 2;
+          const height = node.layout.minHeight + node.layout.paddingY * 2;
+          const spread = Math.hypot(width, height) + node.level * mindmap.metadata.layout.levelGap;
+          return total + spread;
+        }, 0) / branchNodes.length
+      : 0;
+
+  const totalCanvasArea = layoutOverride
+    ? Math.max(layoutOverride.width * layoutOverride.height, 1)
+    : Math.max(
+        Math.PI *
+          Math.pow(
+            Math.max(
+              mindmap.metadata.layout.levelGap * (Math.max(branchNodes.length, 1) + 1),
+              estimateMindmapNodeArea(mindmap),
+            ),
+            2,
+          ) * 1.25,
+        occupiedNodeArea * 2.5,
+      );
+
+  const edgeToNodeRatio = mindmap.edges.length / Math.max(mindmap.nodes.length, 1);
+  const estimatedCoverage = totalCanvasArea > 0 ? occupiedNodeArea / totalCanvasArea : 0;
+  const targetCoverage = 0.5;
+  const coverageDistance = Math.abs(estimatedCoverage - targetCoverage) / Math.max(targetCoverage, 0.01);
+  const spreadSignal = clampNumber(branchSpread / Math.max(Math.sqrt(totalCanvasArea), 1), 0, 1);
+  const complexitySignal = clampNumber(edgeToNodeRatio / 2.5, 0, 1);
+  const densityScore = clampNumber(
+    0.7 * (1 - coverageDistance) + 0.2 * (1 - spreadSignal) + 0.1 * complexitySignal,
+    0,
+    1,
+  );
+  const scaleAdjustment = clampNumber(
+    1 + (targetCoverage - estimatedCoverage) * 1.8 + (1 - densityScore) * 0.18 + spreadSignal * 0.12,
+    0.7,
+    1.35,
+  );
+
+  return {
+    occupiedNodeArea,
+    totalCanvasArea,
+    averageBranchSpread: branchSpread,
+    edgeToNodeRatio,
+    estimatedCoverage,
+    densityScore,
+    targetCoverage,
+    scaleAdjustment,
+  };
+}
+
 export function createExportMindmapVariant(
   mindmap: GeneratedMindmap,
   options: MindmapExportScaleOptions = {},
@@ -470,11 +545,33 @@ export function createExportMindmapVariant(
     ...defaultMindmapExportScaleOptions,
     ...options,
   };
+  const densityProfile = estimateMindmapDensity(mindmap);
+  const densityAdaptiveScale = densityProfile.scaleAdjustment;
+  const spacingAdaptiveScale = clampNumber(
+    1 + (densityProfile.targetCoverage - densityProfile.estimatedCoverage) * 0.9,
+    0.72,
+    1.22,
+  );
   const textDrivenBoxScale = scaleWithTextInfluence(exportScale.textScale, 0.45);
   const textDrivenPaddingScale = scaleWithTextInfluence(exportScale.textScale, 0.32);
-  const effectiveWidthScale = exportScale.nodeWidthScale * textDrivenBoxScale;
-  const effectiveHeightScale = exportScale.nodeHeightScale * textDrivenBoxScale;
-  const effectivePaddingScale = exportScale.nodePaddingScale * textDrivenPaddingScale;
+  const widthScaleCeiling = Math.max(1.05, exportScale.textScale * 0.98);
+  const heightScaleCeiling = Math.max(1.05, exportScale.textScale * 0.98);
+  const paddingScaleCeiling = Math.max(1.05, exportScale.textScale * 0.98);
+  const effectiveWidthScale = clampNumber(
+    exportScale.nodeWidthScale * densityAdaptiveScale * textDrivenBoxScale,
+    1.05,
+    widthScaleCeiling,
+  );
+  const effectiveHeightScale = clampNumber(
+    exportScale.nodeHeightScale * densityAdaptiveScale * textDrivenBoxScale,
+    1.05,
+    heightScaleCeiling,
+  );
+  const effectivePaddingScale = clampNumber(
+    exportScale.nodePaddingScale * densityAdaptiveScale * textDrivenPaddingScale,
+    1.05,
+    paddingScaleCeiling,
+  );
 
   return {
     ...mindmap,
@@ -482,9 +579,18 @@ export function createExportMindmapVariant(
       ...mindmap.metadata,
       layout: {
         ...mindmap.metadata.layout,
-        levelGap: scalePositiveInt(mindmap.metadata.layout.levelGap, exportScale.levelGapScale),
-        siblingGap: scalePositiveInt(mindmap.metadata.layout.siblingGap, exportScale.siblingGapScale),
-        branchGap: scalePositiveInt(mindmap.metadata.layout.branchGap, exportScale.siblingGapScale),
+        levelGap: scalePositiveInt(
+          mindmap.metadata.layout.levelGap,
+          exportScale.levelGapScale * spacingAdaptiveScale,
+        ),
+        siblingGap: scalePositiveInt(
+          mindmap.metadata.layout.siblingGap,
+          exportScale.siblingGapScale * spacingAdaptiveScale,
+        ),
+        branchGap: scalePositiveInt(
+          mindmap.metadata.layout.branchGap,
+          exportScale.siblingGapScale * spacingAdaptiveScale,
+        ),
         branchWidthHint: scalePositiveInt(mindmap.metadata.layout.branchWidthHint, effectiveWidthScale),
         branchHeightHint: scalePositiveInt(mindmap.metadata.layout.branchHeightHint, effectiveHeightScale),
         leafWidthHint: scalePositiveInt(mindmap.metadata.layout.leafWidthHint, effectiveWidthScale),
@@ -501,7 +607,10 @@ export function createExportMindmapVariant(
         minHeight: scalePositiveInt(node.layout.minHeight, effectiveHeightScale),
         paddingX: scaleNonNegativeInt(node.layout.paddingX, effectivePaddingScale),
         paddingY: scaleNonNegativeInt(node.layout.paddingY, effectivePaddingScale),
-        siblingGap: scalePositiveInt(node.layout.siblingGap, exportScale.siblingGapScale),
+        siblingGap: scalePositiveInt(
+          node.layout.siblingGap,
+          exportScale.siblingGapScale * spacingAdaptiveScale,
+        ),
       },
     })),
     edges: mindmap.edges.map((edge) => ({ ...edge })),
@@ -625,6 +734,14 @@ function getMindmapRadialNodeSpacing(mindmap: GeneratedMindmap): number {
 
 function formatElkPadding(padding: number): string {
   return `[top=${padding},left=${padding},bottom=${padding},right=${padding}]`;
+}
+
+function estimateMindmapNodeArea(mindmap: GeneratedMindmap): number {
+  return mindmap.nodes.reduce((total, node) => {
+    const width = node.layout.minWidth + node.layout.paddingX * 2;
+    const height = node.layout.minHeight + node.layout.paddingY * 2;
+    return total + width * height;
+  }, 0);
 }
 
 function scalePositiveInt(value: number, factor: number): number {

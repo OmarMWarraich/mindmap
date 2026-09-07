@@ -8,6 +8,7 @@ import {
   computeMindmapLayoutMetrics,
   createExportMindmapVariant,
   createMindmapRadialLayoutOptions,
+  estimateMindmapDensity,
   layoutMindmapWithElk,
   layoutMindmapWithElkRaw,
 } from './layout.ts';
@@ -64,6 +65,20 @@ test('buildMindmapBranchClusterPlan groups branches into compact angular slots a
   assert.equal(plan.clusters.every((cluster) => cluster.angleEnd > cluster.angleStart), true);
   assert.equal(plan.clusters.every((cluster) => cluster.angle >= cluster.angleStart), true);
   assert.equal(plan.clusters.every((cluster) => cluster.angle <= cluster.angleEnd), true);
+});
+
+test('estimateMindmapDensity measures occupancy, spread, and edge density for auto-fit', () => {
+  const density = estimateMindmapDensity(validGeneratedMindmapFixture);
+
+  assert.equal(Number.isFinite(density.occupiedNodeArea), true);
+  assert.equal(Number.isFinite(density.totalCanvasArea), true);
+  assert.equal(Number.isFinite(density.averageBranchSpread), true);
+  assert.equal(Number.isFinite(density.edgeToNodeRatio), true);
+  assert.equal(Number.isFinite(density.estimatedCoverage), true);
+  assert.equal(Number.isFinite(density.densityScore), true);
+  assert.equal(density.estimatedCoverage > 0, true);
+  assert.equal(density.densityScore >= 0, true);
+  assert.equal(density.densityScore <= 1, true);
 });
 
 test('layoutMindmapWithElk reduces branch radius after the branch-cluster post-pass', async () => {
