@@ -8,6 +8,7 @@ export interface ScalingValues {
   levelGapScale: number;
   fontScale: number;
   fontWeight: number;
+  strokeScale: number;
 }
 
 export const defaultScalingValues: ScalingValues = {
@@ -18,6 +19,7 @@ export const defaultScalingValues: ScalingValues = {
   levelGapScale: 1.05,
   fontScale: 1,
   fontWeight: 800,
+  strokeScale: 1,
 };
 
 interface ExpertScalingPanelProps {
@@ -41,6 +43,7 @@ const SLIDERS: ReadonlyArray<{
   { key: 'levelGapScale',    label: 'Root distance',   min: 0.9,  max: 1.6, step: 0.01 },
   { key: 'fontScale',        label: 'Text size',       min: 0.9,  max: 2.2, step: 0.01 },
   { key: 'fontWeight',       label: 'Font weight',     min: 400,  max: 900, step: 50, format: 'raw' },
+  { key: 'strokeScale',      label: 'Stroke weight',   min: 0.6,  max: 2.5, step: 0.05 },
 ];
 
 function formatPct(value: number): string {

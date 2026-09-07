@@ -529,6 +529,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
         profile: 'export',
         renderScale: exportControls.fontScale,
         fontWeight: exportControls.fontWeight,
+        strokeScale: exportControls.strokeScale,
         theme,
       });
 
@@ -581,6 +582,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
       const snapshot = createSvgPreviewSnapshot(effectiveMindmap, deterministicLayout, {
         profile: 'export',
         fontWeight: exportControls.fontWeight,
+        strokeScale: exportControls.strokeScale,
         theme,
       });
       // 1024px edge keeps the upload well under the serverless body cap.
@@ -845,6 +847,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
             onNodePositionOverridesChange={setNodePositionOverrides}
             onTransformChange={setPreviewTransform}
             renderScale={exportControls.fontScale}
+            strokeScale={exportControls.strokeScale}
             theme={theme}
             transform={previewTransform}
           />
@@ -883,6 +886,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
             onTransformChange={setPreviewTransform}
             open={previewOpen}
             renderScale={exportControls.fontScale}
+            strokeScale={exportControls.strokeScale}
             theme={theme}
             transform={previewTransform}
           />

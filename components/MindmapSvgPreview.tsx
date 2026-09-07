@@ -34,6 +34,7 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
   transform?: SvgPreviewTransform;
   renderScale?: number;
   fontWeight?: number;
+  strokeScale?: number;
   onTransformChange?: (transform: SvgPreviewTransform) => void;
   nodePositionOverrides?: MindmapNodePositionOverrides;
   onNodePositionOverridesChange?: (overrides: MindmapNodePositionOverrides) => void;
@@ -46,6 +47,7 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
   transform: controlledTransform,
   renderScale = 1,
   fontWeight,
+  strokeScale = 1,
   onTransformChange,
   nodePositionOverrides,
   onNodePositionOverridesChange,
@@ -305,7 +307,7 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
                 key={edge.id}
                 stroke={edge.color}
                 strokeOpacity={theme.edge.opacity}
-                strokeWidth={previewMetrics.edgeStrokeWidth * theme.edge.strokeWidthScale}
+                strokeWidth={previewMetrics.edgeStrokeWidth * theme.edge.strokeWidthScale * strokeScale}
               />
             ))}
           </g>
@@ -351,7 +353,7 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
                     height={node.height}
                     rx={(node.kind === 'root' ? previewMetrics.rootCornerRadius : previewMetrics.nodeCornerRadius) * theme.node.cornerRadiusScale}
                     stroke={node.style.stroke}
-                    strokeWidth={(node.kind === 'root' ? previewMetrics.rootStrokeWidth : previewMetrics.nodeStrokeWidth) * theme.node.strokeWidthScale}
+                    strokeWidth={(node.kind === 'root' ? previewMetrics.rootStrokeWidth : previewMetrics.nodeStrokeWidth) * theme.node.strokeWidthScale * strokeScale}
                     width={node.width}
                     x="0"
                     y="0"

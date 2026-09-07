@@ -396,6 +396,7 @@ export function createSvgPreviewSnapshot(
     profile?: SvgPreviewRenderProfile;
     renderScale?: number;
     fontWeight?: number;
+    strokeScale?: number;
     theme?: MindmapTheme;
   } = {},
 ): { node: SVGSVGElement; width: number; height: number } {
@@ -406,12 +407,13 @@ export function createSvgPreviewSnapshot(
   const profile = options.profile ?? 'preview';
   const theme = options.theme ?? defaultMindmapTheme;
   const fontWeights = resolveMindmapFontWeights(options.fontWeight);
+  const strokeScale = Math.max(0.2, options.strokeScale ?? 1);
   const metrics = applyThemeTypographyToMetrics(
     getSvgPreviewRenderMetrics(profile, { scale: options.renderScale }),
     theme,
   );
   const exportPadding = Math.ceil(
-    Math.max(metrics.edgeStrokeWidth, metrics.rootStrokeWidth, metrics.nodeStrokeWidth) + 4,
+    Math.max(metrics.edgeStrokeWidth, metrics.rootStrokeWidth, metrics.nodeStrokeWidth) * strokeScale + 4,
   );
   const model = buildSvgPreviewModel(mindmap, layoutResult, {
     profile,
@@ -441,7 +443,7 @@ export function createSvgPreviewSnapshot(
     path.setAttribute('d', edge.path);
     path.setAttribute('stroke', edge.color);
     path.setAttribute('stroke-opacity', String(theme.edge.opacity));
-    path.setAttribute('stroke-width', String(metrics.edgeStrokeWidth * theme.edge.strokeWidthScale));
+    path.setAttribute('stroke-width', String(metrics.edgeStrokeWidth * theme.edge.strokeWidthScale * strokeScale));
     edgeGroup.append(path);
   }
 
@@ -485,7 +487,8 @@ export function createSvgPreviewSnapshot(
       'stroke-width',
       String(
         (node.kind === 'root' ? metrics.rootStrokeWidth : metrics.nodeStrokeWidth)
-        * theme.node.strokeWidthScale,
+        * theme.node.strokeWidthScale
+        * strokeScale,
       ),
     );
     frame.setAttribute('rx', String(cornerRadius));

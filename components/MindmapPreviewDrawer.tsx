@@ -19,6 +19,7 @@ export interface MindmapPreviewDrawerProps {
   transform: SvgPreviewTransform;
   renderScale?: number;
   fontWeight?: number;
+  strokeScale?: number;
   onTransformChange: (transform: SvgPreviewTransform) => void;
   theme?: MindmapTheme;
 }
@@ -56,6 +57,7 @@ const MindmapPreviewDrawer = forwardRef<
     transform,
     renderScale,
     fontWeight,
+    strokeScale,
     onTransformChange,
     theme,
   },
@@ -102,6 +104,7 @@ const MindmapPreviewDrawer = forwardRef<
             mindmap={mindmap}
             onTransformChange={onTransformChange}
             renderScale={renderScale}
+            strokeScale={strokeScale}
             theme={theme}
             transform={transform}
           />
