@@ -41,8 +41,8 @@ const SLIDERS: ReadonlyArray<{
   { key: 'nodePaddingScale', label: 'Box padding',     min: 1,    max: 1.8, step: 0.02 },
   { key: 'siblingGapScale',  label: 'Sibling spacing', min: 0.85, max: 1.6, step: 0.01 },
   { key: 'levelGapScale',    label: 'Root distance',   min: 0.9,  max: 1.6, step: 0.01 },
-  { key: 'fontScale',        label: 'Text size',       min: 0.9,  max: 2.2, step: 0.01 },
-  { key: 'fontWeight',       label: 'Font weight',     min: 400,  max: 900, step: 50, format: 'raw' },
+  { key: 'fontScale',        label: 'Text size',       min: 0.9,  max: 8.5, step: 0.01 },
+  { key: 'fontWeight',       label: 'Font weight',     min: 400,  max: 1800, step: 50, format: 'raw' },
   { key: 'strokeScale',      label: 'Stroke weight',   min: 0.6,  max: 2.5, step: 0.05 },
 ];
 

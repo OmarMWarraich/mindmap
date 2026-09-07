@@ -251,13 +251,36 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
   const effectiveMindmap = generatedMindmap
     ?? (latestMindmapSnapshotOutline === outline ? latestMindmapSnapshot : null);
 
+  // Debounced so slider drags don't spam ELK relayouts.
+  const [debouncedExportControls, setDebouncedExportControls] = useState<ScalingValues>(exportControls);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedExportControls(exportControls);
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [exportControls]);
+
+  // Preview lays out the same scaled variant as exports so box sizes follow
+  // the sliders; otherwise large text only shrinks to fit fixed boxes.
+  const previewLayoutMindmap = useMemo(() => {
+    if (!effectiveMindmap) {
+      return null;
+    }
+
+    return createExportMindmapVariant(effectiveMindmap, getExportScaleOptions(debouncedExportControls));
+  }, [effectiveMindmap, debouncedExportControls]);
+
   const displayLayoutResult = useMemo(() => {
-    if (!layoutResult || !effectiveMindmap) {
+    if (!layoutResult || !previewLayoutMindmap) {
       return layoutResult;
     }
 
-    return applyMindmapNodePositionOverrides(effectiveMindmap, layoutResult, nodePositionOverrides);
-  }, [effectiveMindmap, layoutResult, nodePositionOverrides]);
+    return applyMindmapNodePositionOverrides(previewLayoutMindmap, layoutResult, nodePositionOverrides);
+  }, [previewLayoutMindmap, layoutResult, nodePositionOverrides]);
 
   const effectiveLayoutStatus = layoutStatus;
   const effectiveLayoutError = layoutError;
@@ -346,7 +369,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
   }, []);
 
   useEffect(() => {
-    if (!effectiveMindmap) {
+    if (!previewLayoutMindmap) {
       // Reset to idle when there's no valid mindmap to lay out. Kept in the
       // effect (not during render) so render stays pure; the state writes run in
       // a closure to avoid a synchronous cascade-render in the effect body, and
@@ -374,13 +397,13 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
       setLayoutDiagnostics({
         phase: 'posting',
         summary: `Starting layout request ${requestId} (attempting worker transport).`,
-        detail: `Laying out ${effectiveMindmap.nodes.length} nodes and ${effectiveMindmap.edges.length} edges (worker preferred; main-thread fallback if unavailable).`,
+        detail: `Laying out ${previewLayoutMindmap.nodes.length} nodes and ${previewLayoutMindmap.edges.length} edges (worker preferred; main-thread fallback if unavailable).`,
         requestId,
       });
 
       try {
         const { result, transport, fallbackReason } =
-          await getMindmapLayoutClient().layout(effectiveMindmap);
+          await getMindmapLayoutClient().layout(previewLayoutMindmap);
         if (cancelled || layoutRequestIdRef.current !== requestId) {
           return;
         }
@@ -432,7 +455,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
     return () => {
       cancelled = true;
     };
-  }, [effectiveMindmap]);
+  }, [previewLayoutMindmap]);
 
   useEffect(() => {
     if (!hasRestoredDraftRef.current) {
@@ -579,7 +602,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
     try {
       // The AI pass renders a visual background layer only. It does not decide the
       // mindmap geometry; it consumes the exact same deterministic branch-cluster layout as preview/export.
-      const snapshot = createSvgPreviewSnapshot(effectiveMindmap, deterministicLayout, {
+      const snapshot = createSvgPreviewSnapshot(previewLayoutMindmap ?? effectiveMindmap, deterministicLayout, {
         profile: 'export',
         fontWeight: exportControls.fontWeight,
         strokeScale: exportControls.strokeScale,
@@ -842,7 +865,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
             layoutError={effectiveLayoutError}
             layoutResult={displayLayoutResult}
             layoutStatus={effectiveLayoutStatus}
-            mindmap={effectiveMindmap}
+            mindmap={previewLayoutMindmap ?? effectiveMindmap}
             nodePositionOverrides={nodePositionOverrides}
             onNodePositionOverridesChange={setNodePositionOverrides}
             onTransformChange={setPreviewTransform}
@@ -879,7 +902,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
             layoutError={effectiveLayoutError}
             layoutResult={displayLayoutResult}
             layoutStatus={effectiveLayoutStatus}
-            mindmap={effectiveMindmap}
+            mindmap={previewLayoutMindmap ?? effectiveMindmap}
             onClose={() => {
               setPreviewOpen(false);
             }}
