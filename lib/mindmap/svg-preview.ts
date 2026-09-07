@@ -138,11 +138,11 @@ const branchTokenStyles = {
 
 const previewRenderMetrics: SvgPreviewRenderMetrics = {
   approxCharacterWidth: 8,
-  lineHeight: 20,
-  rootFontSize: 22,
-  nodeFontSize: 16,
-  rootLineStartY: 50,
-  nodeLineStartY: 42,
+  lineHeight: 24,
+  rootFontSize: 30,
+  nodeFontSize: 22,
+  rootLineStartY: 60,
+  nodeLineStartY: 48,
   rootStrokeWidth: 3,
   nodeStrokeWidth: 2,
   rootCornerRadius: 28,

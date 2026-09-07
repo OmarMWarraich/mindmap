@@ -230,6 +230,36 @@ test('buildSvgPreviewModel wraps export text more aggressively when render scale
   assert.equal(model.nodes[0]!.lines.length >= 4, true);
 });
 
+test('buildSvgPreviewModel keeps preview text readable without zooming', () => {
+  const node = validGeneratedMindmapFixture.nodes[1]!;
+  const model = buildSvgPreviewModel(
+    {
+      ...validGeneratedMindmapFixture,
+      nodes: [{ ...node, label: 'Comparative methodology and synthesis' }],
+      edges: [],
+    },
+    {
+      width: 440,
+      height: 260,
+      nodes: [{
+        id: node.id,
+        x: 60,
+        y: 40,
+        width: 260,
+        height: 150,
+      }],
+      edges: [],
+    },
+    {
+      profile: 'preview',
+      renderScale: 1,
+    },
+  );
+
+  assert.equal(model.nodes[0]!.fontSize >= 20, true);
+  assert.equal(model.nodes[0]!.lineHeight >= 24, true);
+});
+
 test('buildSvgPreviewModel keeps export text close to the shared target size for larger boxes', () => {
   const node = validGeneratedMindmapFixture.nodes[1]!;
   const metrics = getSvgPreviewRenderMetrics('export', { scale: 1.4 });
@@ -263,6 +293,41 @@ test('buildSvgPreviewModel keeps export text close to the shared target size for
   assert.equal(model.nodes[0]!.fontSize <= metrics.nodeFontSize, true);
   assert.equal(model.nodes[0]!.fontSize >= metrics.nodeFontSize * 0.75, true);
   assert.equal(model.nodes[0]!.lineHeight >= metrics.lineHeight * 0.85, true);
+});
+
+test('buildSvgPreviewModel keeps roomy export boxes readable instead of shrinking text to a tiny floor', () => {
+  const node = validGeneratedMindmapFixture.nodes[1]!;
+  const metrics = getSvgPreviewRenderMetrics('export', { scale: 1.2 });
+  const model = buildSvgPreviewModel(
+    {
+      ...validGeneratedMindmapFixture,
+      nodes: [{
+        ...node,
+        label: 'Comparative frameworks for structured note synthesis in dense academic review work',
+      }],
+      edges: [],
+    },
+    {
+      width: 680,
+      height: 360,
+      nodes: [{
+        id: node.id,
+        x: 60,
+        y: 40,
+        width: 420,
+        height: 220,
+      }],
+      edges: [],
+    },
+    {
+      profile: 'export',
+      renderScale: 1.2,
+    },
+  );
+
+  assert.equal(model.nodes[0]!.fontSize >= metrics.nodeFontSize * 0.97, true);
+  assert.equal(model.nodes[0]!.fontSize >= 20, true);
+  assert.equal(model.nodes[0]!.lineHeight >= metrics.lineHeight * 0.95, true);
 });
 
 test('buildSvgPreviewModel keeps a single export branch line at the base size when vertical space fits', () => {

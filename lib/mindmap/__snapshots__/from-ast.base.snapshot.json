@@ -1,1 +1,221 @@
-"{\n  \"version\": \"1.0\",\n  \"metadata\": {\n    \"title\": \"Photosynthesis\",\n    \"rootId\": \"root-photosynthesis\",\n    \"branchOrder\": [\n      \"branch-1-overview\",\n      \"branch-2-calvin-cycle\"\n    ],\n    \"layout\": {\n      \"canvasPadding\": 96,\n      \"levelGap\": 168,\n      \"siblingGap\": 44,\n      \"branchGap\": 60,\n      \"nodePaddingX\": 20,\n      \"nodePaddingY\": 14,\n      \"branchWidthHint\": 220,\n      \"branchHeightHint\": 84,\n      \"leafWidthHint\": 156,\n      \"leafHeightHint\": 60\n    },\n    \"source\": {\n      \"format\": \"mindmap-dsl\",\n      \"version\": \"mvp-v1\"\n    }\n  },\n  \"nodes\": [\n    {\n      \"id\": \"root-photosynthesis\",\n      \"kind\": \"root\",\n      \"label\": \"Photosynthesis\",\n      \"level\": 0,\n      \"parentId\": null,\n      \"branchId\": \"root-photosynthesis\",\n      \"childIds\": [\n        \"branch-1-overview\",\n        \"branch-2-calvin-cycle\"\n      ],\n      \"layout\": {\n        \"minWidth\": 268,\n        \"minHeight\": 122,\n        \"paddingX\": 20,\n        \"paddingY\": 14,\n        \"siblingGap\": 52\n      }\n    },\n    {\n      \"id\": \"branch-1-overview\",\n      \"kind\": \"branch\",\n      \"label\": \"Overview\",\n      \"level\": 1,\n      \"parentId\": \"root-photosynthesis\",\n      \"branchId\": \"branch-1-overview\",\n      \"childIds\": [\n        \"node-1-1-definition\",\n        \"node-1-2-why-it-matters\"\n      ],\n      \"style\": {\n        \"branchKey\": \"branch-1-overview\",\n        \"branchIndex\": 0,\n        \"colorToken\": \"amber\",\n        \"tintTone\": \"strong\"\n      },\n      \"layout\": {\n        \"minWidth\": 220,\n        \"minHeight\": 104,\n        \"paddingX\": 20,\n        \"paddingY\": 14,\n        \"siblingGap\": 52\n      }\n    },\n    {\n      \"id\": \"node-1-1-definition\",\n      \"kind\": \"leaf\",\n      \"label\": \"Definition\",\n      \"level\": 2,\n      \"parentId\": \"branch-1-overview\",\n      \"branchId\": \"branch-1-overview\",\n      \"childIds\": [],\n      \"style\": {\n        \"branchKey\": \"branch-1-overview\",\n        \"branchIndex\": 0,\n        \"colorToken\": \"amber\",\n        \"tintTone\": \"base\"\n      },\n      \"layout\": {\n        \"minWidth\": 156,\n        \"minHeight\": 76,\n        \"paddingX\": 20,\n        \"paddingY\": 14,\n        \"siblingGap\": 44\n      }\n    },\n    {\n      \"id\": \"node-1-2-why-it-matters\",\n      \"kind\": \"leaf\",\n      \"label\": \"Why it matters\",\n      \"level\": 2,\n      \"parentId\": \"branch-1-overview\",\n      \"branchId\": \"branch-1-overview\",\n      \"childIds\": [],\n      \"style\": {\n        \"branchKey\": \"branch-1-overview\",\n        \"branchIndex\": 0,\n        \"colorToken\": \"amber\",\n        \"tintTone\": \"base\"\n      },\n      \"layout\": {\n        \"minWidth\": 156,\n        \"minHeight\": 76,\n        \"paddingX\": 20,\n        \"paddingY\": 14,\n        \"siblingGap\": 44\n      }\n    },\n    {\n      \"id\": \"branch-2-calvin-cycle\",\n      \"kind\": \"branch\",\n      \"label\": \"Calvin cycle\",\n      \"level\": 1,\n      \"parentId\": \"root-photosynthesis\",\n      \"branchId\": \"branch-2-calvin-cycle\",\n      \"childIds\": [\n        \"node-2-1-steps\"\n      ],\n      \"style\": {\n        \"branchKey\": \"branch-2-calvin-cycle\",\n        \"branchIndex\": 1,\n        \"colorToken\": \"emerald\",\n        \"tintTone\": \"strong\"\n      },\n      \"layout\": {\n        \"minWidth\": 220,\n        \"minHeight\": 94,\n        \"paddingX\": 20,\n        \"paddingY\": 14,\n        \"siblingGap\": 48\n      }\n    },\n    {\n      \"id\": \"node-2-1-steps\",\n      \"kind\": \"leaf\",\n      \"label\": \"Steps\",\n      \"level\": 2,\n      \"parentId\": \"branch-2-calvin-cycle\",\n      \"branchId\": \"branch-2-calvin-cycle\",\n      \"childIds\": [\n        \"node-2-1-1-fixation\"\n      ],\n      \"style\": {\n        \"branchKey\": \"branch-2-calvin-cycle\",\n        \"branchIndex\": 1,\n        \"colorToken\": \"emerald\",\n        \"tintTone\": \"base\"\n      },\n      \"layout\": {\n        \"minWidth\": 156,\n        \"minHeight\": 76,\n        \"paddingX\": 20,\n        \"paddingY\": 14,\n        \"siblingGap\": 48\n      }\n    },\n    {\n      \"id\": \"node-2-1-1-fixation\",\n      \"kind\": \"leaf\",\n      \"label\": \"Fixation\",\n      \"level\": 3,\n      \"parentId\": \"node-2-1-steps\",\n      \"branchId\": \"branch-2-calvin-cycle\",\n      \"childIds\": [],\n      \"style\": {\n        \"branchKey\": \"branch-2-calvin-cycle\",\n        \"branchIndex\": 1,\n        \"colorToken\": \"emerald\",\n        \"tintTone\": \"soft\"\n      },\n      \"layout\": {\n        \"minWidth\": 156,\n        \"minHeight\": 76,\n        \"paddingX\": 20,\n        \"paddingY\": 14,\n        \"siblingGap\": 48\n      }\n    }\n  ],\n  \"edges\": [\n    {\n      \"id\": \"root-photosynthesis->branch-1-overview\",\n      \"from\": \"root-photosynthesis\",\n      \"to\": \"branch-1-overview\"\n    },\n    {\n      \"id\": \"branch-1-overview->node-1-1-definition\",\n      \"from\": \"branch-1-overview\",\n      \"to\": \"node-1-1-definition\"\n    },\n    {\n      \"id\": \"branch-1-overview->node-1-2-why-it-matters\",\n      \"from\": \"branch-1-overview\",\n      \"to\": \"node-1-2-why-it-matters\"\n    },\n    {\n      \"id\": \"root-photosynthesis->branch-2-calvin-cycle\",\n      \"from\": \"root-photosynthesis\",\n      \"to\": \"branch-2-calvin-cycle\"\n    },\n    {\n      \"id\": \"branch-2-calvin-cycle->node-2-1-steps\",\n      \"from\": \"branch-2-calvin-cycle\",\n      \"to\": \"node-2-1-steps\"\n    },\n    {\n      \"id\": \"node-2-1-steps->node-2-1-1-fixation\",\n      \"from\": \"node-2-1-steps\",\n      \"to\": \"node-2-1-1-fixation\"\n    }\n  ],\n  \"warnings\": [],\n  \"errors\": []\n}"
+{
+  "version": "1.0",
+  "metadata": {
+    "title": "Photosynthesis",
+    "rootId": "root-photosynthesis",
+    "branchOrder": [
+      "branch-1-overview",
+      "branch-2-calvin-cycle"
+    ],
+    "layout": {
+      "canvasPadding": 96,
+      "levelGap": 168,
+      "siblingGap": 44,
+      "branchGap": 60,
+      "nodePaddingX": 20,
+      "nodePaddingY": 14,
+      "branchWidthHint": 220,
+      "branchHeightHint": 84,
+      "leafWidthHint": 156,
+      "leafHeightHint": 60
+    },
+    "source": {
+      "format": "mindmap-dsl",
+      "version": "mvp-v1"
+    }
+  },
+  "nodes": [
+    {
+      "id": "root-photosynthesis",
+      "kind": "root",
+      "label": "Photosynthesis",
+      "level": 0,
+      "parentId": null,
+      "branchId": "root-photosynthesis",
+      "childIds": [
+        "branch-1-overview",
+        "branch-2-calvin-cycle"
+      ],
+      "layout": {
+        "minWidth": 402,
+        "minHeight": 183,
+        "paddingX": 20,
+        "paddingY": 14,
+        "siblingGap": 52
+      }
+    },
+    {
+      "id": "branch-1-overview",
+      "kind": "branch",
+      "label": "Overview",
+      "level": 1,
+      "parentId": "root-photosynthesis",
+      "branchId": "branch-1-overview",
+      "childIds": [
+        "node-1-1-definition",
+        "node-1-2-why-it-matters"
+      ],
+      "style": {
+        "branchKey": "branch-1-overview",
+        "branchIndex": 0,
+        "colorToken": "amber",
+        "tintTone": "strong"
+      },
+      "layout": {
+        "minWidth": 330,
+        "minHeight": 156,
+        "paddingX": 20,
+        "paddingY": 14,
+        "siblingGap": 52
+      }
+    },
+    {
+      "id": "node-1-1-definition",
+      "kind": "leaf",
+      "label": "Definition",
+      "level": 2,
+      "parentId": "branch-1-overview",
+      "branchId": "branch-1-overview",
+      "childIds": [],
+      "style": {
+        "branchKey": "branch-1-overview",
+        "branchIndex": 0,
+        "colorToken": "amber",
+        "tintTone": "base"
+      },
+      "layout": {
+        "minWidth": 234,
+        "minHeight": 114,
+        "paddingX": 20,
+        "paddingY": 14,
+        "siblingGap": 44
+      }
+    },
+    {
+      "id": "node-1-2-why-it-matters",
+      "kind": "leaf",
+      "label": "Why it matters",
+      "level": 2,
+      "parentId": "branch-1-overview",
+      "branchId": "branch-1-overview",
+      "childIds": [],
+      "style": {
+        "branchKey": "branch-1-overview",
+        "branchIndex": 0,
+        "colorToken": "amber",
+        "tintTone": "base"
+      },
+      "layout": {
+        "minWidth": 234,
+        "minHeight": 114,
+        "paddingX": 20,
+        "paddingY": 14,
+        "siblingGap": 44
+      }
+    },
+    {
+      "id": "branch-2-calvin-cycle",
+      "kind": "branch",
+      "label": "Calvin cycle",
+      "level": 1,
+      "parentId": "root-photosynthesis",
+      "branchId": "branch-2-calvin-cycle",
+      "childIds": [
+        "node-2-1-steps"
+      ],
+      "style": {
+        "branchKey": "branch-2-calvin-cycle",
+        "branchIndex": 1,
+        "colorToken": "emerald",
+        "tintTone": "strong"
+      },
+      "layout": {
+        "minWidth": 330,
+        "minHeight": 141,
+        "paddingX": 20,
+        "paddingY": 14,
+        "siblingGap": 48
+      }
+    },
+    {
+      "id": "node-2-1-steps",
+      "kind": "leaf",
+      "label": "Steps",
+      "level": 2,
+      "parentId": "branch-2-calvin-cycle",
+      "branchId": "branch-2-calvin-cycle",
+      "childIds": [
+        "node-2-1-1-fixation"
+      ],
+      "style": {
+        "branchKey": "branch-2-calvin-cycle",
+        "branchIndex": 1,
+        "colorToken": "emerald",
+        "tintTone": "base"
+      },
+      "layout": {
+        "minWidth": 234,
+        "minHeight": 114,
+        "paddingX": 20,
+        "paddingY": 14,
+        "siblingGap": 48
+      }
+    },
+    {
+      "id": "node-2-1-1-fixation",
+      "kind": "leaf",
+      "label": "Fixation",
+      "level": 3,
+      "parentId": "node-2-1-steps",
+      "branchId": "branch-2-calvin-cycle",
+      "childIds": [],
+      "style": {
+        "branchKey": "branch-2-calvin-cycle",
+        "branchIndex": 1,
+        "colorToken": "emerald",
+        "tintTone": "soft"
+      },
+      "layout": {
+        "minWidth": 234,
+        "minHeight": 114,
+        "paddingX": 20,
+        "paddingY": 14,
+        "siblingGap": 48
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "root-photosynthesis->branch-1-overview",
+      "from": "root-photosynthesis",
+      "to": "branch-1-overview"
+    },
+    {
+      "id": "branch-1-overview->node-1-1-definition",
+      "from": "branch-1-overview",
+      "to": "node-1-1-definition"
+    },
+    {
+      "id": "branch-1-overview->node-1-2-why-it-matters",
+      "from": "branch-1-overview",
+      "to": "node-1-2-why-it-matters"
+    },
+    {
+      "id": "root-photosynthesis->branch-2-calvin-cycle",
+      "from": "root-photosynthesis",
+      "to": "branch-2-calvin-cycle"
+    },
+    {
+      "id": "branch-2-calvin-cycle->node-2-1-steps",
+      "from": "branch-2-calvin-cycle",
+      "to": "node-2-1-steps"
+    },
+    {
+      "id": "node-2-1-steps->node-2-1-1-fixation",
+      "from": "node-2-1-steps",
+      "to": "node-2-1-1-fixation"
+    }
+  ],
+  "warnings": [],
+  "errors": []
+}
