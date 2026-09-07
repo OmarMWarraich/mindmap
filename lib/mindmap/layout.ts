@@ -32,6 +32,26 @@ export interface MindmapLayoutMetrics {
   branchOverlap: number;
 }
 
+export interface MindmapBranchCluster {
+  branchId: string;
+  rootId: string;
+  nodeIds: string[];
+  nodeCount: number;
+  totalNodeArea: number;
+  subtreeDepth: number;
+  longestLabelWidth: number;
+  weight: number;
+  angleStart: number;
+  angleEnd: number;
+  angle: number;
+}
+
+export interface MindmapBranchClusterLayoutPlan {
+  rootId: string;
+  clusters: MindmapBranchCluster[];
+  totalWeight: number;
+}
+
 export interface MindmapExportScaleOptions {
   nodeWidthScale?: number;
   nodeHeightScale?: number;
@@ -97,6 +117,87 @@ export async function layoutMindmapWithElk(
       id: edge.id ?? 'edge',
       points: collectEdgePoints(edge),
     })),
+  };
+}
+
+export function buildMindmapBranchClusterPlan(
+  mindmap: GeneratedMindmap,
+): MindmapBranchClusterLayoutPlan {
+  const branchNodes = mindmap.nodes.filter((node) => node.kind === 'branch');
+  const orderedBranches = [...branchNodes].sort((left, right) => {
+    const leftIndex = mindmap.metadata.branchOrder.indexOf(left.id);
+    const rightIndex = mindmap.metadata.branchOrder.indexOf(right.id);
+
+    if (leftIndex === -1 && rightIndex === -1) {
+      return left.id.localeCompare(right.id);
+    }
+
+    if (leftIndex === -1) {
+      return 1;
+    }
+
+    if (rightIndex === -1) {
+      return -1;
+    }
+
+    return leftIndex - rightIndex;
+  });
+
+  const clusters: MindmapBranchCluster[] = [];
+
+  for (const branch of orderedBranches) {
+    const nodeIds = collectSubtreeNodeIds(branch.id, mindmap.nodes);
+    const totalNodeArea = mindmap.nodes
+      .filter((node) => nodeIds.includes(node.id))
+      .reduce((total, node) => {
+        const nodeBoxWidth = node.layout.minWidth + node.layout.paddingX * 2;
+        const nodeBoxHeight = node.layout.minHeight + node.layout.paddingY * 2;
+        return total + nodeBoxWidth * nodeBoxHeight;
+      }, 0);
+    const subtreeDepth = Math.max(
+      ...mindmap.nodes
+        .filter((node) => nodeIds.includes(node.id))
+        .map((node) => node.level - branch.level + 1),
+      1,
+    );
+    const longestLabelWidth = Math.max(
+      ...mindmap.nodes
+        .filter((node) => nodeIds.includes(node.id))
+        .map((node) => node.label.length * 8 + 24),
+      1,
+    );
+    const weight = nodeIds.length * 1.4 + totalNodeArea / 160 + subtreeDepth * 8 + longestLabelWidth / 10;
+
+    clusters.push({
+      branchId: branch.id,
+      rootId: branch.id,
+      nodeIds,
+      nodeCount: nodeIds.length,
+      totalNodeArea,
+      subtreeDepth,
+      longestLabelWidth,
+      weight,
+      angleStart: 0,
+      angleEnd: 0,
+      angle: 0,
+    });
+  }
+
+  const totalWeight = clusters.reduce((total, cluster) => total + cluster.weight, 0);
+  let currentAngle = 0;
+
+  for (const cluster of clusters) {
+    const span = totalWeight > 0 ? (cluster.weight / totalWeight) * (Math.PI * 2 * 0.8) : 0;
+    cluster.angleStart = currentAngle;
+    cluster.angleEnd = currentAngle + span;
+    cluster.angle = cluster.angleStart + span / 2;
+    currentAngle = cluster.angleEnd + (Math.PI * 2 * 0.2) / Math.max(clusters.length, 1);
+  }
+
+  return {
+    rootId: mindmap.metadata.rootId,
+    clusters,
+    totalWeight,
   };
 }
 
@@ -235,6 +336,26 @@ export function createExportMindmapVariant(
     warnings: [...mindmap.warnings],
     errors: [...mindmap.errors],
   };
+}
+
+function collectSubtreeNodeIds(
+  rootId: string,
+  nodes: GeneratedMindmap['nodes'],
+  visited = new Set<string>(),
+): string[] {
+  if (visited.has(rootId)) {
+    return [];
+  }
+
+  visited.add(rootId);
+  const rootNode = nodes.find((node) => node.id === rootId);
+
+  if (!rootNode) {
+    return [];
+  }
+
+  const descendants = rootNode.childIds.flatMap((childId) => collectSubtreeNodeIds(childId, nodes, visited));
+  return [rootId, ...descendants];
 }
 
 function collectEdgePoints(edge: NonNullable<ElkNode['edges']>[number]): ElkPoint[] {

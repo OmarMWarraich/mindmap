@@ -4,6 +4,7 @@ import test from 'node:test';
 import { generateMindmapFromAst } from './from-ast.ts';
 import { validGeneratedMindmapFixture } from './__fixtures__/generatedMindmap.ts';
 import {
+  buildMindmapBranchClusterPlan,
   computeMindmapLayoutMetrics,
   createExportMindmapVariant,
   createMindmapRadialLayoutOptions,
@@ -48,6 +49,20 @@ test('computeMindmapLayoutMetrics exposes the current radial baseline for densit
   assert.equal(metrics.meanBranchRadius > 0, true);
   assert.equal(metrics.nodeCoverageRatio > 0, true);
   assert.equal(metrics.nodeCoverageRatio < 0.55, true);
+});
+
+test('buildMindmapBranchClusterPlan groups branches into compact angular slots around the root', () => {
+  const plan = buildMindmapBranchClusterPlan(validGeneratedMindmapFixture);
+
+  assert.equal(plan.rootId, validGeneratedMindmapFixture.metadata.rootId);
+  assert.equal(plan.clusters.length, 2);
+  assert.equal(plan.totalWeight > 0, true);
+  assert.equal(plan.clusters.every((cluster) => cluster.nodeIds.includes(cluster.rootId)), true);
+  assert.equal(plan.clusters.every((cluster) => cluster.weight > 0), true);
+  assert.equal(plan.clusters.every((cluster) => cluster.angleStart >= 0), true);
+  assert.equal(plan.clusters.every((cluster) => cluster.angleEnd > cluster.angleStart), true);
+  assert.equal(plan.clusters.every((cluster) => cluster.angle >= cluster.angleStart), true);
+  assert.equal(plan.clusters.every((cluster) => cluster.angle <= cluster.angleEnd), true);
 });
 
 test('createExportMindmapVariant scales node boxes and spacing for export layout', () => {
