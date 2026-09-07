@@ -40,3 +40,23 @@ test('createMindmapThemePrompt embeds retry feedback and the previous attempt', 
   assert.match(prompt.user, /version: Invalid literal value, expected 1/);
   assert.match(prompt.user, /\{"version":2\}/);
 });
+
+test('createMindmapThemePrompt includes structured preset metadata when present', () => {
+  const prompt = createMindmapThemePrompt({
+    stylePrompt: 'dark academia',
+    styleMetadata: {
+      id: 'dark-academia',
+      label: 'dark academia',
+      mood: 'scholarly, moody, elegant',
+      palette: ['charcoal', 'parchment', 'antique gold'],
+      lighting: 'library lantern glow',
+      layout: 'structured, editorial, balanced',
+      background: 'study hall with parchment textures',
+    },
+  });
+
+  assert.match(prompt.user, /STYLE ID: dark-academia/);
+  assert.match(prompt.user, /MOOD: scholarly, moody, elegant/);
+  assert.match(prompt.user, /PALETTE: charcoal, parchment, antique gold/);
+  assert.match(prompt.user, /LAYOUT: structured, editorial, balanced/);
+});

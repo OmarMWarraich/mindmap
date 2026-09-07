@@ -1,9 +1,12 @@
 import { z } from 'zod';
 
+import { mindmapStyleMetadataSchema, type MindmapStyleMetadata } from './theme-prompt.ts';
+
 const requiredString = z.string().trim().min(1);
 
 export const mindmapBackgroundGenerationRequestSchema = z.object({
   stylePrompt: requiredString.max(500, 'Style prompt is too long. Keep it under 500 characters.'),
+  styleMetadata: mindmapStyleMetadataSchema.optional(),
   mindmapTitle: z.string().trim().max(200).optional(),
 }).strict();
 
@@ -23,10 +26,24 @@ export const maxBackgroundImageBytes = 3_000_000;
 const openAiImagesEndpoint = 'https://api.openai.com/v1/images/generations';
 const defaultImageModelId = 'gpt-image-1';
 
-export function buildBackgroundImagePrompt(stylePrompt: string, mindmapTitle?: string): string {
+export function buildBackgroundImagePrompt(
+  stylePrompt: string,
+  mindmapTitle?: string,
+  styleMetadata?: MindmapStyleMetadata,
+): string {
+  const metadataLines = styleMetadata
+    ? [
+        styleMetadata.mood ? `Mood: ${styleMetadata.mood}.` : undefined,
+        styleMetadata.palette && styleMetadata.palette.length > 0 ? `Palette: ${styleMetadata.palette.join(', ')}.` : undefined,
+        styleMetadata.lighting ? `Lighting: ${styleMetadata.lighting}.` : undefined,
+        styleMetadata.background ? `Background scene: ${styleMetadata.background}.` : undefined,
+      ].filter((line): line is string => Boolean(line))
+    : [];
+
   return [
     'A subtle, atmospheric background texture for a study mindmap diagram.',
     `Style: ${stylePrompt}.`,
+    ...(metadataLines.length > 0 ? metadataLines : []),
     ...(mindmapTitle ? [`The mindmap topic is "${mindmapTitle}"; evoke it only through mood and color.`] : []),
     'Soft, low-contrast, evenly lit, no focal subject in the center.',
     'Absolutely no text, letters, numbers, words, logos, or diagrams in the image.',
@@ -57,7 +74,11 @@ export async function generateMindmapBackgroundImage(
     },
     body: JSON.stringify({
       model: env.OPENAI_IMAGE_MODEL_ID ?? defaultImageModelId,
-      prompt: buildBackgroundImagePrompt(validatedRequest.stylePrompt, validatedRequest.mindmapTitle),
+      prompt: buildBackgroundImagePrompt(
+        validatedRequest.stylePrompt,
+        validatedRequest.mindmapTitle,
+        validatedRequest.styleMetadata,
+      ),
       size: '1024x1024',
       quality: 'low',
       output_format: 'jpeg',

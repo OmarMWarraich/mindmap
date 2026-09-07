@@ -1,5 +1,21 @@
+import { z } from 'zod';
+
+export const mindmapStyleMetadataSchema = z.object({
+  id: z.string().trim().min(1).max(120).optional(),
+  label: z.string().trim().min(1).max(120).optional(),
+  mood: z.string().trim().max(250).optional(),
+  palette: z.array(z.string().trim().min(1).max(80)).max(12).optional(),
+  lighting: z.string().trim().max(200).optional(),
+  layout: z.string().trim().max(200).optional(),
+  background: z.string().trim().max(200).optional(),
+  description: z.string().trim().max(250).optional(),
+}).strict();
+
+export type MindmapStyleMetadata = z.infer<typeof mindmapStyleMetadataSchema>;
+
 export interface MindmapThemePromptInput {
   stylePrompt: string;
+  styleMetadata?: MindmapStyleMetadata;
   mindmapTitle?: string;
   branchLabels?: string[];
   previousAttempt?: string;
@@ -52,6 +68,42 @@ Omit "root"/"branch"/"leaf" overrides to keep the app's per-branch color palette
 
 export function createMindmapThemePrompt(input: MindmapThemePromptInput): MindmapThemePrompt {
   const contextLines: string[] = [];
+
+  if (input.styleMetadata) {
+    const metadata = input.styleMetadata;
+
+    if (metadata.id) {
+      contextLines.push(`STYLE ID: ${metadata.id}`);
+    }
+
+    if (metadata.label) {
+      contextLines.push(`STYLE LABEL: ${metadata.label}`);
+    }
+
+    if (metadata.mood) {
+      contextLines.push(`MOOD: ${metadata.mood}`);
+    }
+
+    if (metadata.palette && metadata.palette.length > 0) {
+      contextLines.push(`PALETTE: ${metadata.palette.join(', ')}`);
+    }
+
+    if (metadata.lighting) {
+      contextLines.push(`LIGHTING: ${metadata.lighting}`);
+    }
+
+    if (metadata.layout) {
+      contextLines.push(`LAYOUT: ${metadata.layout}`);
+    }
+
+    if (metadata.background) {
+      contextLines.push(`BACKGROUND: ${metadata.background}`);
+    }
+
+    if (metadata.description) {
+      contextLines.push(`DESCRIPTION: ${metadata.description}`);
+    }
+  }
 
   if (input.mindmapTitle) {
     contextLines.push(`MINDMAP TITLE: ${input.mindmapTitle}`);

@@ -4,12 +4,13 @@ import { mindmapThemeSchema, type MindmapTheme } from '../mindmap/theme.ts';
 import { knownModelIdSchema } from '../model/catalog.ts';
 import { requestStructuredModelCompletion } from '../model/dispatch.ts';
 import { parseStructuredModelJson } from '../model/json-parse.ts';
-import { createMindmapThemePrompt } from './theme-prompt.ts';
+import { createMindmapThemePrompt, mindmapStyleMetadataSchema } from './theme-prompt.ts';
 
 const requiredString = z.string().trim().min(1);
 
 export const mindmapThemeGenerationRequestSchema = z.object({
   stylePrompt: requiredString.max(500, 'Style prompt is too long. Keep it under 500 characters.'),
+  styleMetadata: mindmapStyleMetadataSchema.optional(),
   mindmapTitle: z.string().trim().max(200).optional(),
   branchLabels: z.array(requiredString.max(120)).max(24).optional(),
   modelId: knownModelIdSchema.optional(),
@@ -39,6 +40,7 @@ export async function generateMindmapThemeFromPrompt(
   const validatedRequest = mindmapThemeGenerationRequestSchema.parse(request);
   const prompt = createMindmapThemePrompt({
     stylePrompt: validatedRequest.stylePrompt,
+    styleMetadata: validatedRequest.styleMetadata,
     mindmapTitle: validatedRequest.mindmapTitle,
     branchLabels: validatedRequest.branchLabels,
   });
@@ -55,6 +57,7 @@ export async function generateMindmapThemeFromPrompt(
 
   const retryPrompt = createMindmapThemePrompt({
     stylePrompt: validatedRequest.stylePrompt,
+    styleMetadata: validatedRequest.styleMetadata,
     mindmapTitle: validatedRequest.mindmapTitle,
     branchLabels: validatedRequest.branchLabels,
     previousAttempt: firstAttempt,
