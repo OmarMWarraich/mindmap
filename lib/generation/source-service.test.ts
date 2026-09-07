@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { maxSourceTextCharacters } from './limits.ts';
+import { hardSafetyWordsPerLine, maxSourceTextCharacters, targetWordsPerLine } from './limits.ts';
 import {
   countMeaningfulNonEmptyLines,
   generateMindmapDslFromSource,
@@ -143,8 +143,32 @@ test('generateMindmapDslFromSource rejects DSL that does not parse under the sin
   );
 });
 
-test('generateMindmapDslFromSource rejects lines above the 100-word limit', async () => {
-  const overLongLine = `  - ${Array.from({ length: 101 }, (_, index) => `word${index}`).join(' ')}`;
+test(`generateMindmapDslFromSource accepts lines around the ${targetWordsPerLine}-word product target`, async () => {
+  const nearTargetLine = `  - ${Array.from({ length: targetWordsPerLine }, (_, index) => `word${index}`).join(' ')}`;
+
+  const response = await generateMindmapDslFromSource(
+    {
+      sourceText: 'Photosynthesis\nStages',
+    },
+    {
+      env: testEnv,
+      fetchImpl: async () => new Response(JSON.stringify({
+        content: [{ type: 'text', text: JSON.stringify({
+          dsl: `@root: Photosynthesis\n- @branch: Stages\n${nearTargetLine}`,
+        }) }],
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    },
+  );
+
+  assert.equal(response.validation.lineWordLimitSatisfied, true);
+  assert.equal(response.validation.parserErrors.length, 0);
+});
+
+test(`generateMindmapDslFromSource rejects lines above the ${hardSafetyWordsPerLine}-word safety fallback`, async () => {
+  const overLongLine = `  - ${Array.from({ length: hardSafetyWordsPerLine + 1 }, (_, index) => `word${index}`).join(' ')}`;
 
   await assert.rejects(
     () => generateMindmapDslFromSource(
@@ -154,7 +178,7 @@ test('generateMindmapDslFromSource rejects lines above the 100-word limit', asyn
       {
         env: testEnv,
         fetchImpl: async () => new Response(JSON.stringify({
-          content: [{ type: 'text', text:JSON.stringify({
+          content: [{ type: 'text', text: JSON.stringify({
             dsl: `@root: Photosynthesis\n- @branch: Stages\n${overLongLine}`,
           }) }],
         }), {
@@ -163,7 +187,7 @@ test('generateMindmapDslFromSource rejects lines above the 100-word limit', asyn
         }),
       },
     ),
-    /100-word per-line limit/i,
+    new RegExp(`${hardSafetyWordsPerLine}-word per-line limit`, 'i'),
   );
 });
 
