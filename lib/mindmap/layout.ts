@@ -97,9 +97,9 @@ export type MindmapLayoutWorkerResponse =
 const elk = new ELK();
 
 const defaultMindmapExportScaleOptions: Required<MindmapExportScaleOptions> = {
-  nodeWidthScale: 1.32,
-  nodeHeightScale: 1.36,
-  nodePaddingScale: 1.15,
+  nodeWidthScale: 1.5,
+  nodeHeightScale: 1.5,
+  nodePaddingScale: 1.35,
   siblingGapScale: 1.1,
   levelGapScale: 1.05,
   textScale: 1,
@@ -554,9 +554,9 @@ export function createExportMindmapVariant(
   );
   const textDrivenBoxScale = scaleWithTextInfluence(exportScale.textScale, 0.45);
   const textDrivenPaddingScale = scaleWithTextInfluence(exportScale.textScale, 0.32);
-  const widthScaleCeiling = Math.max(1.05, exportScale.textScale * 0.98);
-  const heightScaleCeiling = Math.max(1.05, exportScale.textScale * 0.98);
-  const paddingScaleCeiling = Math.max(1.05, exportScale.textScale * 0.98);
+  const widthScaleCeiling = Math.max(1.5, exportScale.textScale * 0.98);
+  const heightScaleCeiling = Math.max(1.5, exportScale.textScale * 0.98);
+  const paddingScaleCeiling = Math.max(1.35, exportScale.textScale * 0.98);
 
   // Manual sliders are overrides on top of the deterministic density model.
   // They tune the export variant, but never replace the underlying cluster-based layout.

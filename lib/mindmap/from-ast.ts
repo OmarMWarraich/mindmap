@@ -260,7 +260,7 @@ function createNodeLayout(
   // and leaves so text remains readable without making the boxes too large.
   const targetCharsPerLine =
     kind === 'root' ? 48 : kind === 'branch' ? 24 : 22;
-  // Size boxes from the visible text so formatting markers don't inflate nodes.
+  const contentEnvelopeScale = 1.5;
   const wrappedLines = wrapLabelForLayout(stripMindmapInlineFormatting(label), targetCharsPerLine);
   const longestLineLength = wrappedLines.reduce(
     (longest, line) => Math.max(longest, line.length),
@@ -270,10 +270,13 @@ function createNodeLayout(
   const labelBottom = (kind === 'root' ? 50 : 42) + wrappedLines.length * estimatedLineHeightPx + paddingY;
   const heightFromChildren = Math.min(childCount, 5) * 10;
   const levelTaper = Math.max(0, level - 2) * 4;
+  const contentHeight = Math.max(baseHeight + heightFromChildren, labelBottom);
+  const envelopeWidth = Math.max(baseWidth, contentWidth) * contentEnvelopeScale;
+  const envelopeHeight = contentHeight * contentEnvelopeScale;
 
   return {
-    minWidth: Math.max(baseWidth, contentWidth),
-    minHeight: Math.max(baseHeight + heightFromChildren, labelBottom),
+    minWidth: Math.ceil(envelopeWidth),
+    minHeight: Math.ceil(envelopeHeight),
     paddingX,
     paddingY,
     siblingGap: antiCramLayoutDefaults.siblingGap + Math.min(childCount, 4) * 4 + levelTaper,

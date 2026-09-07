@@ -332,6 +332,55 @@ test('layoutMindmapWithElk avoids node overlap in dense radial layouts', async (
   assert.deepEqual(findOverlappingNodePairs(result.nodes), []);
 });
 
+test('content-driven node boxes expand to a 1.5x content envelope to remove dead space', () => {
+  const crowdedMindmap = generateMindmapFromAst({
+    root: {
+      id: 'root-research',
+      kind: 'root',
+      label: 'Research and Innovation Program',
+      source: {
+        line: 1,
+        column: 1,
+        indentLevel: 0,
+        raw: '@root: Research and Innovation Program',
+      },
+      branches: [{
+        id: 'branch-research',
+        kind: 'branch',
+        label: 'Comparative analysis of research methods, policy design, longitudinal evidence, and adoption outcomes across agencies',
+        source: {
+          line: 2,
+          column: 1,
+          indentLevel: 0,
+          raw: '- @branch: Comparative analysis of research methods, policy design, longitudinal evidence, and adoption outcomes across agencies',
+        },
+        children: [{
+          id: 'leaf-research',
+          kind: 'leaf',
+          label: 'Longitudinal evidence synthesis for adoption and policy design across institutional settings and stakeholder needs',
+          source: {
+            line: 3,
+            column: 3,
+            indentLevel: 1,
+            raw: '  - Longitudinal evidence synthesis for adoption and policy design across institutional settings and stakeholder needs',
+          },
+          children: [],
+        }],
+      }],
+    },
+  });
+
+  const branchNode = crowdedMindmap.nodes.find((node) => node.kind === 'branch');
+  const leafNode = crowdedMindmap.nodes.find((node) => node.kind === 'leaf');
+
+  assert.ok(branchNode, 'expected a branch node');
+  assert.ok(leafNode, 'expected a leaf node');
+  assert.equal(branchNode.layout.minWidth >= 220 * 1.5, true);
+  assert.equal(leafNode.layout.minWidth >= 156 * 1.5, true);
+  assert.equal(branchNode.layout.minHeight >= 84 * 1.5, true);
+  assert.equal(leafNode.layout.minHeight >= 60 * 1.5, true);
+});
+
 test('createMindmapRadialLayoutOptions expands radius for crowded exported levels', () => {
   const crowdedMindmap = generateMindmapFromAst({
     root: {

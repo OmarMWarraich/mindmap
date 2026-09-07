@@ -36,7 +36,7 @@ const artisticStylePresets: readonly ArtisticStylePreset[] = [
   {
     id: 'office',
     label: 'office',
-    prompt: 'clean office productivity design with neutral grays, deep blue accents, structured surfaces, soft shadows, polished corporate visual language',
+    prompt: 'clean office productivity design with neutral grays, deep blue accents, structured surfaces, soft shadows, polished corporate visual language; prioritize bold, compact text that fits and wraps tightly inside each root, branch, and node without empty space, with strong contrast and dense but readable fill coverage',
     backgroundPrompt: 'modern office workspace with clean neutral tones, soft daylight, tidy desk, polished corporate aesthetic',
     description: 'Professional office productivity look with structured clarity',
     metadata: {
@@ -53,7 +53,7 @@ const artisticStylePresets: readonly ArtisticStylePreset[] = [
   {
     id: 'memo',
     label: 'memo',
-    prompt: 'memo-style presentation with paper textures, warm ivory backgrounds, subtle graphite lines, understated annotations, executive briefing aesthetic',
+    prompt: 'memo-style presentation with paper textures, warm ivory backgrounds, subtle graphite lines, understated annotations, executive briefing aesthetic; make text bold and compact so it fills each root, branch, and node tightly with minimal dead space and clean wrapping inside the node frame',
     backgroundPrompt: 'paper memo board with warm ivory tones, soft pencil annotations, minimal briefing details',
     description: 'Warm paper notes and concise briefing aesthetic',
     metadata: {
@@ -70,7 +70,7 @@ const artisticStylePresets: readonly ArtisticStylePreset[] = [
   {
     id: 'application',
     label: 'application',
-    prompt: 'application UI mood with clean app-shell surfaces, soft elevation, crisp components, blue-gray interface palette, calm product design tone',
+    prompt: 'application UI mood with clean app-shell surfaces, soft elevation, crisp components, blue-gray interface palette, calm product design tone; use bold text that fills and wraps within each root, branch, and node to eliminate vacant space while keeping labels readable and dense',
     backgroundPrompt: 'clean app dashboard layout with soft shadows, blue-gray interface palette, minimal product design surfaces',
     description: 'UI-style product mockup with structured clarity',
     metadata: {
@@ -87,7 +87,7 @@ const artisticStylePresets: readonly ArtisticStylePreset[] = [
   {
     id: 'correspondence',
     label: 'correspondence',
-    prompt: 'formal correspondence aesthetic with letterhead elegance, muted ink colors, refined serif typography, elegant spacing, structured memo layout',
+    prompt: 'formal correspondence aesthetic with letterhead elegance, muted ink colors, refined serif typography, elegant spacing, structured memo layout; make the text as bold as possible while ensuring it fits and wraps cleanly inside each root, branch, and node without wasted empty space',
     backgroundPrompt: 'elegant letterhead composition with refined neutral palette, soft shadows, formal correspondence style',
     description: 'Formal, paper-based professional correspondence',
     metadata: {
@@ -104,7 +104,7 @@ const artisticStylePresets: readonly ArtisticStylePreset[] = [
   {
     id: 'mindmap',
     label: 'mindmap',
-    prompt: 'mindmap-focused visual system with clear hierarchical blocks, subtle connective lines, balanced density, readable labels, calm academic color palette',
+    prompt: 'mindmap-focused visual system with clear hierarchical blocks, subtle connective lines, balanced density, readable labels, calm academic color palette; prioritize bold text that sits tight in each root, branch, and node, wraps fully within the container, and leaves no vacant space inside the node body',
     backgroundPrompt: 'organized mindmap board with clean hierarchy, balanced spacing, readable branches, calm academic palette',
     description: 'Mind map style tuned for clarity and branch structure',
     metadata: {
@@ -121,7 +121,7 @@ const artisticStylePresets: readonly ArtisticStylePreset[] = [
   {
     id: 'nodes',
     label: 'nodes',
-    prompt: 'node-centered composition with circular and rounded card clusters, soft layered fills, readable adjacency cues, airy but dense knowledge graph styling',
+    prompt: 'node-centered composition with circular and rounded card clusters, soft layered fills, readable adjacency cues, airy but dense knowledge graph styling; encourage bold labels that fit and wrap inside each node body, with no empty padding and dense utilization of the available root, branch, or leaf space',
     backgroundPrompt: 'knowledge graph board with circular node clusters, layered card structure, airy spacing, soft contextual color',
     description: 'Node-heavy knowledge graph aesthetic',
     metadata: {
@@ -138,7 +138,7 @@ const artisticStylePresets: readonly ArtisticStylePreset[] = [
   {
     id: 'dark-academia',
     label: 'dark academia',
-    prompt: 'dark academia style with deep charcoal backgrounds, warm parchment neutrals, antique gold accents, scholarly mood, elegant high-contrast study environment',
+    prompt: 'dark academia style with deep charcoal backgrounds, warm parchment neutrals, antique gold accents, scholarly mood, elegant high-contrast study environment; use the strongest bold text possible while ensuring it fits and wraps cleanly inside each root, branch, and node with zero wasted empty space',
     backgroundPrompt: 'dark academia study space with parchment paper, deep charcoal walls, warm antique gold and moody library lighting',
     description: 'Moody library and scholarly study aesthetic',
     metadata: {
@@ -153,9 +153,43 @@ const artisticStylePresets: readonly ArtisticStylePreset[] = [
     },
   },
   {
+    id: 'academic-research',
+    label: 'academic research',
+    prompt: 'academic research aesthetic with citation cards, annotated note tabs, scholarly paper textures, muted blue and ivory palette, precise academic structure, research journal mood; make every label as bold as possible while fitting and wrapping tightly inside each root, branch, and node, eliminating wasted empty space and using dense but readable text coverage',
+    backgroundPrompt: 'scholarly research desk with paper notes, citation cards, subtle graph paper textures, muted ivory and blue tones, calm academic study ambience',
+    description: 'Research journal aesthetic with notes, citations, and disciplined study clarity',
+    metadata: {
+      id: 'academic-research',
+      label: 'academic research',
+      mood: 'scholarly, precise, analytical',
+      palette: ['ivory', 'muted blue', 'ink', 'sage'],
+      lighting: 'soft reading lamp',
+      layout: 'structured notes, citation cards, balanced academic grid',
+      background: 'research desk with notes and citation cards',
+      description: 'Research journal aesthetic with notes, citations, and disciplined study clarity',
+    },
+  },
+  {
+    id: 'dense-table-notes',
+    label: 'dense table notes',
+    prompt: 'dense table-notes style with highly compressed academic note blocks, tight tabular structure, crisp columns, dense annotations, strong contrast, compact note cells, very little empty padding; use the boldest possible text and force labels to fit and wrap tightly within every root, branch, and node without dead space',
+    backgroundPrompt: 'dense academic tabletop with annotated note sheets, tabular research summaries, crisp paper grids, compact note blocks, and subtle neutral academic textures',
+    description: 'High-density note-table aesthetic with compressed academic cells',
+    metadata: {
+      id: 'dense-table-notes',
+      label: 'dense table notes',
+      mood: 'dense, analytical, tabular',
+      palette: ['paper', 'slate blue', 'ink', 'stone'],
+      lighting: 'soft desk light',
+      layout: 'compressed table cells, dense note blocks, tight academic columns',
+      background: 'tabletop research sheet with compact note blocks',
+      description: 'High-density note-table aesthetic with compressed academic cells',
+    },
+  },
+  {
     id: 'ocean-blues',
     label: 'ocean blues',
-    prompt: 'ocean blues aesthetic with layered teal and sapphire tones, calm sea gradients, crisp structure, light coastal contrast, polished modern marine palette',
+    prompt: 'ocean blues aesthetic with layered teal and sapphire tones, calm sea gradients, crisp structure, light coastal contrast, polished modern marine palette; prioritize bold, compact typography that fills and wraps inside every root, branch, and node with no vacant empty space and strong readability',
     backgroundPrompt: 'coastal ocean scene with layered teal, sapphire, and seafoam tones, soft light, calm marine atmosphere',
     description: 'Calm marine palette with clean structured composition',
     metadata: {
@@ -172,7 +206,7 @@ const artisticStylePresets: readonly ArtisticStylePreset[] = [
   {
     id: 'forest',
     label: 'forest',
-    prompt: 'forest-inspired design with rich green gradients, earthy natural textures, subtle organic movement, balanced readability, calm natural study palette',
+    prompt: 'forest-inspired design with rich green gradients, earthy natural textures, subtle organic movement, balanced readability, calm natural study palette; use bold, dense text that wraps tightly within each node and fills root and branch containers without empty space',
     backgroundPrompt: 'lush forest scene with rich green gradients, soft atmospheric light, natural organic textures and calm depth',
     description: 'Earthy natural palette with organic depth',
     metadata: {
@@ -189,7 +223,7 @@ const artisticStylePresets: readonly ArtisticStylePreset[] = [
   {
     id: 'sunset-poster',
     label: 'sunset poster',
-    prompt: 'sunset poster mood with warm coral, amber, and rose gradients, cinematic contrast, posterized shapes, expressive but readable layout',
+    prompt: 'sunset poster mood with warm coral, amber, and rose gradients, cinematic contrast, posterized shapes, expressive but readable layout; keep text bold and packed tightly inside each root, branch, and node so the content fills the available area and wraps without vacant empty space',
     backgroundPrompt: 'cinematic sunset poster composition with warm coral, amber, and rose tones, bold but balanced color fields',
     description: 'Warm poster aesthetic with cinematic depth',
     metadata: {
