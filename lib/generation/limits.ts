@@ -13,3 +13,8 @@
 // constraint. (A model-aware cap derived from capabilities.contextWindow, and
 // map-reduce chunking for arbitrarily large documents, are tracked as follow-ups.)
 export const maxSourceTextCharacters = 250_000;
+
+// Product target: keep node text readable and roomy, with a tighter target for the
+// model while preserving a higher safety fallback for parser validation.
+export const targetWordsPerLine = 70;
+export const hardSafetyWordsPerLine = 90;

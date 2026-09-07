@@ -7,10 +7,13 @@ import {
   sourceMindmapGenerationSystemPrompt,
 } from './source-prompt.ts';
 
+import { hardSafetyWordsPerLine, targetWordsPerLine } from './limits.ts';
+
 test('source mindmap generation system prompt requires exactly one root and strict JSON', () => {
   assert.match(sourceMindmapGenerationSystemPrompt, /Return one JSON object/i);
   assert.match(sourceMindmapGenerationSystemPrompt, /exactly one @root/i);
-  assert.match(sourceMindmapGenerationSystemPrompt, /100 words or fewer/i);
+  assert.match(sourceMindmapGenerationSystemPrompt, new RegExp(`about ${targetWordsPerLine} words`, 'i'));
+  assert.match(sourceMindmapGenerationSystemPrompt, new RegExp(`${hardSafetyWordsPerLine} words`, 'i'));
 });
 
 test('createSourceMindmapGenerationPrompt injects source density targets', () => {

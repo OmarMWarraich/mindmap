@@ -1,3 +1,5 @@
+import { hardSafetyWordsPerLine, targetWordsPerLine } from './limits.ts';
+
 export type SourceMindmapReadabilityMode = 'compact' | 'plain' | 'detailed';
 
 export interface SourceMindmapGenerationPromptInput {
@@ -29,7 +31,7 @@ Do not add commentary.
 The DSL inside the JSON must use exactly one @root line.
 If the source contains several top-level themes, synthesize one concise umbrella root and turn those themes into branches.
 Use only spaces for indentation, never tabs.
-Keep every generated DSL content line at 100 words or fewer.`;
+Keep every generated DSL content line at about ${targetWordsPerLine} words, with a hard safety cap of ${hardSafetyWordsPerLine} words.`;
 
 export const sourceMindmapGenerationOutputContract = `Return a JSON object with this shape:
 {
@@ -62,7 +64,7 @@ Content goals:
 - Do not repeat a source heading or bullet as a child line unless the term itself needs preservation.
 - Prefer short phrase blocks over long sentences.
 {{READABILITY_GUIDANCE}}
-- Never exceed 100 words on any DSL line.
+- Never exceed ${hardSafetyWordsPerLine} words on any DSL line; aim for roughly ${targetWordsPerLine} words or less.
 - Expand the outline through additional valid child lines, not longer lines.
 
 Minimum density rules:
@@ -89,7 +91,7 @@ Output rules:
 
 Validation requirements before you answer:
 - The DSL must parse with one @root.
-- Each generated line must stay within 100 words.
+- Each generated line must stay within ${hardSafetyWordsPerLine} words; target roughly ${targetWordsPerLine} words.
 - The outline should approach the target range when the source supports it.
 - Avoid outputs that are only bare branch lists.
 
@@ -117,7 +119,7 @@ Condensation goals:
 - Group related points under the sub-topic they belong to; keep the hierarchy clean.
 - Rewrite long passages into short phrase-style labels.
 - Prefer fewer, stronger lines over many weak ones.
-- Never exceed 100 words on any DSL line.
+- Never exceed ${hardSafetyWordsPerLine} words on any DSL line; aim for roughly ${targetWordsPerLine} words or less.
 
 Size target (condensation, not expansion):
 - Source meaningful non-empty line count: {{SOURCE_LINE_COUNT}}
@@ -133,7 +135,7 @@ Output rules:
 
 Validation requirements before you answer:
 - The DSL must parse with one @root.
-- Each generated line must stay within 100 words.
+- Each generated line must stay within ${hardSafetyWordsPerLine} words; target roughly ${targetWordsPerLine} words.
 - The outline must stay within the target range; condense further if it is over.
 
 {{RETRY_BLOCK}}

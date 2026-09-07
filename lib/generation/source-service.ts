@@ -1,5 +1,6 @@
 import { requestStructuredModelCompletion } from '../model/dispatch.ts';
 import { parseMindmapDsl } from '../dsl/parse.ts';
+import { hardSafetyWordsPerLine } from './limits.ts';
 import {
   createSourceMindmapGenerationPrompt,
 } from './source-prompt.ts';
@@ -24,7 +25,7 @@ const distillSourceWordThreshold = 500;
 const distillTargetMinLineCount = 12;
 const distillTargetMaxLineCountStandard = 60;
 const distillTargetMaxLineCountDetailed = 90;
-const maxWordsPerLine = 100;
+const maxWordsPerLine = hardSafetyWordsPerLine;
 
 type EnvRecord = Record<string, string | undefined>;
 
