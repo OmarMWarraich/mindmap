@@ -7,6 +7,7 @@ export interface ScalingValues {
   siblingGapScale: number;
   levelGapScale: number;
   fontScale: number;
+  fontWeight: number;
 }
 
 export const defaultScalingValues: ScalingValues = {
@@ -16,6 +17,7 @@ export const defaultScalingValues: ScalingValues = {
   siblingGapScale: 1.1,
   levelGapScale: 1.05,
   fontScale: 1,
+  fontWeight: 800,
 };
 
 interface ExpertScalingPanelProps {
@@ -30,6 +32,7 @@ const SLIDERS: ReadonlyArray<{
   min: number;
   max: number;
   step: number;
+  format?: 'raw';
 }> = [
   { key: 'nodeWidthScale',   label: 'Box width',       min: 1,    max: 1.9, step: 0.02 },
   { key: 'nodeHeightScale',  label: 'Box height',      min: 1,    max: 1.9, step: 0.02 },
@@ -37,6 +40,7 @@ const SLIDERS: ReadonlyArray<{
   { key: 'siblingGapScale',  label: 'Sibling spacing', min: 0.85, max: 1.6, step: 0.01 },
   { key: 'levelGapScale',    label: 'Root distance',   min: 0.9,  max: 1.6, step: 0.01 },
   { key: 'fontScale',        label: 'Text size',       min: 0.9,  max: 2.2, step: 0.01 },
+  { key: 'fontWeight',       label: 'Font weight',     min: 400,  max: 900, step: 50, format: 'raw' },
 ];
 
 function formatPct(value: number): string {
@@ -91,7 +95,7 @@ export default function ExpertScalingPanel({ values, onChange, onReset }: Expert
               value={values[slider.key]}
             />
             <span className="w-10 text-right text-xs font-medium tabular-nums text-zinc-500">
-              {formatPct(values[slider.key])}
+              {slider.format === 'raw' ? values[slider.key] : formatPct(values[slider.key])}
             </span>
           </div>
         ))}

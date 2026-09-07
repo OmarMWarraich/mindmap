@@ -64,6 +64,21 @@ export interface SvgPreviewRenderScaleOptions {
 
 export type SvgPreviewRenderProfile = 'preview' | 'export';
 
+// Root reads one step heavier and inline-bold two steps heavier than the base weight.
+export function resolveMindmapFontWeights(baseWeight = 800): {
+  root: number;
+  node: number;
+  bold: number;
+} {
+  const clamped = Math.min(900, Math.max(400, Math.round(baseWeight / 50) * 50));
+
+  return {
+    root: Math.min(900, clamped + 100),
+    node: clamped,
+    bold: Math.min(900, clamped + 200),
+  };
+}
+
 interface SvgPreviewRenderMetrics {
   approxCharacterWidth: number;
   lineHeight: number;
@@ -380,6 +395,7 @@ export function createSvgPreviewSnapshot(
   options: {
     profile?: SvgPreviewRenderProfile;
     renderScale?: number;
+    fontWeight?: number;
     theme?: MindmapTheme;
   } = {},
 ): { node: SVGSVGElement; width: number; height: number } {
@@ -389,6 +405,7 @@ export function createSvgPreviewSnapshot(
 
   const profile = options.profile ?? 'preview';
   const theme = options.theme ?? defaultMindmapTheme;
+  const fontWeights = resolveMindmapFontWeights(options.fontWeight);
   const metrics = applyThemeTypographyToMetrics(
     getSvgPreviewRenderMetrics(profile, { scale: options.renderScale }),
     theme,
@@ -488,7 +505,7 @@ export function createSvgPreviewSnapshot(
     text.setAttribute('fill', node.style.text);
     text.setAttribute('font-family', theme.typography.fontFamily);
     text.setAttribute('font-size', String(node.fontSize));
-    text.setAttribute('font-weight', node.kind === 'root' ? '900' : '800');
+    text.setAttribute('font-weight', String(node.kind === 'root' ? fontWeights.root : fontWeights.node));
     text.setAttribute('text-anchor', 'middle');
     text.setAttribute('dominant-baseline', 'hanging');
 
@@ -504,7 +521,7 @@ export function createSvgPreviewSnapshot(
         }
 
         if (segment.bold) {
-          tspan.setAttribute('font-weight', '900');
+          tspan.setAttribute('font-weight', String(fontWeights.bold));
         }
 
         if (segment.italic) {

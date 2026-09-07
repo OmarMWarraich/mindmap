@@ -528,6 +528,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
       const snapshot = createSvgPreviewSnapshot(exportMindmap, exportLayoutWithOverrides, {
         profile: 'export',
         renderScale: exportControls.fontScale,
+        fontWeight: exportControls.fontWeight,
         theme,
       });
 
@@ -579,6 +580,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
       // mindmap geometry; it consumes the exact same deterministic branch-cluster layout as preview/export.
       const snapshot = createSvgPreviewSnapshot(effectiveMindmap, deterministicLayout, {
         profile: 'export',
+        fontWeight: exportControls.fontWeight,
         theme,
       });
       // 1024px edge keeps the upload well under the serverless body cap.
@@ -834,6 +836,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
 
           <MindmapSvgPreview
             ref={previewRef}
+            fontWeight={exportControls.fontWeight}
             layoutError={effectiveLayoutError}
             layoutResult={displayLayoutResult}
             layoutStatus={effectiveLayoutStatus}
@@ -869,6 +872,7 @@ export default function StudyWorkspace({ userId: _userId }: StudyWorkspaceProps)
 
           <MindmapPreviewDrawer
             ref={previewRef}
+            fontWeight={exportControls.fontWeight}
             layoutError={effectiveLayoutError}
             layoutResult={displayLayoutResult}
             layoutStatus={effectiveLayoutStatus}

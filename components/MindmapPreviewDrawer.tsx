@@ -18,6 +18,7 @@ export interface MindmapPreviewDrawerProps {
   layoutError: string | null;
   transform: SvgPreviewTransform;
   renderScale?: number;
+  fontWeight?: number;
   onTransformChange: (transform: SvgPreviewTransform) => void;
   theme?: MindmapTheme;
 }
@@ -54,6 +55,7 @@ const MindmapPreviewDrawer = forwardRef<
     layoutError,
     transform,
     renderScale,
+    fontWeight,
     onTransformChange,
     theme,
   },
@@ -93,6 +95,7 @@ const MindmapPreviewDrawer = forwardRef<
         <div className="min-h-0 flex-1 overflow-hidden">
           <MindmapSvgPreview
             ref={ref}
+            fontWeight={fontWeight}
             layoutError={layoutError}
             layoutResult={layoutResult}
             layoutStatus={layoutStatus}

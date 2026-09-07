@@ -8,6 +8,7 @@ import {
   createDefaultSvgPreviewTransform,
   getSvgPreviewRenderMetrics,
   panSvgPreviewTransform,
+  resolveMindmapFontWeights,
   type SvgPreviewTransform,
   zoomSvgPreviewAroundPoint,
 } from '../lib/mindmap/svg-preview';
@@ -32,6 +33,7 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
   layoutError: string | null;
   transform?: SvgPreviewTransform;
   renderScale?: number;
+  fontWeight?: number;
   onTransformChange?: (transform: SvgPreviewTransform) => void;
   nodePositionOverrides?: MindmapNodePositionOverrides;
   onNodePositionOverridesChange?: (overrides: MindmapNodePositionOverrides) => void;
@@ -43,6 +45,7 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
   layoutError,
   transform: controlledTransform,
   renderScale = 1,
+  fontWeight,
   onTransformChange,
   nodePositionOverrides,
   onNodePositionOverridesChange,
@@ -60,6 +63,7 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
     ? buildSvgPreviewModel(mindmap, layoutResult, { theme, renderScale, profile: 'preview' })
     : null;
   const previewMetrics = getSvgPreviewRenderMetrics('preview', { scale: renderScale });
+  const fontWeights = resolveMindmapFontWeights(fontWeight);
 
   useImperativeHandle(ref, () => ({
     getExportSnapshot() {
@@ -365,7 +369,7 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
                     fill={node.style.text}
                     fontFamily={theme.typography.fontFamily}
                     fontSize={node.fontSize}
-                    fontWeight={node.kind === 'root' ? 800 : 700}
+                    fontWeight={node.kind === 'root' ? fontWeights.root : fontWeights.node}
                     textAnchor="middle"
                     x={node.width / 2}
                   >
@@ -373,7 +377,7 @@ const MindmapSvgPreview = forwardRef<MindmapSvgPreviewHandle, {
                       segments.map((segment, segmentIndex) => (
                         <tspan
                           fontStyle={segment.italic ? 'italic' : undefined}
-                          fontWeight={segment.bold ? 900 : undefined}
+                          fontWeight={segment.bold ? fontWeights.bold : undefined}
                           key={`${node.id}-${lineIndex}-${segmentIndex}`}
                           textDecoration={segment.underline ? 'underline' : undefined}
                           x={segmentIndex === 0 ? node.width / 2 : undefined}

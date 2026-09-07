@@ -9,6 +9,7 @@ import {
   createEdgePath,
   getSvgPreviewRenderMetrics,
   panSvgPreviewTransform,
+  resolveMindmapFontWeights,
   wrapFormattedMindmapLabel,
   wrapMindmapLabel,
   zoomSvgPreviewAroundPoint,
@@ -726,6 +727,15 @@ test('buildSvgPreviewModel wraps bold preview root labels instead of overflowing
   assert.equal(rendered.lines.length >= 2, true);
   assert.equal(widestLine * realisticBoldCharWidth <= availableWidth, true);
   assert.equal(textBottomY <= rootNode.layout.minHeight - rootNode.layout.paddingY, true);
+});
+
+test('resolveMindmapFontWeights maps the base weight onto root, node, and bold tiers', () => {
+  assert.deepEqual(resolveMindmapFontWeights(), { root: 900, node: 800, bold: 900 });
+  assert.deepEqual(resolveMindmapFontWeights(400), { root: 500, node: 400, bold: 600 });
+  assert.deepEqual(resolveMindmapFontWeights(700), { root: 800, node: 700, bold: 900 });
+  assert.deepEqual(resolveMindmapFontWeights(900), { root: 900, node: 900, bold: 900 });
+  assert.deepEqual(resolveMindmapFontWeights(1200), { root: 900, node: 900, bold: 900 });
+  assert.deepEqual(resolveMindmapFontWeights(613), { root: 700, node: 600, bold: 800 });
 });
 
 test('buildSvgPreviewModel with the default theme matches themeless output exactly', () => {
