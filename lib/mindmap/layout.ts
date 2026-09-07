@@ -229,6 +229,7 @@ function applyBranchClusterPostPass(
   }
 
   const adjustedNodes = layout.nodes.map((node) => ({ ...node }));
+  const originalNodes = new Map(layout.nodes.map((node) => [node.id, node]));
   const rootNode = adjustedNodes.find((node) => node.id === mindmap.metadata.rootId);
 
   if (!rootNode) {
@@ -311,30 +312,44 @@ function applyBranchClusterPostPass(
   const width = maxX - minX;
   const height = maxY - minY;
 
+  const translationByNodeId = new Map<string, { x: number; y: number }>();
+
+  for (const node of adjustedNodes) {
+    const originalNode = originalNodes.get(node.id);
+
+    if (!originalNode) {
+      translationByNodeId.set(node.id, { x: 0, y: 0 });
+      continue;
+    }
+
+    translationByNodeId.set(node.id, {
+      x: node.x - originalNode.x,
+      y: node.y - originalNode.y,
+    });
+  }
+
   const nodesById = new Map(adjustedNodes.map((node) => [node.id, node]));
   const edges = mindmap.edges.map((edge) => {
-    const sourceNode = nodesById.get(edge.from);
-    const targetNode = nodesById.get(edge.to);
-
-    if (!sourceNode || !targetNode) {
-      return {
-        id: edge.id,
-        points: [{ x: 0, y: 0 }, { x: 0, y: 0 }],
-      };
-    }
+    const rawPoints = layout.edges.find((candidate) => candidate.id === edge.id)?.points ?? [
+      { x: 0, y: 0 },
+      { x: 0, y: 0 },
+    ];
+    const sourceDelta = translationByNodeId.get(edge.from) ?? { x: 0, y: 0 };
+    const targetDelta = translationByNodeId.get(edge.to) ?? { x: 0, y: 0 };
 
     return {
       id: edge.id,
-      points: [
-        {
-          x: sourceNode.x + sourceNode.width / 2,
-          y: sourceNode.y + sourceNode.height / 2,
-        },
-        {
-          x: targetNode.x + targetNode.width / 2,
-          y: targetNode.y + targetNode.height / 2,
-        },
-      ],
+      points: rawPoints.map((point, index) => {
+        const totalPoints = rawPoints.length > 1 ? rawPoints.length - 1 : 1;
+        const progress = rawPoints.length <= 1 ? 0 : index / totalPoints;
+        const translateX = sourceDelta.x + (targetDelta.x - sourceDelta.x) * progress;
+        const translateY = sourceDelta.y + (targetDelta.y - sourceDelta.y) * progress;
+
+        return {
+          x: point.x + translateX,
+          y: point.y + translateY,
+        };
+      }),
     };
   });
 
@@ -365,60 +380,19 @@ function resolveRadialNodeOverlap(
         moved = true;
         const leftCenter = { x: left.x + left.width / 2, y: left.y + left.height / 2 };
         const rightCenter = { x: right.x + right.width / 2, y: right.y + right.height / 2 };
-        const dx = leftCenter.x - rightCenter.x;
-        const dy = leftCenter.y - rightCenter.y;
+        const dx = rightCenter.x - leftCenter.x;
+        const dy = rightCenter.y - leftCenter.y;
+        const distance = Math.hypot(dx, dy) || 1;
+        const unitX = dx / distance;
+        const unitY = dy / distance;
         const overlapX = Math.min(left.x + left.width, right.x + right.width) - Math.max(left.x, right.x);
         const overlapY = Math.min(left.y + left.height, right.y + right.height) - Math.max(left.y, right.y);
-        const pushX = Math.max(overlapX / 2 + 2, 2);
-        const pushY = Math.max(overlapY / 2 + 2, 2);
+        const move = Math.max(Math.min(overlapX, overlapY) / 2 + 2, 10);
 
-        if (overlapX > 0 && overlapY > 0) {
-          if (overlapX < overlapY) {
-            if (dx >= 0) {
-              left.x += pushX;
-              right.x -= pushX;
-            } else {
-              left.x -= pushX;
-              right.x += pushX;
-            }
-          } else if (dy >= 0) {
-            left.y += pushY;
-            right.y -= pushY;
-          } else {
-            left.y -= pushY;
-            right.y += pushY;
-          }
-        } else if (overlapX > 0) {
-          if (dx >= 0) {
-            left.x += pushX;
-            right.x -= pushX;
-          } else {
-            left.x -= pushX;
-            right.x += pushX;
-          }
-        } else if (dy >= 0) {
-          left.y += pushY;
-          right.y -= pushY;
-        } else {
-          left.y -= pushY;
-          right.y += pushY;
-        }
-
-        const leftPolarRadius = Math.hypot(leftCenter.x - rootCenter.x, leftCenter.y - rootCenter.y) || 1;
-        const rightPolarRadius = Math.hypot(rightCenter.x - rootCenter.x, rightCenter.y - rootCenter.y) || 1;
-        const minAllowedRadius = Math.min(leftPolarRadius, rightPolarRadius) * 0.98;
-
-        if (leftPolarRadius < minAllowedRadius) {
-          const leftAngle = Math.atan2(leftCenter.y - rootCenter.y, leftCenter.x - rootCenter.x);
-          left.x = rootCenter.x + Math.cos(leftAngle) * minAllowedRadius - left.width / 2;
-          left.y = rootCenter.y + Math.sin(leftAngle) * minAllowedRadius - left.height / 2;
-        }
-
-        if (rightPolarRadius < minAllowedRadius) {
-          const rightAngle = Math.atan2(rightCenter.y - rootCenter.y, rightCenter.x - rootCenter.x);
-          right.x = rootCenter.x + Math.cos(rightAngle) * minAllowedRadius - right.width / 2;
-          right.y = rootCenter.y + Math.sin(rightAngle) * minAllowedRadius - right.height / 2;
-        }
+        left.x -= unitX * (move / 2);
+        left.y -= unitY * (move / 2);
+        right.x += unitX * (move / 2);
+        right.y += unitY * (move / 2);
       }
     }
 

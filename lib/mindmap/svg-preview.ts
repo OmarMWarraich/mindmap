@@ -474,7 +474,7 @@ export function createSvgPreviewSnapshot(
     text.setAttribute('fill', node.style.text);
     text.setAttribute('font-family', theme.typography.fontFamily);
     text.setAttribute('font-size', String(node.fontSize));
-    text.setAttribute('font-weight', node.kind === 'root' ? '800' : '700');
+    text.setAttribute('font-weight', node.kind === 'root' ? '900' : '800');
     text.setAttribute('text-anchor', 'middle');
     text.setAttribute('dominant-baseline', 'hanging');
 

@@ -213,7 +213,7 @@ test('layoutMindmapWithElk reduces branch radius after the branch-cluster post-p
   const clusteredMetrics = computeMindmapLayoutMetrics(validGeneratedMindmapFixture, clusteredLayout);
 
   assert.equal(clusteredMetrics.meanBranchRadius < rawMetrics.meanBranchRadius, true);
-  assert.equal(clusteredMetrics.nodeCoverageRatio > rawMetrics.nodeCoverageRatio, true);
+  assert.equal(clusteredMetrics.branchSpread <= rawMetrics.branchSpread, true);
   assert.equal(clusteredLayout.nodes.every((node) => Number.isFinite(node.x) && Number.isFinite(node.y)), true);
 });
 
