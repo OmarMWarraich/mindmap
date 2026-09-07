@@ -24,6 +24,14 @@ export interface MindmapLayoutResult {
   edges: MindmapLayoutEdge[];
 }
 
+export interface MindmapLayoutMetrics {
+  totalEdgeLength: number;
+  meanBranchRadius: number;
+  nodeCoverageRatio: number;
+  branchSpread: number;
+  branchOverlap: number;
+}
+
 export interface MindmapExportScaleOptions {
   nodeWidthScale?: number;
   nodeHeightScale?: number;
@@ -90,6 +98,95 @@ export async function layoutMindmapWithElk(
       points: collectEdgePoints(edge),
     })),
   };
+}
+
+export function computeMindmapLayoutMetrics(
+  mindmap: GeneratedMindmap,
+  layout: MindmapLayoutResult,
+): MindmapLayoutMetrics {
+  const rootNode = layout.nodes.find((node) => node.id === mindmap.metadata.rootId) ?? null;
+  const rootCenter = rootNode
+    ? { x: rootNode.x + rootNode.width / 2, y: rootNode.y + rootNode.height / 2 }
+    : { x: layout.width / 2, y: layout.height / 2 };
+
+  const branchNodeIds = new Set(
+    mindmap.nodes.filter((node) => node.kind === 'branch').map((node) => node.id),
+  );
+  const branchCenters = layout.nodes
+    .filter((node) => branchNodeIds.has(node.id))
+    .map((node) => ({
+      x: node.x + node.width / 2,
+      y: node.y + node.height / 2,
+    }));
+
+  const totalEdgeLength = layout.edges.reduce((total, edge) => {
+    if (edge.points.length < 2) {
+      return total;
+    }
+
+    let edgeLength = 0;
+
+    for (let index = 1; index < edge.points.length; index += 1) {
+      const previousPoint = edge.points[index - 1];
+      const currentPoint = edge.points[index];
+      edgeLength += Math.hypot(
+        currentPoint.x - previousPoint.x,
+        currentPoint.y - previousPoint.y,
+      );
+    }
+
+    return total + edgeLength;
+  }, 0);
+
+  const meanBranchRadius = branchCenters.length
+    ? branchCenters.reduce(
+        (total, center) => total + Math.hypot(center.x - rootCenter.x, center.y - rootCenter.y),
+        0,
+      ) / branchCenters.length
+    : 0;
+
+  const totalNodeArea = layout.nodes.reduce((total, node) => total + node.width * node.height, 0);
+  const canvasArea = Math.max(layout.width * layout.height, 1);
+  const nodeCoverageRatio = totalNodeArea / canvasArea;
+
+  const branchSpread = branchCenters.length
+    ? branchCenters.reduce(
+        (total, center) => total + Math.hypot(center.x - rootCenter.x, center.y - rootCenter.y),
+        0,
+      ) / branchCenters.length
+    : 0;
+
+  const branchOverlap = countOverlappingNodePairs(layout.nodes);
+
+  return {
+    totalEdgeLength,
+    meanBranchRadius,
+    nodeCoverageRatio,
+    branchSpread,
+    branchOverlap,
+  };
+}
+
+function countOverlappingNodePairs(nodes: MindmapLayoutNode[]): number {
+  let overlaps = 0;
+
+  for (let index = 0; index < nodes.length; index += 1) {
+    for (let comparisonIndex = index + 1; comparisonIndex < nodes.length; comparisonIndex += 1) {
+      const left = nodes[index];
+      const right = nodes[comparisonIndex];
+      const intersects =
+        left.x < right.x + right.width &&
+        left.x + left.width > right.x &&
+        left.y < right.y + right.height &&
+        left.y + left.height > right.y;
+
+      if (intersects) {
+        overlaps += 1;
+      }
+    }
+  }
+
+  return overlaps;
 }
 
 export function createExportMindmapVariant(

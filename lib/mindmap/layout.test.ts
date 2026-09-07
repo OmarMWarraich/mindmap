@@ -4,6 +4,7 @@ import test from 'node:test';
 import { generateMindmapFromAst } from './from-ast.ts';
 import { validGeneratedMindmapFixture } from './__fixtures__/generatedMindmap.ts';
 import {
+  computeMindmapLayoutMetrics,
   createExportMindmapVariant,
   createMindmapRadialLayoutOptions,
   layoutMindmapWithElk,
@@ -32,6 +33,21 @@ test('layoutMindmapWithElk returns positioned nodes and routed edges', async () 
   assert.equal(result.height > 0, true);
   assert.equal(result.nodes.every((node) => Number.isFinite(node.x) && Number.isFinite(node.y)), true);
   assert.equal(result.edges.every((edge) => edge.points.length >= 2), true);
+});
+
+test('computeMindmapLayoutMetrics exposes the current radial baseline for density and spread', async () => {
+  const result = await layoutMindmapWithElk(validGeneratedMindmapFixture);
+  const metrics = computeMindmapLayoutMetrics(validGeneratedMindmapFixture, result);
+
+  assert.equal(Number.isFinite(metrics.totalEdgeLength), true);
+  assert.equal(Number.isFinite(metrics.meanBranchRadius), true);
+  assert.equal(Number.isFinite(metrics.nodeCoverageRatio), true);
+  assert.equal(Number.isFinite(metrics.branchSpread), true);
+  assert.equal(Number.isFinite(metrics.branchOverlap), true);
+  assert.equal(metrics.totalEdgeLength > 0, true);
+  assert.equal(metrics.meanBranchRadius > 0, true);
+  assert.equal(metrics.nodeCoverageRatio > 0, true);
+  assert.equal(metrics.nodeCoverageRatio < 0.55, true);
 });
 
 test('createExportMindmapVariant scales node boxes and spacing for export layout', () => {
